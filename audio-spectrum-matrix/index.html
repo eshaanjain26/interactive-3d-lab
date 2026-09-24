@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cyberpunk Audio Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #05030c;
+    --panel: rgba(12, 7, 26, 0.8);
+    --panel-border: rgba(255, 43, 214, 0.2);
+    --text: #eef1ff;
+    --muted: #9a93c0;
+    --faint: #5f5884;
+    --magenta: #ff2bd6;
+    --violet: #8a5cff;
+    --cyan: #19f0ff;
+    --btn: rgba(255, 255, 255, 0.05);
+    --btn-hover: rgba(255, 255, 255, 0.1);
+    --radius: 12px;
+    --display: "Chakra Petch", Inter, system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 13px; }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; outline: none; }
+  #stage::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px);
+    mix-blend-mode: multiply; }
+
+  .panel { position: fixed; background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(25, 240, 255, 0.04); z-index: 5; }
+  #hud { top: 16px; left: 16px; width: 286px; padding: 14px; }
+
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .brand .logo { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; flex: none;
+    background: linear-gradient(135deg, var(--magenta), var(--cyan)); color: #0a0318;
+    box-shadow: 0 0 18px rgba(255, 43, 214, 0.45); }
+  .brand h1 { font-family: var(--display); font-size: 15px; margin: 0; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+  .brand p { margin: 1px 0 0; color: var(--muted); font-size: 11px; font-family: var(--mono); }
+
+  h2 { font-family: var(--display); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--muted);
+    margin: 14px 0 8px; font-weight: 600; }
+
+  button { font: inherit; color: var(--text); background: var(--btn); border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px; padding: 8px 10px; cursor: pointer; transition: background .15s, border-color .15s, box-shadow .15s; }
+  button:hover { background: var(--btn-hover); border-color: rgba(25, 240, 255, 0.4); }
+  button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+  .seg { display: grid; grid-template-columns: 1.25fr 1fr 0.8fr; gap: 4px; }
+  .seg button { padding: 8px 4px; font-size: 11.5px; font-weight: 500; }
+  .seg button[aria-pressed="true"] { border-color: var(--magenta); background: rgba(255, 43, 214, 0.14);
+    box-shadow: 0 0 14px rgba(255, 43, 214, 0.25), inset 0 0 10px rgba(255, 43, 214, 0.12); }
+
+  .row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  #playBtn { width: 76px; flex: none; font-size: 12px; }
+  #status { flex: 1; min-width: 0; font-family: var(--mono); font-size: 11px; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 7px; }
+  #status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: none; }
+  #status.live { color: var(--cyan); }
+  #status.live::before { background: var(--cyan); box-shadow: 0 0 10px var(--cyan); animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0.25; } }
+
+  .meter { display: grid; grid-template-columns: 58px 1fr 34px; align-items: center; gap: 8px; margin: 6px 0; }
+  .meter .lbl { font-size: 11.5px; color: var(--text); line-height: 1.15; }
+  .meter .lbl small { display: block; color: var(--faint); font-family: var(--mono); font-size: 9.5px; }
+  .meter .bar { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.05); overflow: hidden; }
+  .meter .bar i { display: block; height: 100%; width: 100%; transform-origin: left; transform: scaleX(0);
+    background: var(--c); box-shadow: 0 0 10px var(--c); }
+  .meter .val { font-family: var(--mono); font-size: 11px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .readout { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
+  .readout div { background: rgba(255, 255, 255, 0.035); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 6px 9px; }
+  .readout .k { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; }
+  .readout .v { font-family: var(--mono); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 1px; }
+
+  #hint { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); color: var(--muted); font-size: 11px;
+    font-family: var(--mono); background: rgba(5, 3, 12, 0.6); padding: 6px 12px; border-radius: 99px;
+    border: 1px solid rgba(255, 255, 255, 0.06); pointer-events: none; white-space: nowrap; z-index: 4; }
+
+  #overlay { position: fixed; inset: 0; display: grid; place-items: center; z-index: 20; padding: 16px;
+    background: radial-gradient(ellipse at center, rgba(5, 3, 12, 0.45), rgba(5, 3, 12, 0.85)); }
+  #overlay.hidden { display: none; }
+  .card { width: min(440px, 100%); padding: 26px 24px 22px; text-align: center; position: static; }
+  .card h2 { font-size: 22px; letter-spacing: 0.06em; color: var(--text); margin: 0 0 10px; font-weight: 700; }
+  .card h2 span { background: linear-gradient(90deg, var(--magenta), var(--cyan)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .card p { color: var(--muted); line-height: 1.55; margin: 0 0 18px; font-size: 13px; }
+  .card .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .card .actions button { padding: 12px 10px; font-weight: 600; font-size: 13px; }
+  .card .primary { background: linear-gradient(135deg, rgba(255, 43, 214, 0.3), rgba(138, 92, 255, 0.3));
+    border-color: rgba(255, 43, 214, 0.6); box-shadow: 0 0 20px rgba(255, 43, 214, 0.3); }
+  .card .primary:hover { background: linear-gradient(135deg, rgba(255, 43, 214, 0.45), rgba(138, 92, 255, 0.45)); }
+  .card small { display: block; margin-top: 14px; color: var(--faint); font-size: 11px; font-family: var(--mono); }
+
+  #toast { position: fixed; left: 50%; bottom: 52px; transform: translate(-50%, 12px); opacity: 0; z-index: 30;
+    background: rgba(40, 8, 36, 0.92); border: 1px solid rgba(255, 43, 214, 0.5); color: #ffd6f6; padding: 9px 14px;
+    border-radius: 9px; font-size: 12px; max-width: calc(100vw - 32px); transition: opacity .2s, transform .2s; pointer-events: none; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  #drop { position: fixed; inset: 12px; border: 2px dashed var(--cyan); border-radius: 16px; z-index: 40; display: none;
+    place-items: center; background: rgba(5, 3, 12, 0.7); font-family: var(--display); font-size: 22px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--cyan); pointer-events: none; }
+  #drop.on { display: grid; }
+
+  body .lil-gui {
+    --background-color: rgba(12, 7, 26, 0.88);
+    --title-background-color: rgba(255, 43, 214, 0.12);
+    --title-text-color: var(--text);
+    --text-color: #d9d6f2;
+    --widget-color: rgba(255, 255, 255, 0.08);
+    --hover-color: rgba(255, 255, 255, 0.14);
+    --focus-color: rgba(25, 240, 255, 0.22);
+    --number-color: var(--cyan);
+    --string-color: var(--magenta);
+    --font-family: Inter, system-ui, sans-serif;
+    --font-family-mono: var(--mono);
+    --font-size: 11.5px;
+    --widget-height: 22px;
+    --padding: 6px;
+  }
+  body .lil-gui.root { border: 1px solid var(--panel-border); border-radius: var(--radius); overflow: hidden;
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); }
+  body .lil-gui.root > .title { font-family: var(--display); letter-spacing: 0.12em; text-transform: uppercase; font-size: 11px; }
+  body .lil-gui.autoPlace { top: 16px; right: 16px; max-height: calc(100% - 32px); max-width: calc(100vw - 24px); }
+
+  @media (max-width: 760px) {
+    #hud { top: auto; bottom: 12px; left: 12px; right: 12px; width: auto; padding: 12px; }
+    #hud .brand p, #hud .readout { display: none; }
+    #hint { display: none; }
+    body .lil-gui.autoPlace { top: 12px; right: 12px; }
+    #toast { bottom: auto; top: 60px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+
+<div id="stage" aria-label="3D audio terrain"></div>
+
+<aside class="panel" id="hud">
+  <div class="brand">
+    <div class="logo" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor"><rect x="1" y="7" width="2.4" height="4" rx="1"/><rect x="4.6" y="4" width="2.4" height="10" rx="1"/><rect x="8.2" y="1" width="2.4" height="16" rx="1"/><rect x="11.8" y="5" width="2.4" height="8" rx="1"/><rect x="15.2" y="7.5" width="2" height="3" rx="1"/></svg>
+    </div>
+    <div>
+      <h1>Audio Spectrum Matrix</h1>
+      <p>Web Audio FFT to 3D terrain</p>
+    </div>
+  </div>
+
+  <h2>Audio source</h2>
+  <div class="seg" id="sourceSeg">
+    <button type="button" data-src="synth" aria-pressed="false">Synthetic Pulse</button>
+    <button type="button" data-src="mic" aria-pressed="false">Microphone</button>
+    <button type="button" data-src="file" aria-pressed="false">File</button>
+  </div>
+  <div class="row">
+    <button type="button" id="playBtn" disabled>Pause</button>
+    <span id="status">Idle</span>
+  </div>
+
+  <h2>Frequency bands</h2>
+  <div class="meter" style="--c: var(--magenta)"><span class="lbl">Low<small>20-250 Hz</small></span><div class="bar"><i id="mLow"></i></div><span class="val" id="vLow">0</span></div>
+  <div class="meter" style="--c: var(--violet)"><span class="lbl">Mid<small>0.25-2 kHz</small></span><div class="bar"><i id="mMid"></i></div><span class="val" id="vMid">0</span></div>
+  <div class="meter" style="--c: var(--cyan)"><span class="lbl">High<small>2-14 kHz</small></span><div class="bar"><i id="mHigh"></i></div><span class="val" id="vHigh">0</span></div>
+
+  <div class="readout">
+    <div><div class="k">Peak</div><div class="v" id="peakHz">--</div></div>
+    <div><div class="k">Energy</div><div class="v" id="energy">0%</div></div>
+  </div>
+</aside>
+
+<div id="overlay">
+  <div class="panel card" role="dialog" aria-labelledby="ovTitle">
+    <h2 id="ovTitle"><span>Audio Spectrum Matrix</span></h2>
+    <p>Sound shapes the grid in real time. Bass raises the center ridges, highs light up the outer edges, and each frame of the spectrum rolls toward you across the terrain.</p>
+    <div class="actions">
+      <button type="button" class="primary" data-start="synth">Start Synthetic Pulse</button>
+      <button type="button" data-start="mic">Use microphone</button>
+    </div>
+    <small>Or drop an audio file anywhere on the page</small>
+  </div>
+</div>
+
+<div id="hint">Drag to orbit · scroll to zoom · space to pause · drop an audio file</div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="drop">Drop to play</div>
+<input type="file" id="fileInput" accept="audio/*" hidden>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.19.2/dist/lil-gui.esm.min.js"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import GUI from 'lil-gui';
+
+/* =====================================================================
+   Parameters
+   ===================================================================== */
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const params = {
+  wireColor: '#ff2bd6',
+  peakColor: '#19f0ff',
+  heightScale: 5,
+  waveSpeed: 1,
+  resolution: 128,
+  bandColorShift: 0.6,
+  glow: 0.9,
+  cameraShake: reducedMotion ? 0 : 0.6,
+  parallax: reducedMotion ? 0.2 : 0.8,
+  autoRotate: false,
+  volume: 0.8,
+  sensitivity: 1,
+  smoothing: 0.72,
+  tempo: 118,
+};
+
+const TERRAIN_SIZE = 40;
+const SPEC_W = 256;           // log-spaced frequency columns
+const SPEC_H = 128;           // rows of spectrum history
+const ROWS_PER_SEC = 40;      // history scroll rate at waveSpeed = 1
+const F_MIN = 32, F_MAX = 15000;
+
+const BAND_COLORS = {
+  low: new THREE.Color('#ff2bd6'),
+  mid: new THREE.Color('#8a5cff'),
+  high: new THREE.Color('#19f0ff'),
+};
+
+/* =====================================================================
+   Audio engine
+   ===================================================================== */
+const audio = {
+  ctx: null, bus: null, monitor: null, sens: null, analyser: null,
+  freq: null, mode: 'none',
+  micStream: null, micNode: null,
+  fileBuffer: null, fileName: '', fileNode: null,
+  colB0: new Float32Array(SPEC_W), colB1: new Float32Array(SPEC_W),
+};
+let switchToken = 0;
+
+function initAudio() {
+  if (audio.ctx) return;
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  audio.ctx = ctx;
+
+  // bus -> monitor -> speakers (muted for mic to avoid feedback)
+  // bus -> sens -> analyser -> silent sink -> speakers (keeps the analyser pulled by the graph)
+  audio.bus = ctx.createGain();
+  audio.monitor = ctx.createGain();
+  audio.sens = ctx.createGain();
+  audio.analyser = ctx.createAnalyser();
+  audio.analyser.fftSize = 2048;
+  audio.analyser.minDecibels = -88;
+  audio.analyser.maxDecibels = -18;
+  audio.analyser.smoothingTimeConstant = params.smoothing;
+  const sink = ctx.createGain();
+  sink.gain.value = 0;
+
+  audio.bus.connect(audio.monitor).connect(ctx.destination);
+  audio.bus.connect(audio.sens).connect(audio.analyser).connect(sink).connect(ctx.destination);
+  audio.freq = new Uint8Array(audio.analyser.frequencyBinCount);
+
+  const binHz = ctx.sampleRate / audio.analyser.fftSize;
+  for (let c = 0; c < SPEC_W; c++) {
+    audio.colB0[c] = F_MIN * Math.pow(F_MAX / F_MIN, c / SPEC_W) / binHz;
+    audio.colB1[c] = F_MIN * Math.pow(F_MAX / F_MIN, (c + 1) / SPEC_W) / binHz;
+  }
+
+  synth.init(ctx, audio.bus);
+  applyGains();
+}
+
+function applyGains() {
+  if (!audio.ctx) return;
+  const t = audio.ctx.currentTime;
+  audio.monitor.gain.setTargetAtTime(audio.mode === 'mic' ? 0 : params.volume, t, 0.03);
+  // Raw mic input sits well below line level once browser AGC is off.
+  audio.sens.gain.setTargetAtTime(params.sensitivity * (audio.mode === 'mic' ? 3 : 1), t, 0.03);
+}
+
+function stopCurrent() {
+  synth.stop();
+  if (audio.fileNode) { try { audio.fileNode.stop(); } catch (e) {} audio.fileNode.disconnect(); audio.fileNode = null; }
+  if (audio.micNode) { audio.micNode.disconnect(); audio.micNode = null; }
+  if (audio.micStream) { audio.micStream.getTracks().forEach(t => t.stop()); audio.micStream = null; }
+}
+
+async function setSource(mode) {
+  initAudio();
+  if (mode === 'file' && !audio.fileBuffer) { fileInput.click(); return false; }
+  const token = ++switchToken;
+
+  if (mode === 'mic') {
+    let stream;
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error('unsupported');
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      });
+    } catch (err) {
+      if (token !== switchToken) return false;
+      toast(err.message === 'unsupported'
+        ? 'This browser does not expose a microphone here. Playing Synthetic Pulse instead.'
+        : 'Microphone access was blocked. Playing Synthetic Pulse instead.');
+      return setSource('synth');
+    }
+    if (token !== switchToken) { stream.getTracks().forEach(t => t.stop()); return false; }
+    stopCurrent();
+    audio.micStream = stream;
+    audio.micNode = audio.ctx.createMediaStreamSource(stream);
+    audio.micNode.connect(audio.bus);
+  } else {
+    stopCurrent();
+    if (mode === 'synth') synth.start();
+    if (mode === 'file') {
+      const src = audio.ctx.createBufferSource();
+      src.buffer = audio.fileBuffer;
+      src.loop = true;
+      src.connect(audio.bus);
+      src.start();
+      audio.fileNode = src;
+    }
+  }
+
+  audio.mode = mode;
+  applyGains();
+  await audio.ctx.resume();
+  hideOverlay();
+  updateSourceUI();
+  return true;
+}
+
+async function loadFile(file) {
+  if (!file) return;
+  if (!file.type.startsWith('audio/') && !/\.(mp3|wav|ogg|oga|flac|m4a|aac|webm)$/i.test(file.name)) {
+    toast('That file is not audio. Try an MP3, WAV, OGG, FLAC, or M4A.');
+    return;
+  }
+  initAudio();
+  try {
+    const buf = await audio.ctx.decodeAudioData(await file.arrayBuffer());
+    audio.fileBuffer = buf;
+    audio.fileName = file.name;
+    await setSource('file');
+  } catch (err) {
+    toast('Could not decode that file in this browser.');
+  }
+}
+
+async function togglePause() {
+  if (!audio.ctx || audio.mode === 'none') return;
+  if (audio.ctx.state === 'running') await audio.ctx.suspend();
+  else await audio.ctx.resume();
+  updateSourceUI();
+}
+
+/* =====================================================================
+   Synthetic Pulse: a 4-bar synthwave loop built from oscillators
+   ===================================================================== */
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+const PROGRESSION = [
+  { root: 45, third: 3 },   // A minor
+  { root: 41, third: 4 },   // F major
+  { root: 48, third: 4 },   // C major
+  { root: 43, third: 4 },   // G major
+];
+const ARP_ORDER = [0, 2, 1, 3];
+
+const synth = {
+  ctx: null, out: null, duck: null, delay: null, delaySend: null, noise: null,
+  running: false, step: 0, nextTime: 0, timer: 0,
+
+  init(ctx, dest) {
+    this.ctx = ctx;
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -14; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.2;
+    this.out = ctx.createGain();
+    this.out.gain.value = 0.85;
+    this.out.connect(comp).connect(dest);
+
+    this.duck = ctx.createGain();
+    this.duck.connect(this.out);
+
+    this.delay = ctx.createDelay(1.5);
+    this.delay.delayTime.value = this.delayTime();
+    const fb = ctx.createGain(); fb.gain.value = 0.38;
+    const tone = ctx.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 3200;
+    this.delaySend = ctx.createGain(); this.delaySend.gain.value = 0.32;
+    this.delaySend.connect(this.delay);
+    this.delay.connect(tone).connect(fb).connect(this.delay);
+    tone.connect(this.out);
+
+    const len = ctx.sampleRate;
+    this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = this.noise.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  },
+
+  delayTime() { return (60 / params.tempo) * 0.75; },
+  setTempo() { if (this.ctx) this.delay.delayTime.setTargetAtTime(this.delayTime(), this.ctx.currentTime, 0.05); },
+
+  start() {
+    if (this.running) return;
+    this.running = true;
+    this.step = 0;
+    this.nextTime = this.ctx.currentTime + 0.06;
+    this.tick();
+  },
+  stop() { this.running = false; clearTimeout(this.timer); },
+
+  tick() {
+    if (!this.running) return;
+    const spb = 60 / params.tempo / 4;
+    // Clock can jump after a long background throttle; skip the missed steps instead of firing them all at once.
+    if (this.nextTime < this.ctx.currentTime - 0.2) this.nextTime = this.ctx.currentTime + 0.02;
+    while (this.nextTime < this.ctx.currentTime + 0.12) {
+      this.playStep(this.step, this.nextTime, spb);
+      this.nextTime += spb;
+      this.step = (this.step + 1) % 64;
+    }
+    this.timer = setTimeout(() => this.tick(), 25);
+  },
+
+  playStep(step, t, spb) {
+    const s = step % 16;
+    const chord = PROGRESSION[Math.floor(step / 16)];
+    const tones = [0, chord.third, 7, 12];
+
+    if (s % 4 === 0) this.kick(t);
+    if (s === 4 || s === 12) this.snare(t);
+    if (s === 14) this.hat(t, 0.1, 0.22);
+    else this.hat(t, s % 4 === 2 ? 0.09 : 0.035, 0.045);
+
+    if (s % 4 !== 0) this.pluck(mtof(chord.root - 12 + (s % 4 === 3 ? 12 : 0)), t, spb * 0.9, 0.2, 'sawtooth', 820, false);
+    const arpNote = chord.root + 24 + tones[ARP_ORDER[s % 4]] + (s >= 8 ? 12 : 0);
+    if (s % 2 === 0) this.pluck(mtof(arpNote), t, spb * 1.6, 0.055, 'square', 3400, true);
+    if (s === 0) this.pad([chord.root + 12, chord.root + 12 + chord.third, chord.root + 19], t, spb * 16);
+  },
+
+  kick(t) {
+    const { ctx } = this;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.setValueAtTime(165, t);
+    o.frequency.exponentialRampToValueAtTime(44, t + 0.13);
+    g.gain.setValueAtTime(1, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+    o.connect(g).connect(this.out);
+    o.start(t); o.stop(t + 0.5);
+    this.duck.gain.setValueAtTime(0.3, t);
+    this.duck.gain.setTargetAtTime(1, t + 0.02, 0.09);
+  },
+
+  noiseHit(t, type, freq, q, gain, dur) {
+    const { ctx } = this;
+    const src = ctx.createBufferSource(); src.buffer = this.noise;
+    const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(f).connect(g).connect(this.out);
+    src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
+  },
+
+  snare(t) {
+    this.noiseHit(t, 'bandpass', 1900, 0.7, 0.55, 0.2);
+    const { ctx } = this;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'triangle'; o.frequency.setValueAtTime(200, t); o.frequency.exponentialRampToValueAtTime(140, t + 0.08);
+    g.gain.setValueAtTime(0.28, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    o.connect(g).connect(this.out);
+    o.start(t); o.stop(t + 0.15);
+  },
+
+  hat(t, gain, dur) { this.noiseHit(t, 'highpass', 7200, 0.5, gain, dur); },
+
+  pluck(freq, t, dur, gain, type, cutoff, send) {
+    const { ctx } = this;
+    const o = ctx.createOscillator(); o.type = type; o.frequency.value = freq;
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 6;
+    f.frequency.setValueAtTime(cutoff, t);
+    f.frequency.exponentialRampToValueAtTime(cutoff * 0.22, t + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(f).connect(g).connect(this.duck);
+    if (send) g.connect(this.delaySend);
+    o.start(t); o.stop(t + dur + 0.02);
+  },
+
+  pad(notes, t, dur) {
+    const { ctx } = this;
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 2;
+    f.frequency.setValueAtTime(500, t);
+    f.frequency.linearRampToValueAtTime(1600, t + dur * 0.5);
+    f.frequency.linearRampToValueAtTime(700, t + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.05, t + 0.35);
+    g.gain.setValueAtTime(0.05, t + dur - 0.3);
+    g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.1);
+    f.connect(g).connect(this.duck);
+    for (const n of notes) {
+      for (const detune of [-8, 8]) {
+        const o = ctx.createOscillator(); o.type = 'sawtooth';
+        o.frequency.value = mtof(n); o.detune.value = detune;
+        o.connect(f); o.start(t); o.stop(t + dur + 0.15);
+      }
+    }
+  },
+};
+
+/* =====================================================================
+   Spectrum analysis: log-spaced columns + band energies
+   ===================================================================== */
+const specData = new Uint8Array(SPEC_W * SPEC_H);
+const specTex = new THREE.DataTexture(specData, SPEC_W, SPEC_H, THREE.RedFormat, THREE.UnsignedByteType);
+specTex.minFilter = specTex.magFilter = THREE.LinearFilter;
+specTex.wrapS = THREE.ClampToEdgeWrapping;
+specTex.wrapT = THREE.RepeatWrapping;
+specTex.needsUpdate = true;
+
+const colBuf = new Uint8Array(SPEC_W);
+let head = 0, rowAcc = 0;
+const bands = { low: 0, mid: 0, high: 0, lowFast: 0, lowSlow: 0, peakHz: 0 };
+
+function readColumns() {
+  const f = audio.freq, n = f.length;
+  for (let c = 0; c < SPEC_W; c++) {
+    const b0 = audio.colB0[c], b1 = audio.colB1[c];
+    let v;
+    if (b1 - b0 < 1) {
+      // Several low columns share one FFT bin, so interpolate to avoid flat steps in the bass.
+      const bc = (b0 + b1) * 0.5, i = Math.floor(bc), t = bc - i;
+      v = f[Math.min(i, n - 1)] * (1 - t) + f[Math.min(i + 1, n - 1)] * t;
+    } else {
+      v = 0;
+      const end = Math.min(Math.ceil(b1), n - 1);
+      for (let i = Math.floor(b0); i <= end; i++) if (f[i] > v) v = f[i];
+    }
+    v = (v / 255 - 0.06) / 0.94;
+    v = Math.max(0, v) * (0.8 + 0.5 * c / SPEC_W);   // spectra fall off with frequency; lift the highs
+    colBuf[c] = Math.min(255, v * 255);
+  }
+}
+
+function readBands(dt) {
+  const f = audio.freq, n = f.length;
+  const binHz = audio.ctx.sampleRate / audio.analyser.fftSize;
+  const range = (lo, hi) => {
+    const a = Math.max(1, Math.floor(lo / binHz)), b = Math.min(n - 1, Math.ceil(hi / binHz));
+    let s = 0;
+    for (let i = a; i <= b; i++) s += f[i];
+    return s / ((b - a + 1) * 255);
+  };
+  const low = Math.min(1, range(20, 250) * 1.15);
+  const mid = Math.min(1, range(250, 2000) * 1.5);
+  const high = Math.min(1, range(2000, 14000) * 2.4);
+
+  let peak = 0, peakI = 0;
+  const start = Math.ceil(40 / binHz);
+  for (let i = start; i < n; i++) if (f[i] > peak) { peak = f[i]; peakI = i; }
+  bands.peakHz = peak > 40 ? peakI * binHz : 0;
+
+  const k = 1 - Math.exp(-dt * 12);
+  bands.low += (low - bands.low) * k;
+  bands.mid += (mid - bands.mid) * k;
+  bands.high += (high - bands.high) * k;
+  bands.lowFast += (low - bands.lowFast) * (1 - Math.exp(-dt * 25));
+  bands.lowSlow += (low - bands.lowSlow) * (1 - Math.exp(-dt * 2.5));
+}
+
+function decayBands(dt) {
+  const k = Math.exp(-dt * 4);
+  bands.low *= k; bands.mid *= k; bands.high *= k; bands.lowFast *= k; bands.lowSlow *= k;
+}
+
+function updateSpectrum(dt) {
+  audio.analyser.getByteFrequencyData(audio.freq);
+  readColumns();
+  readBands(dt);
+
+  rowAcc += dt * ROWS_PER_SEC * params.waveSpeed;
+  while (rowAcc >= 1) {
+    rowAcc -= 1;
+    head = (head + 1) % SPEC_H;
+    specData.set(colBuf, head * SPEC_W);   // fill every row we step over so none keep stale data
+  }
+  // The newest row tracks the live spectrum every frame, so the far edge reacts without waiting for a scroll step.
+  specData.set(colBuf, head * SPEC_W);
+  specTex.needsUpdate = true;
+}
+
+/* =====================================================================
+   Renderer, scene, camera
+   ===================================================================== */
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+stage.appendChild(renderer.domElement);
+
+const BG = new THREE.Color('#05030c');
+const scene = new THREE.Scene();
+scene.background = BG;
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 400);
+camera.position.set(0, 9.5, 25);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.5, -3);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.minDistance = 8;
+controls.maxDistance = 75;
+controls.maxPolarAngle = 1.48;
+controls.autoRotateSpeed = 0.6;
+controls.update();
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), params.glow, 0.45, 0.22);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+/* =====================================================================
+   Terrain: one displacement shader shared by the fill mesh and the neon grid
+   ===================================================================== */
+const terrainVertex = /* glsl */`
+  uniform sampler2D uSpec;
+  uniform float uHead, uRows, uScale, uTime, uIdle;
+  varying float vH;
+  varying float vDist;
+  varying vec2 vUv;
+
+  float spectrumAt(vec2 uv) {
+    float fx = abs(uv.x * 2.0 - 1.0);                          // center = bass, edges = treble
+    float row = uHead - ((1.0 - uv.y) * (uRows - 2.0) + 1.0);  // far edge = newest row
+    return texture2D(uSpec, vec2(0.002 + fx * 0.996, (row + 0.5) / uRows)).r;
+  }
+
+  void main() {
+    vUv = uv;
+    vec3 p = position;
+    float h = pow(spectrumAt(uv), 2.0) * uScale;
+    float idle = (sin(p.x * 0.35 + uTime * 0.9) + sin(p.z * 0.3 - uTime * 1.3)) * 0.18 * uIdle;
+    h = (h + idle) * smoothstep(0.0, 0.08, uv.y);
+    p.y += h;
+    vH = h;
+    vec4 mv = modelViewMatrix * vec4(p, 1.0);
+    vDist = -mv.z;
+    gl_Position = projectionMatrix * mv;
+  }
+`;
+
+const sharedUniforms = {
+  uSpec: { value: specTex },
+  uHead: { value: 0 },
+  uRows: { value: SPEC_H },
+  uScale: { value: params.heightScale },
+  uTime: { value: 0 },
+  uIdle: { value: 1 },
+  uBg: { value: BG.clone() },
+  uFogNear: { value: 28 },
+  uFogFar: { value: 78 },
+  uWire: { value: new THREE.Color(params.wireColor) },
+  uPeak: { value: new THREE.Color(params.peakColor) },
+  uTint: { value: new THREE.Color('#ff2bd6') },
+  uShift: { value: 0 },
+  uEnergy: { value: 0 },
+};
+
+const wireMat = new THREE.ShaderMaterial({
+  uniforms: sharedUniforms,
+  vertexShader: terrainVertex,
+  fragmentShader: /* glsl */`
+    uniform vec3 uWire, uPeak, uTint;
+    uniform float uScale, uShift, uEnergy, uFogNear, uFogFar;
+    varying float vH;
+    varying float vDist;
+    void main() {
+      float k = clamp(vH / max(uScale, 0.001), 0.0, 1.0);
+      vec3 col = mix(uWire, uPeak, smoothstep(0.08, 0.75, k));
+      col = mix(col, uTint, uShift * 0.6);
+      col *= 0.32 + 0.95 * k + 0.25 * uEnergy;
+      float fog = smoothstep(uFogNear, uFogFar, vDist);
+      gl_FragColor = vec4(col, 1.0 - fog);
+    }
+  `,
+  transparent: true,
+  depthWrite: false,
+});
+
+const fillMat = new THREE.ShaderMaterial({
+  uniforms: sharedUniforms,
+  vertexShader: terrainVertex,
+  fragmentShader: /* glsl */`
+    uniform vec3 uWire, uTint, uBg;
+    uniform float uScale, uEnergy, uFogNear, uFogFar;
+    varying float vH;
+    varying float vDist;
+    void main() {
+      float k = clamp(vH / max(uScale, 0.001), 0.0, 1.0);
+      vec3 col = vec3(0.012, 0.005, 0.03) + uWire * 0.07 * k + uTint * 0.03 * uEnergy;
+      col = mix(col, uBg, smoothstep(uFogNear, uFogFar, vDist));
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `,
+  polygonOffset: true,
+  polygonOffsetFactor: 1,
+  polygonOffsetUnits: 1,
+});
+
+const terrain = new THREE.Group();
+scene.add(terrain);
+let fillMesh = null, gridLines = null;
+
+function buildTerrain(res) {
+  if (fillMesh) { terrain.remove(fillMesh, gridLines); fillMesh.geometry.dispose(); gridLines.geometry.dispose(); }
+  const plane = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, res, res);
+  plane.rotateX(-Math.PI / 2);
+
+  // Grid lines reuse the plane's vertices but index only rows and columns, so no triangle diagonals show.
+  const lines = new THREE.BufferGeometry();
+  lines.setAttribute('position', plane.getAttribute('position'));
+  lines.setAttribute('uv', plane.getAttribute('uv'));
+  const n = res + 1, idx = [];
+  for (let j = 0; j < n; j++) for (let i = 0; i < res; i++) idx.push(j * n + i, j * n + i + 1);
+  for (let i = 0; i < n; i++) for (let j = 0; j < res; j++) idx.push(j * n + i, (j + 1) * n + i);
+  lines.setIndex(idx);
+
+  fillMesh = new THREE.Mesh(plane, fillMat);
+  gridLines = new THREE.LineSegments(lines, wireMat);
+  fillMesh.frustumCulled = gridLines.frustumCulled = false;   // vertices move in the shader
+  gridLines.renderOrder = 1;
+  terrain.add(fillMesh, gridLines);
+}
+buildTerrain(params.resolution);
+
+/* ---- floor grid, sun, stars ---- */
+const floor = new THREE.GridHelper(260, 130, 0x19f0ff, 0x19f0ff);
+floor.material.transparent = true;
+floor.material.opacity = 0.07;
+floor.material.depthWrite = false;
+floor.position.y = -0.3;
+scene.add(floor);
+
+const sunMat = new THREE.ShaderMaterial({
+  uniforms: {
+    uTime: { value: 0 },
+    uPulse: { value: 0 },
+    uTop: { value: new THREE.Color('#ffd23f') },
+    uBot: { value: new THREE.Color('#ff2bd6') },
+  },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: /* glsl */`
+    uniform float uTime, uPulse;
+    uniform vec3 uTop, uBot;
+    varying vec2 vUv;
+    void main() {
+      vec2 p = vUv * 2.0 - 1.0;
+      float r = length(p);
+      if (r > 1.0) discard;
+      float y = vUv.y;
+      if (y < 0.5 && fract(y * 13.0 + uTime * 0.25) < (0.5 - y) * 1.1) discard;
+      vec3 col = mix(uBot, uTop, smoothstep(0.1, 0.95, y)) * (0.26 + 0.14 * uPulse);
+      gl_FragColor = vec4(col, smoothstep(1.0, 0.97, r));
+    }
+  `,
+  transparent: true,
+  depthWrite: false,
+});
+const sun = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), sunMat);
+sun.position.set(0, 8, -52);
+sun.scale.setScalar(30);
+sun.renderOrder = -1;
+scene.add(sun);
+
+{
+  const N = 1400, pos = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    const th = Math.random() * Math.PI * 2, ph = Math.random() * 1.25, r = 150 + Math.random() * 60;
+    pos[i * 3] = r * Math.sin(ph) * Math.cos(th);
+    pos[i * 3 + 1] = r * Math.cos(ph) + 6;
+    pos[i * 3 + 2] = r * Math.sin(ph) * Math.sin(th);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({
+    color: 0xb9c2ff, size: 1.4, sizeAttenuation: false, transparent: true, opacity: 0.6, depthWrite: false,
+  })));
+}
+
+/* =====================================================================
+   Controls: lil-gui
+   ===================================================================== */
+const gui = new GUI({ title: 'Matrix controls', width: 270 });
+
+const fv = gui.addFolder('Terrain');
+fv.addColor(params, 'wireColor').name('Wireframe color').onChange(v => sharedUniforms.uWire.value.set(v));
+fv.addColor(params, 'peakColor').name('Peak color').onChange(v => sharedUniforms.uPeak.value.set(v));
+fv.add(params, 'heightScale', 0.5, 12, 0.1).name('Height scale');
+fv.add(params, 'waveSpeed', 0.1, 3, 0.05).name('Wave speed');
+fv.add(params, 'resolution', [32, 64, 96, 128, 192, 256]).name('Grid resolution').onChange(v => buildTerrain(Number(v)));
+fv.add(params, 'bandColorShift', 0, 1, 0.01).name('Band color shift');
+fv.add(params, 'glow', 0, 2.5, 0.05).name('Neon glow');
+
+const fc = gui.addFolder('Camera');
+fc.add(params, 'cameraShake', 0, 1.5, 0.05).name('Bass shake');
+fc.add(params, 'parallax', 0, 2, 0.05).name('Mouse parallax');
+fc.add(params, 'autoRotate').name('Auto orbit').onChange(v => { controls.autoRotate = v; });
+
+const fa = gui.addFolder('Audio');
+fa.add(params, 'sensitivity', 0.2, 4, 0.05).name('Input sensitivity').onChange(applyGains);
+fa.add(params, 'volume', 0, 1, 0.01).name('Playback volume').onChange(applyGains);
+fa.add(params, 'smoothing', 0, 0.95, 0.01).name('FFT smoothing').onChange(v => { if (audio.analyser) audio.analyser.smoothingTimeConstant = v; });
+fa.add(params, 'tempo', 80, 160, 1).name('Synth tempo (BPM)').onChange(() => { synth.setTempo(); updateSourceUI(); });
+
+let narrow = innerWidth < 760;
+if (narrow) gui.close();
+
+/* =====================================================================
+   UI wiring
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const fileInput = $('fileInput');
+const overlay = $('overlay');
+const statusEl = $('status');
+const playBtn = $('playBtn');
+const segButtons = [...document.querySelectorAll('#sourceSeg button')];
+const meters = { low: [$('mLow'), $('vLow')], mid: [$('mMid'), $('vMid')], high: [$('mHigh'), $('vHigh')] };
+
+function hideOverlay() { overlay.classList.add('hidden'); }
+
+function updateSourceUI() {
+  segButtons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.src === audio.mode)));
+  const running = audio.ctx?.state === 'running';
+  playBtn.disabled = audio.mode === 'none';
+  playBtn.textContent = running ? 'Pause' : 'Play';
+  const label = {
+    synth: `Synthetic Pulse · ${params.tempo} BPM`,
+    mic: 'Microphone live',
+    file: audio.fileName,
+    none: 'Idle',
+  }[audio.mode];
+  statusEl.textContent = running || audio.mode === 'none' ? label : `Paused · ${label}`;
+  statusEl.title = statusEl.textContent;
+  statusEl.classList.toggle('live', running && audio.mode !== 'none');
+}
+
+let toastTimer = 0;
+function toast(msg) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 4200);
+}
+
+segButtons.forEach(b => b.addEventListener('click', () => setSource(b.dataset.src)));
+document.querySelectorAll('[data-start]').forEach(b => b.addEventListener('click', () => setSource(b.dataset.start)));
+playBtn.addEventListener('click', togglePause);
+fileInput.addEventListener('change', () => { loadFile(fileInput.files[0]); fileInput.value = ''; });
+
+addEventListener('keydown', e => {
+  if (e.code !== 'Space' || (e.target instanceof Element && e.target.closest('button, input, select, .lil-gui'))) return;
+  e.preventDefault();
+  togglePause();
+});
+
+const dropEl = $('drop');
+let dragDepth = 0;
+addEventListener('dragenter', e => { if (e.dataTransfer?.types.includes('Files')) { dragDepth++; dropEl.classList.add('on'); } });
+addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) dropEl.classList.remove('on'); });
+addEventListener('dragover', e => e.preventDefault());
+addEventListener('drop', e => {
+  e.preventDefault();
+  dragDepth = 0;
+  dropEl.classList.remove('on');
+  loadFile(e.dataTransfer?.files?.[0]);
+});
+
+/* ---- pointer parallax ---- */
+const pointer = new THREE.Vector2(), parallax = new THREE.Vector2();
+addEventListener('pointermove', e => {
+  pointer.set((e.clientX / innerWidth) * 2 - 1, -((e.clientY / innerHeight) * 2 - 1));
+});
+document.documentElement.addEventListener('mouseleave', () => pointer.set(0, 0));
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+  bloom.resolution.set(innerWidth, innerHeight);
+  // Collapse only when crossing into phone width; mobile toolbar resizes should not keep closing it.
+  if (innerWidth < 760 && !narrow) gui.close();
+  narrow = innerWidth < 760;
+});
+
+/* =====================================================================
+   Frame loop
+   ===================================================================== */
+const clock = new THREE.Clock();
+const tint = new THREE.Color();
+const tmpColor = new THREE.Color();
+const basePos = new THREE.Vector3(), baseQuat = new THREE.Quaternion();
+const right = new THREE.Vector3(), up = new THREE.Vector3(), offset = new THREE.Vector3();
+let shake = 0, shakeCooldown = 0, hudTimer = 0;
+
+function frame() {
+  const dt = Math.min(clock.getDelta(), 0.1);
+  const t = clock.elapsedTime;
+
+  const live = audio.ctx?.state === 'running' && audio.mode !== 'none';
+  if (live) updateSpectrum(dt); else decayBands(dt);
+
+  const { low, mid, high } = bands;
+  const energy = (low + mid + high) / 3;
+
+  tint.setRGB(0, 0, 0)
+    .add(tmpColor.copy(BAND_COLORS.low).multiplyScalar(low))
+    .add(tmpColor.copy(BAND_COLORS.mid).multiplyScalar(mid))
+    .add(tmpColor.copy(BAND_COLORS.high).multiplyScalar(high))
+    .multiplyScalar(1 / (low + mid + high + 1e-3));
+  sharedUniforms.uTint.value.copy(tint);
+  sharedUniforms.uShift.value = params.bandColorShift * Math.min(1, energy * 2.2);
+  sharedUniforms.uEnergy.value = energy;
+  sharedUniforms.uScale.value = params.heightScale;
+  sharedUniforms.uHead.value = head + rowAcc;
+  sharedUniforms.uTime.value = t * params.waveSpeed;
+
+  sunMat.uniforms.uTime.value = t;
+  sunMat.uniforms.uPulse.value = low;
+  sun.lookAt(camera.position);
+  bloom.strength = params.glow * (0.7 + 0.4 * low);
+
+  // Shake fires on bass transients (fast envelope jumping above the slow one), then decays.
+  shakeCooldown -= dt;
+  if (live && bands.lowFast - bands.lowSlow > 0.07 && shakeCooldown <= 0) { shake = 1; shakeCooldown = 0.15; }
+  shake *= Math.exp(-dt * 9);
+
+  controls.update();
+
+  const k = 1 - Math.exp(-dt * 3);
+  parallax.x += (pointer.x - parallax.x) * k;
+  parallax.y += (pointer.y - parallax.y) * k;
+
+  basePos.copy(camera.position);
+  baseQuat.copy(camera.quaternion);
+  right.set(1, 0, 0).applyQuaternion(camera.quaternion);
+  up.set(0, 1, 0).applyQuaternion(camera.quaternion);
+  const amp = shake * params.cameraShake * 0.45;
+  offset.copy(right).multiplyScalar(parallax.x * 2.2 * params.parallax + (Math.random() - 0.5) * amp)
+    .addScaledVector(up, parallax.y * 1.2 * params.parallax + (Math.random() - 0.5) * amp);
+  camera.position.add(offset);
+  camera.lookAt(controls.target);
+
+  if (innerWidth > 0 && innerHeight > 0) composer.render();
+
+  // Parallax and shake are render-only offsets; OrbitControls keeps owning the real camera pose.
+  camera.position.copy(basePos);
+  camera.quaternion.copy(baseQuat);
+
+  hudTimer -= dt;
+  if (hudTimer <= 0) {
+    hudTimer = 0.06;
+    for (const key of ['low', 'mid', 'high']) {
+      meters[key][0].style.transform = `scaleX(${bands[key].toFixed(3)})`;
+      meters[key][1].textContent = Math.round(bands[key] * 100);
+    }
+    $('peakHz').textContent = live && bands.peakHz
+      ? (bands.peakHz >= 1000 ? `${(bands.peakHz / 1000).toFixed(2)} kHz` : `${Math.round(bands.peakHz)} Hz`)
+      : '--';
+    $('energy').textContent = `${Math.round(energy * 100)}%`;
+  }
+
+  requestAnimationFrame(frame);
+}
+
+updateSourceUI();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
