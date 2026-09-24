@@ -1,12 +1,13 @@
 # Interactive 3D Lab
 
-Eleven interactive Three.js explorers covering chips, AI, anatomy, embryology, energy, space and U.S. immigration law. Each one is a single self-contained HTML file.
+Fourteen interactive Three.js explorers covering chips, quantum computing, AI, robotics, audio, anatomy, embryology, energy, space and U.S. immigration law. Each one is a single self-contained HTML file.
 
 **Live site:** https://eshaanjain26.github.io/interactive-3d-lab/
 
 | Explorer | What it shows |
 |---|---|
 | [Chip Depth Explorer](https://eshaanjain26.github.io/interactive-3d-lab/chip-depth-explorer/) | Continuous zoom from a packaged processor down to an 18 nm FinFET gate, across six scales |
+| [Quantum Qubit Sandbox](https://eshaanjain26.github.io/interactive-3d-lab/quantum-qubit-sandbox/) | Two Bloch spheres with animated H, X, Y, Z, S, T and CNOT gates, live entanglement (concurrence), and measurement collapse |
 | [Attention Lens](https://eshaanjain26.github.io/interactive-3d-lab/attention-lens/) | A transformer block in 3D: embeddings, attention heads, residual stream |
 | [Neural Network Lab](https://eshaanjain26.github.io/interactive-3d-lab/neural-network-lab/) | Signals moving through a feedforward network, editable weights, animated backpropagation |
 | [Q-Learning Grid World](https://eshaanjain26.github.io/interactive-3d-lab/q-learning-grid-world/) | A tabular Q-learning agent trained live, with a Q-table view |
@@ -17,6 +18,8 @@ Eleven interactive Three.js explorers covering chips, AI, anatomy, embryology, e
 | [Fetal Growth Timeline Lab](https://eshaanjain26.github.io/interactive-3d-lab/fetal-growth-timeline/) | Embryo and fetus from week 1 to 40 by day: length and weight, a real-scale comparison object, and organ-system milestones |
 | [EB-1 Adjudication Lab](https://eshaanjain26.github.io/interactive-3d-lab/eb1-adjudication-lab/) | The EB-1A petition in 3D: lifecycle timeline, the ten criteria, USCIS two-step adjudication with outcome simulation, and AAO review |
 | [Heliocentric Orrery](https://eshaanjain26.github.io/interactive-3d-lab/heliocentric-orrery/) | A 3D solar system simulator |
+| [Drone Swarm Boids](https://eshaanjain26.github.io/interactive-3d-lab/drone-swarm-boids/) | Reynolds flocking across up to 600 quadcopters, with click-placed beacons, hazards and obstacles, three camera modes and live swarm telemetry |
+| [Audio Spectrum Matrix](https://eshaanjain26.github.io/interactive-3d-lab/audio-spectrum-matrix/) | A neon wireframe terrain driven by live FFT data from a built-in synth, microphone or audio file |
 
 ## Run locally
 
