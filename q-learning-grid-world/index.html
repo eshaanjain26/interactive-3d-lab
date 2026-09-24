@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Q-Learning Grid World</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #070b14;
+    --panel: rgba(13, 19, 32, 0.82);
+    --panel-border: rgba(120, 150, 210, 0.16);
+    --text: #e6ecf7;
+    --muted: #8a97b0;
+    --faint: #56627a;
+    --accent: #38d6ff;
+    --accent-2: #7c5cff;
+    --good: #2ee68a;
+    --bad: #ff4d5e;
+    --gold: #ffc53d;
+    --amber: #ffb547;
+    --btn: rgba(255, 255, 255, 0.06);
+    --btn-hover: rgba(255, 255, 255, 0.11);
+    --radius: 12px;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 13px; }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; outline: none; }
+
+  .panel { position: fixed; top: 16px; background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: var(--radius); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); padding: 14px; max-height: calc(100vh - 32px); overflow-y: auto;
+    scrollbar-width: thin; scrollbar-color: #2a3550 transparent; }
+  #controls { left: 16px; width: 280px; }
+  #metrics { right: 16px; width: 320px; }
+
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .brand .logo { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2)); font-weight: 700; color: #061019; font-size: 13px; }
+  .brand h1 { font-size: 14px; margin: 0; font-weight: 700; letter-spacing: 0.01em; }
+  .brand p { margin: 1px 0 0; color: var(--muted); font-size: 11px; }
+
+  h2 { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted);
+    margin: 16px 0 8px; font-weight: 600; }
+  h2:first-of-type { margin-top: 4px; }
+
+  .row { display: flex; gap: 6px; }
+  .row > * { flex: 1; }
+  button { font: inherit; color: var(--text); background: var(--btn); border: 1px solid var(--panel-border);
+    border-radius: 8px; padding: 8px 10px; cursor: pointer; transition: background .15s, border-color .15s, opacity .15s;
+    white-space: nowrap; }
+  button:hover:not(:disabled) { background: var(--btn-hover); border-color: rgba(140, 170, 230, 0.32); }
+  button:disabled { opacity: 0.38; cursor: not-allowed; }
+  button.primary { background: linear-gradient(135deg, #1fb8e6, #6a4cf0); border-color: transparent; font-weight: 600; color: #fff; }
+  button.primary:hover:not(:disabled) { filter: brightness(1.1); background: linear-gradient(135deg, #1fb8e6, #6a4cf0); }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .mt { margin-top: 6px; }
+
+  .slider { margin: 8px 0 2px; }
+  .slider label { display: flex; justify-content: space-between; color: var(--muted); font-size: 11.5px; margin-bottom: 4px; }
+  .slider label b { color: var(--text); font-family: var(--mono); font-weight: 600; font-size: 11px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); margin: 0; }
+  select { width: 100%; font: inherit; color: var(--text); background: #111827; border: 1px solid var(--panel-border);
+    border-radius: 8px; padding: 7px 8px; }
+
+  .tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .tool { display: flex; align-items: center; gap: 6px; justify-content: flex-start; padding: 7px 8px; font-size: 12px; }
+  .tool.active { border-color: var(--accent); background: rgba(56, 214, 255, 0.12); }
+  .sw { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+  .sw.wall { background: #6b7690; } .sw.hazard { background: var(--bad); box-shadow: 0 0 6px var(--bad); }
+  .sw.goal { background: var(--good); box-shadow: 0 0 6px var(--good); } .sw.coin { background: var(--gold); border-radius: 50%; }
+  .sw.start { background: var(--accent); border-radius: 50%; } .sw.erase { background: transparent; border: 1px dashed var(--muted); }
+
+  .check { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; margin: 6px 0; cursor: pointer; }
+  .check input { accent-color: var(--accent); margin: 0; }
+  .hint { color: var(--faint); font-size: 11px; line-height: 1.45; margin: 8px 0 0; }
+  kbd { font-family: var(--mono); font-size: 10px; background: #1a2336; border: 1px solid #2a3550; border-radius: 4px; padding: 1px 4px; color: var(--muted); }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .stat { background: rgba(255, 255, 255, 0.035); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 9px; padding: 8px 10px; }
+  .stat .k { color: var(--muted); font-size: 10.5px; }
+  .stat .v { font-family: var(--mono); font-size: 16px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .stat.wide { grid-column: span 2; }
+  .bar { height: 5px; background: rgba(255, 255, 255, 0.07); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--amber), #ff7a45); width: 100%; transition: width .2s; }
+  .phase { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 99px; margin-left: 6px; vertical-align: 2px;
+    background: rgba(255, 181, 71, 0.15); color: var(--amber); font-family: Inter, sans-serif; font-weight: 600; }
+  .phase.exploit { background: rgba(46, 230, 138, 0.14); color: var(--good); }
+  .phase.balance { background: rgba(56, 214, 255, 0.14); color: var(--accent); }
+
+  .chart-wrap { background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 9px; padding: 8px; }
+  #chart { width: 100%; height: 130px; display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; color: var(--muted); font-size: 10.5px; }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: 2px; background: var(--c); }
+
+  .gradient { height: 8px; border-radius: 4px; background: linear-gradient(90deg, hsl(0 80% 42%), hsl(35 85% 45%), hsl(60 80% 42%), hsl(120 75% 40%)); }
+  .gradient-labels { display: flex; justify-content: space-between; color: var(--faint); font-size: 10.5px; margin-top: 4px; }
+  .rewards { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; font-size: 11.5px; color: var(--muted); margin-top: 8px; }
+  .rewards b { font-family: var(--mono); color: var(--text); font-weight: 600; text-align: right; }
+
+  #log { list-style: none; margin: 0; padding: 0; font-size: 11.5px; color: var(--muted); }
+  #log li { padding: 4px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.04); display: flex; gap: 8px; }
+  #log li:last-child { border: 0; }
+  #log .t { font-family: var(--mono); color: var(--faint); font-size: 10.5px; flex: none; }
+  #log .good { color: var(--good); } #log .bad { color: var(--bad); } #log .info { color: var(--accent); }
+
+  #tooltip { position: fixed; pointer-events: none; z-index: 20; background: rgba(8, 12, 22, 0.94);
+    border: 1px solid var(--panel-border); border-radius: 9px; padding: 8px 10px; font-size: 11.5px; min-width: 150px;
+    display: none; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); }
+  #tooltip .title { font-weight: 600; margin-bottom: 4px; }
+  #tooltip .q { display: grid; grid-template-columns: repeat(4, auto); gap: 2px 10px; font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 4px; }
+  #tooltip .q .best { color: var(--good); }
+
+  #toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(20px); opacity: 0;
+    background: rgba(12, 18, 30, 0.95); border: 1px solid var(--panel-border); padding: 9px 14px; border-radius: 99px;
+    font-size: 12px; transition: all .25s; pointer-events: none; z-index: 30; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 900px) {
+    .panel { position: fixed; left: 16px; right: 16px; width: auto !important; max-height: 42vh; }
+    #controls { top: 16px; }
+    #metrics { top: auto; bottom: 16px; }
+    .panel.collapsed > :not(.brand) { display: none; }
+    .brand { cursor: pointer; margin-bottom: 0; }
+    .panel:not(.collapsed) .brand { margin-bottom: 12px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+
+<!-- ============ CONTROL PANEL ============ -->
+<aside id="controls" class="panel" aria-label="Training controls">
+  <div class="brand" data-collapse>
+    <div class="logo">Q</div>
+    <div><h1>Q-Learning Grid World</h1><p>Tabular RL agent, trained live in 3D</p></div>
+  </div>
+
+  <h2>Training</h2>
+  <div class="row">
+    <button id="btnStart" class="primary">▶ Start Training</button>
+    <button id="btnPause" disabled>❚❚ Pause</button>
+  </div>
+  <div class="row mt">
+    <button id="btnStep" title="Run exactly one Q-learning update">Step</button>
+    <button id="btnGreedy" title="Follow the learned policy with ε = 0">Watch Greedy Run</button>
+  </div>
+  <div class="slider">
+    <label for="speed">Epoch speed <b id="speedLabel"></b></label>
+    <input id="speed" type="range" min="1" max="100" value="10">
+  </div>
+  <button id="btnResetBrain" class="mt" style="width:100%">Reset Agent Brain (clear Q-table)</button>
+
+  <h2>Hyperparameters</h2>
+  <div class="slider"><label for="alpha">Learning rate α <b id="alphaVal"></b></label>
+    <input id="alpha" type="range" min="0.01" max="1" step="0.01" value="0.2"></div>
+  <div class="slider"><label for="gamma">Discount γ <b id="gammaVal"></b></label>
+    <input id="gamma" type="range" min="0.5" max="0.99" step="0.01" value="0.95"></div>
+  <div class="slider"><label for="decay">ε decay per epoch <b id="decayVal"></b></label>
+    <input id="decay" type="range" min="0.9" max="0.999" step="0.001" value="0.99"></div>
+  <div class="slider"><label for="epsMin">ε floor <b id="epsMinVal"></b></label>
+    <input id="epsMin" type="range" min="0" max="0.3" step="0.01" value="0.05"></div>
+
+  <h2>Place on grid</h2>
+  <div class="tools" role="radiogroup" aria-label="Placement tool">
+    <button class="tool active" data-tool="wall"><span class="sw wall"></span>Wall</button>
+    <button class="tool" data-tool="hazard"><span class="sw hazard"></span>Hazard</button>
+    <button class="tool" data-tool="goal"><span class="sw goal"></span>Goal</button>
+    <button class="tool" data-tool="coin"><span class="sw coin"></span>Coin</button>
+    <button class="tool" data-tool="start"><span class="sw start"></span>Start</button>
+    <button class="tool" data-tool="erase"><span class="sw erase"></span>Erase</button>
+  </div>
+  <label class="check"><input id="reexplore" type="checkbox" checked> Re-explore after edits (ε ≥ 0.35)</label>
+  <p class="hint">Click a tile to place. Click the same item again to remove it. Drag to orbit, scroll to zoom.</p>
+
+  <h2>Environment</h2>
+  <div class="row">
+    <select id="gridSize" aria-label="Grid size">
+      <option value="5">5 × 5 grid</option>
+      <option value="8" selected>8 × 8 grid</option>
+      <option value="10">10 × 10 grid</option>
+    </select>
+  </div>
+  <div class="row mt">
+    <button id="btnResetMap">Reset Map</button>
+    <button id="btnClearMap">Clear Map</button>
+  </div>
+
+  <h2>Display</h2>
+  <label class="check"><input id="showHeat" type="checkbox" checked> Q-value heatmap</label>
+  <label class="check"><input id="showArrows" type="checkbox" checked> Policy arrows</label>
+  <label class="check"><input id="showPath" type="checkbox" checked> Greedy path preview</label>
+  <p class="hint"><kbd>Space</kbd> start/pause · <kbd>G</kbd> greedy run · <kbd>1</kbd>–<kbd>6</kbd> tools</p>
+</aside>
+
+<!-- ============ METRICS HUD ============ -->
+<aside id="metrics" class="panel" aria-label="Training metrics">
+  <div class="brand" data-collapse>
+    <div class="logo" style="background:linear-gradient(135deg,#2ee68a,#38d6ff)">∑</div>
+    <div><h1>Live Metrics</h1><p id="status">Idle · press Start Training</p></div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="k">Epoch (episode)</div><div class="v" id="mEpoch">0</div></div>
+    <div class="stat"><div class="k">Total steps</div><div class="v" id="mSteps">0</div></div>
+    <div class="stat wide">
+      <div class="k">Exploration rate ε <span id="mPhase" class="phase">Exploring</span></div>
+      <div class="v" id="mEps">1.000</div>
+      <div class="bar"><i id="mEpsBar"></i></div>
+    </div>
+    <div class="stat"><div class="k">Last epoch reward</div><div class="v" id="mLast">-</div></div>
+    <div class="stat"><div class="k">Avg reward (50)</div><div class="v" id="mAvg">-</div></div>
+    <div class="stat"><div class="k">TD loss (MSE)</div><div class="v" id="mLoss">-</div></div>
+    <div class="stat"><div class="k">Goal rate (50)</div><div class="v" id="mSucc">-</div></div>
+    <div class="stat"><div class="k">Cumulative reward</div><div class="v" id="mCum">0</div></div>
+    <div class="stat"><div class="k">Steps this epoch</div><div class="v" id="mEpSteps">0</div></div>
+  </div>
+
+  <h2>Reward history</h2>
+  <div class="chart-wrap">
+    <canvas id="chart"></canvas>
+    <div class="legend">
+      <span style="--c:#6f7f9c">Epoch reward</span>
+      <span style="--c:#38d6ff">Moving avg (20)</span>
+      <span style="--c:#ffb547">ε (0 to 1)</span>
+    </div>
+  </div>
+
+  <h2>Heatmap · V(s) = max<sub>a</sub> Q(s, a)</h2>
+  <div class="gradient"></div>
+  <div class="gradient-labels"><span>Low value</span><span>High value</span></div>
+  <div class="rewards">
+    <span>Reach goal (ends epoch)</span><b>+10</b>
+    <span>Coin (once per epoch)</span><b>+3</b>
+    <span>Each step</span><b>-0.1</b>
+    <span>Bump wall / edge</span><b>-0.5</b>
+    <span>Hazard (ends epoch)</span><b>-10</b>
+  </div>
+
+  <h2>Event log</h2>
+  <ul id="log"></ul>
+</aside>
+
+<div id="tooltip"></div>
+<div id="toast"></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* =====================================================================
+   1. ENVIRONMENT DEFINITION
+   The grid world is a Markov Decision Process:
+     - State  s : the agent's tile index (z * N + x)
+     - Action a : 0=up(-z), 1=right(+x), 2=down(+z), 3=left(-x)
+     - Reward r : returned by envStep()
+     - Terminal : goal or hazard tiles end the episode ("epoch")
+   ===================================================================== */
+const T = { EMPTY: 0, WALL: 1, GOAL: 2, HAZARD: 3, COIN: 4 };
+const T_NAME = ['Open tile', 'Wall', 'Goal', 'Hazard', 'Coin'];
+const ACTIONS = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+const ARROW = ['↑', '→', '↓', '←'];
+const REWARD = { step: -0.1, bump: -0.5, goal: 10, hazard: -10, coin: 3 };
+
+// S = start, # = wall, H = hazard, G = goal, C = coin
+const PRESETS = {
+  5: ['S....',
+      '.#.H.',
+      '...#.',
+      '.H...',
+      '...#G'],
+  8: ['S.......',
+      '.##..#..',
+      '...H.#..',
+      '.#...#.C',
+      '.#.H....',
+      '.#..##H.',
+      '...H....',
+      '..#...#G'],
+  10: ['S.........',
+       '.##.#..#..',
+       '....#H.#..',
+       '.H..#..#.C',
+       '..#....H..',
+       '..#.##....',
+       'C.#..H.##.',
+       '..#.....#.',
+       '.H..##..#.',
+       '....H....G'],
+};
+
+let N = 8;
+let grid = [];
+let start = { x: 0, z: 0 };
+const idx = (x, z) => z * N + x;
+const cx = i => i % N;
+const cz = i => Math.floor(i / N);
+const startIdx = () => idx(start.x, start.z);
+const maxSteps = () => N * N * 2;
+
+function loadPreset(n, empty = false) {
+  N = n;
+  grid = new Array(N * N).fill(T.EMPTY);
+  start = { x: 0, z: 0 };
+  if (empty) { grid[idx(N - 1, N - 1)] = T.GOAL; return; }
+  PRESETS[n].forEach((row, z) => [...row].forEach((ch, x) => {
+    const i = idx(x, z);
+    if (ch === '#') grid[i] = T.WALL;
+    else if (ch === 'H') grid[i] = T.HAZARD;
+    else if (ch === 'G') grid[i] = T.GOAL;
+    else if (ch === 'C') grid[i] = T.COIN;
+    else if (ch === 'S') start = { x, z };
+  }));
+}
+
+// Deterministic transition function. `coins` is the set of coins already
+// taken this episode. Coins pay out once per episode; because that flag is not
+// part of the state, coins make the task slightly non-Markov, which is a nice
+// way to watch tabular Q-learning cope with imperfect state information.
+function envStep(s, a, coins) {
+  const [dx, dz] = ACTIONS[a];
+  const nx = cx(s) + dx, nz = cz(s) + dz;
+  if (nx < 0 || nz < 0 || nx >= N || nz >= N || grid[idx(nx, nz)] === T.WALL) {
+    return { s2: s, r: REWARD.bump, done: false, bump: true };
+  }
+  const s2 = idx(nx, nz);
+  const t = grid[s2];
+  if (t === T.GOAL) return { s2, r: REWARD.goal, done: true, outcome: 'goal' };
+  if (t === T.HAZARD) return { s2, r: REWARD.hazard, done: true, outcome: 'hazard' };
+  if (t === T.COIN && !coins.has(s2)) { coins.add(s2); return { s2, r: REWARD.coin, done: false, coin: true }; }
+  return { s2, r: REWARD.step, done: false };
+}
+
+/* =====================================================================
+   2. Q-LEARNING AGENT
+   Q is a flat table of N*N*4 values: Q[s*4 + a] estimates the expected
+   discounted return of taking action a in state s, then acting greedily.
+   ===================================================================== */
+const cfg = { alpha: 0.2, gamma: 0.95, eps: 1, epsMin: 0.05, epsDecay: 0.99 };
+let Q, visits;
+let ep = null;              // current episode: { s, steps, reward, lossSum, coins }
+let epoch = 0, totalSteps = 0, cumReward = 0, firstGoalEpoch = null;
+const hist = { reward: [], loss: [], eps: [], success: [] };
+const HIST_CAP = 5000;
+
+function resetBrain() {
+  Q = new Float32Array(N * N * 4);
+  visits = new Uint32Array(N * N);
+  cfg.eps = 1;
+  ep = null; epoch = 0; totalSteps = 0; cumReward = 0; firstGoalEpoch = null;
+  for (const k in hist) hist[k].length = 0;
+}
+
+const maxQ = s => Math.max(Q[s * 4], Q[s * 4 + 1], Q[s * 4 + 2], Q[s * 4 + 3]);
+
+// Greedy action. Random tie-breaking matters early on, when every Q is 0;
+// otherwise the agent would always pick "up" and never explore evenly.
+function argmax(s, randomTies = true) {
+  let best = -Infinity, picks = [];
+  for (let a = 0; a < 4; a++) {
+    const q = Q[s * 4 + a];
+    if (q > best + 1e-9) { best = q; picks = [a]; }
+    else if (Math.abs(q - best) <= 1e-9) picks.push(a);
+  }
+  return randomTies ? picks[(Math.random() * picks.length) | 0] : picks[0];
+}
+
+// ε-greedy policy: explore with probability ε, otherwise exploit.
+function chooseAction(s) {
+  if (Math.random() < cfg.eps) return { a: (Math.random() * 4) | 0, explore: true };
+  return { a: argmax(s), explore: false };
+}
+
+function startEpisode() {
+  ep = { s: startIdx(), steps: 0, reward: 0, lossSum: 0, coins: new Set() };
+  view.agentCell = ep.s;
+  view.snap = true;
+}
+
+/* One Q-learning update (one environment step):
+ *   1. observe state s
+ *   2. pick action a with ε-greedy
+ *   3. step the environment → reward r, next state s'
+ *   4. TD target   y  = r + γ · max_a' Q(s', a')     (y = r if s' is terminal)
+ *   5. TD error    δ  = y − Q(s, a)
+ *   6. update      Q(s, a) ← Q(s, a) + α · δ
+ * Off-policy: the target uses the greedy max even when the agent explored,
+ * which is what lets Q-learning converge to the optimal policy while acting
+ * randomly part of the time. */
+function trainStep() {
+  if (!ep) startEpisode();
+  const s = ep.s;
+  const { a, explore } = chooseAction(s);
+  const res = envStep(s, a, ep.coins);
+
+  const qi = s * 4 + a;
+  const target = res.done ? res.r : res.r + cfg.gamma * maxQ(res.s2);
+  const td = target - Q[qi];
+  Q[qi] += cfg.alpha * td;
+
+  visits[s]++;
+  ep.lossSum += td * td;
+  ep.steps++;
+  ep.reward += res.r;
+  ep.s = res.s2;
+  totalSteps++;
+
+  view.agentCell = res.s2;
+  view.heading = a;
+  view.explore = explore;
+  if (res.bump) view.bump = 0.25;
+  if (res.coin && !turbo()) addPulse(res.s2, 0xffc53d);
+
+  if (res.done || ep.steps >= maxSteps()) endEpisode(res.outcome || 'timeout');
+  return res;
+}
+
+// Episode bookkeeping: log metrics, decay ε, and queue a fresh episode.
+function endEpisode(outcome) {
+  epoch++;
+  cumReward += ep.reward;
+  push(hist.reward, ep.reward);
+  push(hist.loss, ep.lossSum / ep.steps);
+  push(hist.eps, cfg.eps);
+  push(hist.success, outcome === 'goal' ? 1 : 0);
+  cfg.eps = Math.max(cfg.epsMin, cfg.eps * cfg.epsDecay);
+
+  if (outcome === 'goal' && firstGoalEpoch === null) {
+    firstGoalEpoch = epoch;
+    log(`First goal reached at epoch ${epoch}`, 'good');
+  }
+  if (!turbo()) addPulse(ep.s, outcome === 'goal' ? 0x2ee68a : outcome === 'hazard' ? 0xff4d5e : 0x8a97b0);
+  milestoneCheck();
+  ep = null;
+  chartDirty = true;
+}
+const push = (arr, v) => { arr.push(v); if (arr.length > HIST_CAP) arr.shift(); };
+
+let lastMilestone = 0;
+function milestoneCheck() {
+  const m = [0.5, 0.8, 0.95];
+  const rate = recentRate(50);
+  if (hist.success.length >= 50) {
+    for (const t of m) if (rate >= t && lastMilestone < t) {
+      lastMilestone = t; log(`Goal rate hit ${Math.round(t * 100)}% at epoch ${epoch}`, 'good');
+    }
+  }
+}
+const recentRate = n => { const s = hist.success.slice(-n); return s.length ? s.reduce((a, b) => a + b, 0) / s.length : 0; };
+const recentAvg = (arr, n) => { const s = arr.slice(-n); return s.length ? s.reduce((a, b) => a + b, 0) / s.length : NaN; };
+
+// Follow argmax from the start without learning. Used for the path preview
+// and the "Watch Greedy Run" demo.
+function greedyPath() {
+  let s = startIdx();
+  const coins = new Set(), seen = new Set([s]), path = [s];
+  for (let k = 0; k < maxSteps(); k++) {
+    if (!visits[s]) return { path, outcome: 'unknown' };
+    const res = envStep(s, argmax(s, false), coins);
+    if (res.s2 === s) return { path, outcome: 'loop' };
+    path.push(res.s2);
+    if (res.done) return { path, outcome: res.outcome };
+    if (seen.has(res.s2) && !res.coin) return { path, outcome: 'loop' };
+    seen.add(res.s2);
+    s = res.s2;
+  }
+  return { path, outcome: 'timeout' };
+}
+
+/* =====================================================================
+   3. THREE.JS SCENE
+   ===================================================================== */
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x070b14);
+scene.fog = new THREE.Fog(0x070b14, 22, 55);
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 200);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.maxPolarAngle = Math.PI / 2.15;
+controls.minDistance = 4;
+controls.maxDistance = 40;
+
+scene.add(new THREE.HemisphereLight(0xa9bcff, 0x0a0e18, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+sun.position.set(6, 14, 8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0005;
+scene.add(sun);
+const rim = new THREE.DirectionalLight(0x5b7cff, 0.5);
+rim.position.set(-8, 6, -10);
+scene.add(rim);
+
+const floorGrid = new THREE.GridHelper(80, 80, 0x1a2336, 0x111827);
+floorGrid.position.y = -0.31;
+scene.add(floorGrid);
+
+// Shared geometries and materials
+const G = {
+  tile: new THREE.BoxGeometry(0.92, 0.2, 0.92),
+  wall: new THREE.BoxGeometry(0.92, 0.75, 0.92),
+  spike: new THREE.ConeGeometry(0.09, 0.3, 6),
+  coin: new THREE.CylinderGeometry(0.2, 0.2, 0.05, 32),
+  beam: new THREE.CylinderGeometry(0.3, 0.4, 1.8, 24, 1, true),
+  ring: new THREE.TorusGeometry(0.3, 0.035, 10, 40),
+  pulse: new THREE.RingGeometry(0.28, 0.36, 40),
+  startRing: new THREE.RingGeometry(0.34, 0.42, 40),
+  arrowHead: new THREE.ConeGeometry(0.11, 0.22, 3),
+  arrowShaft: new THREE.BoxGeometry(0.05, 0.02, 0.2),
+};
+const M = {
+  wall: new THREE.MeshStandardMaterial({ color: 0x3a4459, roughness: 0.6, metalness: 0.25 }),
+  wallEdge: new THREE.LineBasicMaterial({ color: 0x7d8cb0, transparent: true, opacity: 0.45 }),
+  spike: new THREE.MeshStandardMaterial({ color: 0xff3344, emissive: 0xff1a2a, emissiveIntensity: 0.7, roughness: 0.4 }),
+  coin: new THREE.MeshStandardMaterial({ color: 0xffc53d, emissive: 0xb07800, emissiveIntensity: 0.5, metalness: 0.9, roughness: 0.25 }),
+  beam: new THREE.MeshBasicMaterial({ color: 0x2ee68a, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }),
+  goalRing: new THREE.MeshBasicMaterial({ color: 0x7dffba }),
+  arrow: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 }),
+  startRing: new THREE.MeshBasicMaterial({ color: 0x38d6ff, side: THREE.DoubleSide }),
+};
+const wallEdgeGeo = new THREE.EdgesGeometry(G.wall);
+
+const board = new THREE.Group();
+scene.add(board);
+let tiles = [], arrows = [], decor = [], startMarker, baseSlab;
+
+const cellPos = i => ({ x: cx(i) - (N - 1) / 2, z: cz(i) - (N - 1) / 2 });
+const yawFor = a => Math.atan2(-ACTIONS[a][0], -ACTIONS[a][1]);
+
+function buildBoard() {
+  board.traverse(o => { if (o.userData.ownMat) o.material.dispose(); });
+  if (baseSlab) baseSlab.geometry.dispose();
+  board.clear();
+  tiles = []; arrows = []; decor = new Array(N * N).fill(null);
+
+  baseSlab = new THREE.Mesh(new THREE.BoxGeometry(N + 0.5, 0.3, N + 0.5),
+    new THREE.MeshStandardMaterial({ color: 0x0e1422, roughness: 0.8, metalness: 0.2 }));
+  baseSlab.position.y = -0.15;
+  baseSlab.receiveShadow = true;
+  baseSlab.userData.ownMat = true;
+  board.add(baseSlab);
+
+  for (let i = 0; i < N * N; i++) {
+    const p = cellPos(i);
+    const tile = new THREE.Mesh(G.tile, new THREE.MeshStandardMaterial({ color: 0x273041, roughness: 0.55, metalness: 0.1 }));
+    tile.position.set(p.x, 0.1, p.z);
+    tile.receiveShadow = true;
+    tile.userData = { cell: i, ownMat: true };
+    board.add(tile);
+    tiles.push(tile);
+
+    const arrow = new THREE.Group();
+    const head = new THREE.Mesh(G.arrowHead, M.arrow);
+    head.rotation.x = -Math.PI / 2;
+    head.position.z = -0.12;
+    const shaft = new THREE.Mesh(G.arrowShaft, M.arrow);
+    shaft.position.z = 0.06;
+    arrow.add(head, shaft);
+    arrow.position.set(p.x, 0.215, p.z);
+    arrow.scale.set(1, 0.3, 1);
+    arrow.visible = false;
+    board.add(arrow);
+    arrows.push(arrow);
+
+    rebuildDecor(i);
+  }
+
+  startMarker = new THREE.Mesh(G.startRing, M.startRing);
+  startMarker.rotation.x = -Math.PI / 2;
+  board.add(startMarker);
+  placeStartMarker();
+
+  const s = N * 0.75;
+  Object.assign(sun.shadow.camera, { left: -s, right: s, top: s, bottom: -s, near: 1, far: 40 });
+  sun.shadow.camera.updateProjectionMatrix();
+  // Pull back on narrower viewports so the whole board stays in frame.
+  const f = Math.max(1.15, 1.9 / camera.aspect);
+  camera.position.set(N * 0.35 * f, N * 1.05 * f, N * 1.15 * f);
+  controls.target.set(0, 0, 0);
+  controls.update();
+}
+
+function placeStartMarker() {
+  const p = cellPos(startIdx());
+  startMarker.position.set(p.x, 0.205, p.z);
+}
+
+// Per-tile 3D props (walls, goal beacon, hazard spikes, coin)
+function rebuildDecor(i) {
+  if (decor[i]) { board.remove(decor[i]); decor[i] = null; }
+  const p = cellPos(i);
+  const t = grid[i];
+  let g = null;
+  if (t === T.WALL) {
+    g = new THREE.Mesh(G.wall, M.wall);
+    g.position.set(p.x, 0.2 + 0.375, p.z);
+    g.castShadow = g.receiveShadow = true;
+    g.add(new THREE.LineSegments(wallEdgeGeo, M.wallEdge));
+  } else if (t === T.GOAL) {
+    g = new THREE.Group();
+    const beam = new THREE.Mesh(G.beam, M.beam);
+    beam.position.y = 1.1;
+    const ring = new THREE.Mesh(G.ring, M.goalRing);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.55;
+    g.add(beam, ring);
+    g.position.set(p.x, 0, p.z);
+  } else if (t === T.HAZARD) {
+    g = new THREE.Group();
+    [[0, 0, 1.2], [0.22, 0.2, 0.9], [-0.22, 0.2, 0.9], [0.22, -0.2, 0.9], [-0.22, -0.2, 0.9]].forEach(([x, z, sc]) => {
+      const sp = new THREE.Mesh(G.spike, M.spike);
+      sp.position.set(x, 0.2 + 0.15 * sc, z);
+      sp.scale.setScalar(sc);
+      sp.castShadow = true;
+      g.add(sp);
+    });
+    g.position.set(p.x, 0, p.z);
+  } else if (t === T.COIN) {
+    g = new THREE.Mesh(G.coin, M.coin);
+    g.rotation.x = Math.PI / 2;
+    g.position.set(p.x, 0.55, p.z);
+    g.castShadow = true;
+  }
+  if (g) { g.userData.kind = t; g.userData.cell = i; board.add(g); decor[i] = g; }
+}
+
+/* ---------- Rover avatar ---------- */
+function buildRover() {
+  const g = new THREE.Group();
+  const white = new THREE.MeshStandardMaterial({ color: 0xe9eef7, roughness: 0.35, metalness: 0.3 });
+  const accent = new THREE.MeshStandardMaterial({ color: 0x2a8cff, roughness: 0.4, metalness: 0.4 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x151a24, roughness: 0.8 });
+  const glow = new THREE.MeshStandardMaterial({ color: 0x38d6ff, emissive: 0x38d6ff, emissiveIntensity: 1.6 });
+
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.14, 0.54), white);
+  body.position.y = 0.2;
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.06, 0.3), accent);
+  deck.position.set(0, 0.3, 0.06);
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.2, 8), dark);
+  mast.position.set(0, 0.37, -0.14);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.1, 0.12), white);
+  head.position.set(0, 0.5, -0.14);
+  const eye = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.035, 0.02), glow);
+  eye.position.set(0, 0.5, -0.205);
+  const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.18, 6), dark);
+  antenna.position.set(0.14, 0.42, 0.18);
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 12), glow.clone());
+  beacon.position.set(0.14, 0.52, 0.18);
+  g.add(body, deck, mast, head, eye, antenna, beacon);
+
+  const wheels = [];
+  const wheelGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.08, 18);
+  for (const [x, z] of [[0.25, 0.18], [-0.25, 0.18], [0.25, -0.18], [-0.25, -0.18]]) {
+    const w = new THREE.Mesh(wheelGeo, dark);
+    w.rotation.z = Math.PI / 2;
+    w.position.set(x, 0.1, z);
+    g.add(w);
+    wheels.push(w);
+  }
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  g.userData = { wheels, beacon };
+  return g;
+}
+const rover = buildRover();
+scene.add(rover);
+
+/* ---------- Greedy path preview ---------- */
+let pathMesh = null, pathKey = '';
+const pathMat = { goal: new THREE.MeshBasicMaterial({ color: 0x38d6ff, transparent: true, opacity: 0.9 }),
+  other: new THREE.MeshBasicMaterial({ color: 0xffb547, transparent: true, opacity: 0.8 }) };
+function updatePathPreview(force = false) {
+  const show = ui.showPath.checked;
+  const { path, outcome } = greedyPath();
+  const key = show + '|' + outcome + '|' + path.join(',');
+  if (key === pathKey && !force) return;
+  pathKey = key;
+  if (pathMesh) { board.remove(pathMesh); pathMesh.geometry.dispose(); pathMesh = null; }
+  if (!show || path.length < 2) return;
+  const curve = new THREE.CurvePath();
+  for (let k = 0; k < path.length - 1; k++) {
+    const a = cellPos(path[k]), b = cellPos(path[k + 1]);
+    curve.add(new THREE.LineCurve3(new THREE.Vector3(a.x, 0.3, a.z), new THREE.Vector3(b.x, 0.3, b.z)));
+  }
+  pathMesh = new THREE.Mesh(new THREE.TubeGeometry(curve, path.length * 6, 0.04, 6, false),
+    outcome === 'goal' ? pathMat.goal : pathMat.other);
+  board.add(pathMesh);
+}
+
+/* ---------- Pulse effects ---------- */
+const pulses = [];
+function addPulse(cell, color) {
+  const m = new THREE.Mesh(G.pulse, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
+  const p = cellPos(cell);
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(p.x, 0.22, p.z);
+  scene.add(m);
+  pulses.push({ m, life: 1 });
+}
+
+/* =====================================================================
+   4. HEATMAP + POLICY VISUALS
+   Tile color = normalized V(s) = max_a Q(s,a), mapped red → green.
+   Arrows show the greedy action argmax_a Q(s,a) for each visited tile.
+   ===================================================================== */
+const tmpC = new THREE.Color();
+const C = { base: new THREE.Color(0x273041), wallFloor: new THREE.Color(0x151a26), black: new THREE.Color(0x000000),
+  goal: new THREE.Color(0x0e6b3c), goalE: new THREE.Color(0x22ff88), haz: new THREE.Color(0x6b0f18), hazE: new THREE.Color(0xff2a3a) };
+
+function updateTiles(time) {
+  const heat = ui.showHeat.checked, showArrows = ui.showArrows.checked;
+  let vmin = Infinity, vmax = -Infinity;
+  for (let i = 0; i < N * N; i++) {
+    if ((grid[i] === T.EMPTY || grid[i] === T.COIN) && visits[i]) {
+      const v = maxQ(i); if (v < vmin) vmin = v; if (v > vmax) vmax = v;
+    }
+  }
+  const range = vmax - vmin;
+  const pulse = 0.5 + 0.5 * Math.sin(time * 3);
+
+  for (let i = 0; i < N * N; i++) {
+    const mat = tiles[i].material, t = grid[i];
+    let arrowOn = false;
+    if (t === T.WALL) { mat.color.copy(C.wallFloor); mat.emissive.copy(C.black); }
+    else if (t === T.GOAL) { mat.color.copy(C.goal); mat.emissive.copy(C.goalE); mat.emissiveIntensity = 0.45 + 0.3 * pulse; }
+    else if (t === T.HAZARD) { mat.color.copy(C.haz); mat.emissive.copy(C.hazE); mat.emissiveIntensity = 0.35 + 0.35 * pulse; }
+    else if (heat && visits[i]) {
+      const n = range > 1e-6 ? (maxQ(i) - vmin) / range : 0.5;
+      tmpC.setHSL(n * 0.34, 0.78, 0.24 + 0.12 * n);
+      mat.color.copy(tmpC); mat.emissive.copy(tmpC); mat.emissiveIntensity = 0.35;
+      arrowOn = true;
+    } else { mat.color.copy(C.base); mat.emissive.copy(C.black); arrowOn = !heat && visits[i] > 0; }
+
+    const ar = arrows[i];
+    ar.visible = showArrows && arrowOn;
+    if (ar.visible) ar.rotation.y = yawFor(argmax(i, false));
+  }
+}
+
+/* =====================================================================
+   5. SIMULATION LOOP + SPEED CONTROL
+   Speed 1-20: "watch" mode, one animated step every `interval` ms.
+   Speed 21-100: "turbo" mode, hundreds to thousands of steps per frame.
+   ===================================================================== */
+const view = { agentCell: 0, heading: 1, explore: false, snap: true, bump: 0, yaw: 0, wheelSpin: 0 };
+let running = false, demo = null, acc = 0, chartDirty = true;
+
+function speedParams() {
+  const v = +ui.speed.value;
+  if (v <= 20) return { turbo: false, interval: 700 * Math.pow(0.84, v - 1) };
+  return { turbo: true, spf: Math.round(5 + Math.pow((v - 20) / 80, 2) * 4000) };
+}
+const turbo = () => speedParams().turbo;
+
+function tick(dt) {
+  if (demo) { demoTick(dt); return; }
+  if (!running) return;
+  const sp = speedParams();
+  if (sp.turbo) {
+    // Cap the work per frame so the UI stays responsive at max speed.
+    const t0 = performance.now();
+    for (let k = 0; k < sp.spf && performance.now() - t0 < 12; k++) trainStep();
+    view.snap = true;
+  } else {
+    acc += dt * 1000;
+    let n = 0;
+    while (acc >= sp.interval && n < 4) { acc -= sp.interval; trainStep(); n++; }
+    if (n === 4) acc = 0;
+  }
+}
+
+/* ---------- Greedy demo run (ε = 0, no learning) ---------- */
+function startDemo() {
+  setRunning(false);
+  ep = null;
+  demo = { s: startIdx(), steps: 0, coins: new Set(), acc: 0, reward: 0 };
+  view.agentCell = demo.s; view.snap = true;
+  log('Greedy run: following argmax Q from the start', 'info');
+  setStatus('Greedy run · ε = 0, no learning');
+}
+function demoTick(dt) {
+  demo.acc += dt * 1000;
+  if (demo.acc < 220) return;
+  demo.acc = 0;
+  const a = argmax(demo.s, false);
+  const res = envStep(demo.s, a, demo.coins);
+  demo.s = res.s2; demo.steps++; demo.reward += res.r;
+  view.agentCell = res.s2; view.heading = a; view.explore = false;
+  if (res.bump) view.bump = 0.25;
+  if (res.coin) addPulse(res.s2, 0xffc53d);
+  const limit = demo.steps >= N * N * 1.5;
+  if (res.done || limit) {
+    const msg = res.outcome === 'goal' ? `reached the goal in ${demo.steps} steps (reward ${demo.reward.toFixed(1)})`
+      : res.outcome === 'hazard' ? `fell into a hazard after ${demo.steps} steps` : `got stuck after ${demo.steps} steps. Train longer`;
+    log(`Greedy run ${msg}`, res.outcome === 'goal' ? 'good' : 'bad');
+    addPulse(res.s2, res.outcome === 'goal' ? 0x2ee68a : 0xff4d5e);
+    demo = null;
+    setStatus('Paused');
+  }
+}
+
+/* ---------- Rover animation ---------- */
+function updateRover(dt, time) {
+  const p = cellPos(view.agentCell);
+  if (view.snap) { rover.position.x = p.x; rover.position.z = p.z; view.snap = false; }
+  const interval = demo ? 220 : (speedParams().interval || 16);
+  const k = 1 - Math.exp(-dt * (3200 / interval));
+  const ox = rover.position.x, oz = rover.position.z;
+  rover.position.x += (p.x - rover.position.x) * k;
+  rover.position.z += (p.z - rover.position.z) * k;
+
+  const target = yawFor(view.heading);
+  let d = target - view.yaw;
+  d = Math.atan2(Math.sin(d), Math.cos(d));
+  view.yaw += d * Math.min(1, k * 1.5 + 0.05);
+  rover.rotation.y = view.yaw;
+
+  if (view.bump > 0) {
+    view.bump = Math.max(0, view.bump - dt);
+    const [dx, dz] = ACTIONS[view.heading];
+    const push = Math.sin((0.25 - view.bump) / 0.25 * Math.PI) * 0.18;
+    rover.position.x = p.x + dx * push; rover.position.z = p.z + dz * push;
+  }
+  const moved = Math.hypot(rover.position.x - ox, rover.position.z - oz);
+  view.wheelSpin += moved / 0.1;
+  rover.userData.wheels.forEach(w => { w.rotation.x = view.wheelSpin; });
+  rover.position.y = 0.2 + Math.sin(time * 6) * 0.008;
+  // Beacon color: amber when the last action was exploratory, cyan when greedy.
+  rover.userData.beacon.material.emissive.setHex(view.explore ? 0xffb547 : 0x38d6ff);
+  rover.userData.beacon.material.color.setHex(view.explore ? 0xffb547 : 0x38d6ff);
+}
+
+function updateDecor(dt, time) {
+  const taken = demo ? demo.coins : ep ? ep.coins : null;
+  for (const d of decor) {
+    if (!d) continue;
+    if (d.userData.kind === T.COIN) {
+      d.rotation.z += dt * 2.2;
+      d.position.y = 0.55 + Math.sin(time * 2.5 + d.userData.cell) * 0.06;
+      d.visible = !(taken && taken.has(d.userData.cell));
+    } else if (d.userData.kind === T.GOAL) {
+      d.children[1].position.y = 0.55 + Math.sin(time * 2) * 0.12;
+      d.children[1].rotation.z += dt;
+    }
+  }
+  for (let k = pulses.length - 1; k >= 0; k--) {
+    const pu = pulses[k];
+    pu.life -= dt * 1.4;
+    pu.m.scale.setScalar(1 + (1 - pu.life) * 2.2);
+    pu.m.material.opacity = Math.max(0, pu.life) * 0.9;
+    if (pu.life <= 0) { scene.remove(pu.m); pu.m.material.dispose(); pulses.splice(k, 1); }
+  }
+  startMarker.material.opacity = 1;
+  startMarker.scale.setScalar(1 + Math.sin(time * 3) * 0.05);
+}
+
+/* =====================================================================
+   6. UI: CONTROLS, PLACEMENT, HUD, CHART
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const ui = {
+  start: $('btnStart'), pause: $('btnPause'), step: $('btnStep'), greedy: $('btnGreedy'),
+  resetBrain: $('btnResetBrain'), resetMap: $('btnResetMap'), clearMap: $('btnClearMap'),
+  speed: $('speed'), speedLabel: $('speedLabel'), gridSize: $('gridSize'),
+  alpha: $('alpha'), gamma: $('gamma'), decay: $('decay'), epsMin: $('epsMin'),
+  reexplore: $('reexplore'), showHeat: $('showHeat'), showArrows: $('showArrows'), showPath: $('showPath'),
+  tooltip: $('tooltip'), toast: $('toast'), log: $('log'), status: $('status'), chart: $('chart'),
+};
+let tool = 'wall';
+
+function setRunning(on) {
+  running = on;
+  if (on) demo = null;
+  ui.start.disabled = on;
+  ui.pause.disabled = !on;
+  ui.step.disabled = on;
+  setStatus(on ? 'Training' : epoch ? 'Paused' : 'Idle · press Start Training');
+}
+const setStatus = s => { ui.status.textContent = s; };
+
+ui.start.onclick = () => { setRunning(true); if (epoch === 0 && totalSteps === 0) log('Training started. ε = 1.0, pure exploration', 'info'); };
+ui.pause.onclick = () => setRunning(false);
+ui.step.onclick = () => { demo = null; const r = trainStep(); setStatus(`Stepped: ${ARROW[view.heading]}  r = ${r.r}`); };
+ui.greedy.onclick = startDemo;
+ui.resetBrain.onclick = () => { resetBrain(); lastMilestone = 0; demo = null; startEpisode(); chartDirty = true; log('Q-table cleared. Agent starts from scratch', 'info'); };
+
+function bindSlider(el, out, fmt, apply) {
+  const f = () => { out.textContent = fmt(+el.value); apply(+el.value); };
+  el.addEventListener('input', f); f();
+}
+bindSlider(ui.alpha, $('alphaVal'), v => v.toFixed(2), v => cfg.alpha = v);
+bindSlider(ui.gamma, $('gammaVal'), v => v.toFixed(2), v => cfg.gamma = v);
+bindSlider(ui.decay, $('decayVal'), v => v.toFixed(3), v => cfg.epsDecay = v);
+bindSlider(ui.epsMin, $('epsMinVal'), v => v.toFixed(2), v => { cfg.epsMin = v; cfg.eps = Math.max(cfg.eps, v); });
+bindSlider(ui.speed, ui.speedLabel, () => {
+  const sp = speedParams();
+  return sp.turbo ? `Turbo · ${sp.spf.toLocaleString()} steps/frame` : `Watch · ${(1000 / sp.interval).toFixed(1)} steps/s`;
+}, () => {});
+
+ui.gridSize.onchange = () => newMap(+ui.gridSize.value, false);
+ui.resetMap.onclick = () => newMap(N, false);
+ui.clearMap.onclick = () => newMap(N, true);
+function newMap(n, empty) {
+  demo = null;
+  loadPreset(n, empty);
+  resetBrain();
+  lastMilestone = 0;
+  buildBoard();
+  startEpisode();
+  pathKey = '';
+  if (pathMesh) { pathMesh.geometry.dispose(); pathMesh = null; }
+  chartDirty = true;
+  log(`${empty ? 'Cleared' : 'Loaded'} ${n}×${n} map. Q-table reset`, 'info');
+}
+
+[ui.showHeat, ui.showArrows].forEach(el => el.onchange = () => {});
+ui.showPath.onchange = () => updatePathPreview(true);
+
+document.querySelectorAll('.tool').forEach(b => b.onclick = () => selectTool(b.dataset.tool));
+function selectTool(t) {
+  tool = t;
+  document.querySelectorAll('.tool').forEach(b => {
+    b.classList.toggle('active', b.dataset.tool === t);
+    b.setAttribute('aria-checked', b.dataset.tool === t);
+  });
+}
+
+// Mobile: tap a panel header to collapse it.
+document.querySelectorAll('[data-collapse]').forEach(h => h.onclick = () => {
+  if (innerWidth <= 900) h.parentElement.classList.toggle('collapsed');
+});
+
+/* ---------- Click-to-place (works mid-training) ---------- */
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+function pick(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const targets = tiles.concat(decor.filter(d => d && d.userData.kind === T.WALL));
+  const hit = raycaster.intersectObjects(targets, false)[0];
+  return hit ? hit.object.userData.cell : null;
+}
+
+function applyTool(i) {
+  const x = cx(i), z = cz(i);
+  if (tool === 'start') {
+    if (grid[i] !== T.EMPTY && grid[i] !== T.COIN) return toast('Start must be on an open tile');
+    start = { x, z };
+    placeStartMarker();
+    ep = null; demo = null; startEpisode();
+    log(`Start moved to (${x}, ${z})`, 'info');
+    return;
+  }
+  if (i === startIdx() && tool !== 'erase') return toast('That is the start tile. Move the start first.');
+  const map = { wall: T.WALL, hazard: T.HAZARD, goal: T.GOAL, coin: T.COIN, erase: T.EMPTY };
+  let nt = map[tool];
+  if (grid[i] === nt && nt !== T.EMPTY) nt = T.EMPTY;
+  if (grid[i] === nt) return;
+  const old = grid[i];
+  grid[i] = nt;
+  rebuildDecor(i);
+
+  // The Q-table is kept on purpose: the agent has to discover the change
+  // through experience, which is how you see the policy adapt live.
+  if (ep && ep.s === i && nt !== T.EMPTY && nt !== T.COIN) { ep = null; startEpisode(); }
+  if (demo) demo = null;
+  if (ui.reexplore.checked && cfg.eps < 0.35 && epoch > 0) cfg.eps = 0.35;
+  const what = nt === T.EMPTY ? `${T_NAME[old]} removed` : `${T_NAME[nt]} placed`;
+  log(`${what} at (${x}, ${z})`, nt === T.HAZARD ? 'bad' : nt === T.GOAL ? 'good' : '');
+  if (!grid.includes(T.GOAL)) toast('No goal on the map. The agent can only avoid penalties.');
+}
+
+let downAt = null;
+renderer.domElement.addEventListener('pointerdown', e => { downAt = { x: e.clientX, y: e.clientY }; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downAt) return;
+  const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
+  downAt = null;
+  if (moved > 6) return; // it was an orbit drag, not a click
+  const c = pick(e);
+  if (c !== null) applyTool(c);
+});
+
+/* ---------- Hover tooltip: live Q-values for a tile ---------- */
+let hoverCell = null, hoverPos = { x: 0, y: 0 };
+renderer.domElement.addEventListener('pointermove', e => {
+  if (e.pointerType !== 'mouse') return;
+  hoverCell = pick(e);
+  hoverPos = { x: e.clientX, y: e.clientY };
+});
+renderer.domElement.addEventListener('pointerleave', () => { hoverCell = null; });
+function updateTooltip() {
+  const tt = ui.tooltip;
+  if (hoverCell === null) { tt.style.display = 'none'; return; }
+  const i = hoverCell, t = grid[i];
+  let html = `<div class="title">(${cx(i)}, ${cz(i)}) · ${i === startIdx() ? 'Start' : T_NAME[t]}</div>`;
+  if (t === T.EMPTY || t === T.COIN) {
+    const best = argmax(i, false);
+    html += `<div>V(s) = <b>${maxQ(i).toFixed(2)}</b> · visits ${visits[i].toLocaleString()}</div><div class="q">`;
+    for (let a = 0; a < 4; a++) html += `<span class="${visits[i] && a === best ? 'best' : ''}">${ARROW[a]} ${Q[i * 4 + a].toFixed(2)}</span>`;
+    html += '</div>';
+  } else if (t === T.GOAL) html += '<div>Terminal · +10</div>';
+  else if (t === T.HAZARD) html += '<div>Terminal · -10</div>';
+  else html += '<div>Blocks movement · -0.5 on bump</div>';
+  tt.innerHTML = html;
+  tt.style.display = 'block';
+  const w = tt.offsetWidth, h = tt.offsetHeight;
+  tt.style.left = Math.min(innerWidth - w - 8, hoverPos.x + 14) + 'px';
+  tt.style.top = Math.min(innerHeight - h - 8, hoverPos.y + 14) + 'px';
+}
+
+/* ---------- HUD ---------- */
+const fmt = (v, d = 2) => Number.isFinite(v) ? v.toFixed(d) : '-';
+function updateHUD() {
+  $('mEpoch').textContent = epoch.toLocaleString();
+  $('mSteps').textContent = totalSteps.toLocaleString();
+  $('mEps').textContent = cfg.eps.toFixed(3);
+  $('mEpsBar').style.width = (cfg.eps * 100).toFixed(1) + '%';
+  const ph = $('mPhase');
+  const mode = cfg.eps > 0.6 ? ['Exploring', ''] : cfg.eps > 0.2 ? ['Balancing', 'balance'] : ['Exploiting', 'exploit'];
+  ph.textContent = mode[0]; ph.className = 'phase ' + mode[1];
+  $('mLast').textContent = fmt(hist.reward.at(-1), 1);
+  $('mAvg').textContent = fmt(recentAvg(hist.reward, 50), 2);
+  $('mLoss').textContent = fmt(hist.loss.at(-1), 3);
+  $('mSucc').textContent = hist.success.length ? Math.round(recentRate(50) * 100) + '%' : '-';
+  $('mCum').textContent = Math.round(cumReward).toLocaleString();
+  $('mEpSteps').textContent = ep ? ep.steps : demo ? demo.steps : 0;
+  if (running) setStatus(`Training · ${turbo() ? 'turbo' : 'watch'} mode`);
+}
+
+function drawChart() {
+  const c = ui.chart, ctx = c.getContext('2d'), dpr = devicePixelRatio || 1;
+  const w = c.clientWidth, h = c.clientHeight;
+  if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  const WIN = 300, R = hist.reward, n = Math.min(WIN, R.length);
+  if (n < 2) {
+    ctx.fillStyle = '#56627a'; ctx.font = '11px Inter, sans-serif';
+    ctx.fillText('History appears once epochs complete', 8, h / 2);
+    return;
+  }
+  const off = R.length - n;
+  const data = R.slice(off), eps = hist.eps.slice(off);
+  const ma = data.map((_, k) => { const a = Math.max(0, off + k - 19); const s = R.slice(a, off + k + 1); return s.reduce((x, y) => x + y, 0) / s.length; });
+  let lo = Math.min(...data), hi = Math.max(...data);
+  if (hi - lo < 1) { hi += 0.5; lo -= 0.5; }
+  const pad = 6;
+  const X = k => pad + (k / (n - 1)) * (w - pad * 2);
+  const Y = v => h - pad - ((v - lo) / (hi - lo)) * (h - pad * 2);
+  const line = (arr, y, color, width) => {
+    ctx.beginPath(); arr.forEach((v, k) => k ? ctx.lineTo(X(k), y(v)) : ctx.moveTo(X(k), y(v)));
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.stroke();
+  };
+  if (lo < 0 && hi > 0) {
+    ctx.setLineDash([3, 4]); ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad, Y(0)); ctx.lineTo(w - pad, Y(0)); ctx.stroke(); ctx.setLineDash([]);
+  }
+  line(data, Y, 'rgba(111,127,156,0.55)', 1);
+  line(eps, v => h - pad - v * (h - pad * 2), '#ffb547', 1.5);
+  line(ma, Y, '#38d6ff', 2);
+  ctx.fillStyle = '#56627a'; ctx.font = '10px "JetBrains Mono", monospace';
+  ctx.fillText(hi.toFixed(1), pad + 2, pad + 9);
+  ctx.fillText(lo.toFixed(1), pad + 2, h - pad - 2);
+  ctx.textAlign = 'right';
+  ctx.fillText(`last ${n} epochs`, w - pad - 2, pad + 9);
+  ctx.textAlign = 'left';
+}
+
+/* ---------- Event log + toast ---------- */
+const t0 = performance.now();
+function log(msg, kind = '') {
+  const li = document.createElement('li');
+  const s = Math.floor((performance.now() - t0) / 1000);
+  li.innerHTML = `<span class="t">${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}</span><span class="${kind}"></span>`;
+  li.lastChild.textContent = msg;
+  ui.log.prepend(li);
+  while (ui.log.children.length > 7) ui.log.lastChild.remove();
+}
+let toastTimer;
+function toast(msg) {
+  ui.toast.textContent = msg;
+  ui.toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => ui.toast.classList.remove('show'), 2200);
+}
+
+/* ---------- Keyboard ---------- */
+addEventListener('keydown', e => {
+  if (e.target.matches('input, select')) return;
+  if (e.code === 'Space') { e.preventDefault(); setRunning(!running); }
+  else if (e.key === 'g' || e.key === 'G') startDemo();
+  else if (/^[1-6]$/.test(e.key)) selectTool(['wall', 'hazard', 'goal', 'coin', 'start', 'erase'][+e.key - 1]);
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  chartDirty = true;
+});
+
+/* =====================================================================
+   7. MAIN RENDER LOOP
+   ===================================================================== */
+const clock = new THREE.Clock();
+let hudTimer = 0, chartTimer = 0, pathTimer = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.1);
+  const time = clock.elapsedTime;
+
+  tick(dt);
+  updateRover(dt, time);
+  updateTiles(time);
+  updateDecor(dt, time);
+
+  hudTimer += dt; chartTimer += dt; pathTimer += dt;
+  if (hudTimer > 0.1) { hudTimer = 0; updateHUD(); updateTooltip(); }
+  if (chartDirty && chartTimer > 0.2) { chartTimer = 0; chartDirty = false; drawChart(); }
+  if (pathTimer > 0.25) { pathTimer = 0; updatePathPreview(); }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// Boot
+loadPreset(8);
+resetBrain();
+buildBoard();
+startEpisode();
+setRunning(false);
+log('Ready. Press Start Training or hit Space', 'info');
+animate();
+
+// Exposed for console experiments and automated checks.
+window.rl = { trainStep, greedyPath, cfg, get Q() { return Q; }, get epoch() { return epoch; }, grid: () => grid, N: () => N };
+</script>
+</body>
+</html>

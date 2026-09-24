@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cardiac Flow Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Single dark "bedside monitor" world: committed on purpose, so no light-theme blocks. */
+  :root {
+    color-scheme: dark;
+    --ground: #05070c;
+    --ground-2: #0c1320;
+    --panel: rgba(10, 14, 21, 0.86);
+    --panel-solid: #0b1018;
+    --line: rgba(150, 172, 205, 0.14);
+    --line-strong: rgba(150, 172, 205, 0.28);
+    --text: #e9eef6;
+    --muted: #8f9aac;
+    --faint: #5c6678;
+    --ecg: #3cf59c;
+    --oxy: #ff3b4f;
+    --deoxy: #4a8bff;
+    --amber: #ffb23e;
+    --la-trace: #f3a3b0;
+    --btn: rgba(255, 255, 255, 0.05);
+    --btn-hover: rgba(255, 255, 255, 0.1);
+    --radius: 10px;
+    --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --cond: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body { background: radial-gradient(ellipse at 50% 42%, var(--ground-2) 0%, var(--ground) 62%); background-color: var(--ground);
+    color: var(--text); font-family: var(--sans); font-size: 13px; line-height: 1.45; }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; outline: none; touch-action: none; }
+
+  .panel { position: fixed; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 14px 44px rgba(0, 0, 0, 0.5);
+    overflow-y: auto; scrollbar-width: thin; scrollbar-color: #243047 transparent; z-index: 5; }
+  #controls { top: 16px; left: 16px; width: 284px; max-height: calc(100% - 32px); padding: 14px; }
+  #monitor { top: 16px; right: 16px; width: 348px; max-height: calc(100% - 32px); padding: 12px 14px 14px; }
+
+  .brand { display: flex; gap: 10px; align-items: center; margin-bottom: 4px; }
+  .brand svg { flex: none; }
+  .brand h1 { font-family: var(--cond); font-size: 17px; font-weight: 700; margin: 0; letter-spacing: 0.02em; }
+  .brand p { margin: 0; color: var(--muted); font-size: 11.5px; }
+
+  h2 { font-family: var(--cond); font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted);
+    margin: 18px 0 8px; font-weight: 600; }
+  .hrline { display: flex; align-items: baseline; justify-content: space-between; }
+  .hrline output { font-family: var(--mono); font-size: 22px; font-weight: 600; color: var(--ecg); font-variant-numeric: tabular-nums; }
+  .hrline output small { font-size: 11px; color: var(--muted); margin-left: 4px; font-weight: 500; }
+  input[type=range] { width: 100%; accent-color: var(--ecg); margin: 6px 0 2px; }
+  .scale { display: flex; justify-content: space-between; color: var(--faint); font-size: 10.5px; font-family: var(--mono); }
+  .note { color: var(--muted); font-size: 11.5px; margin: 8px 0 0; }
+  .note b { color: var(--text); font-weight: 600; font-family: var(--mono); font-size: 11px; }
+
+  .row { display: flex; gap: 6px; }
+  .row > * { flex: 1; }
+  button, select { font: inherit; color: var(--text); background: var(--btn); border: 1px solid var(--line);
+    border-radius: 7px; padding: 7px 9px; cursor: pointer; transition: background .15s, border-color .15s; }
+  button:hover { background: var(--btn-hover); border-color: var(--line-strong); }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  button.on { border-color: var(--ecg); color: var(--ecg); background: rgba(60, 245, 156, 0.08); }
+  select { background: var(--panel-solid); }
+  .mt { margin-top: 6px; }
+
+  .check { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; margin: 5px 0; cursor: pointer; }
+  .check input { accent-color: var(--ecg); margin: 0; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chips + .sub { margin-top: 10px; }
+  .sub { font-size: 10.5px; color: var(--faint); margin: 0 0 5px; letter-spacing: 0.04em; }
+  .chip { padding: 4px 9px; font-size: 12px; border-radius: 99px; }
+  .chip.sel { border-color: var(--amber); color: var(--amber); background: rgba(255, 178, 62, 0.1); }
+
+  .legend { display: flex; gap: 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11.5px; }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .dot.deoxy { background: var(--deoxy); box-shadow: 0 0 8px var(--deoxy); }
+  .dot.oxy { background: var(--oxy); box-shadow: 0 0 8px var(--oxy); }
+
+  /* ---------- bedside monitor ---------- */
+  .mon-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .mon-hr { display: flex; align-items: center; gap: 10px; }
+  .mon-hr svg { transition: transform .08s ease-out; transform-origin: center; }
+  .mon-hr svg.beat { transform: scale(1.22); }
+  .mon-hr .big { font-family: var(--mono); font-size: 34px; line-height: 1; font-weight: 600; color: var(--ecg); font-variant-numeric: tabular-nums; }
+  .mon-hr .unit { font-family: var(--cond); font-size: 11px; letter-spacing: 0.12em; color: var(--muted); text-transform: uppercase; }
+  .phase { text-align: right; }
+  .pill { display: inline-block; font-family: var(--cond); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 2px 8px; border-radius: 99px; background: rgba(255, 59, 79, 0.14); color: #ff7f8c; }
+  .pill.dia { background: rgba(74, 139, 255, 0.15); color: #8db4ff; }
+  .phase .name { font-size: 12px; color: var(--text); margin-top: 4px; min-height: 18px; }
+
+  .trace { margin-top: 10px; background: #03060a; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px 6px; }
+  .trace .cap { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: var(--faint); margin-bottom: 2px; }
+  .trace .cap .lead { color: var(--ecg); }
+  .trace canvas { display: block; width: 100%; height: 78px; }
+  #pressCanvas { height: 92px; }
+  .keys { display: flex; flex-wrap: wrap; gap: 10px; font-size: 10.5px; color: var(--muted); margin-top: 4px; }
+  .keys i { display: inline-block; width: 12px; height: 2px; vertical-align: 3px; margin-right: 5px; background: var(--c); }
+
+  .timing { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
+  .timing div { border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; }
+  .timing .k { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-family: var(--cond); }
+  .timing .v { font-family: var(--mono); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .timing .v small { font-size: 10px; color: var(--faint); font-weight: 400; margin-left: 2px; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+  th { text-align: left; font-family: var(--cond); font-weight: 600; font-size: 10.5px; color: var(--faint); letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 0 0 5px; border-bottom: 1px solid var(--line); }
+  th.n, td.n { text-align: right; }
+  td { padding: 5px 0; border-bottom: 1px solid rgba(150, 172, 205, 0.06); font-variant-numeric: tabular-nums; }
+  td.n { font-family: var(--mono); font-size: 11.5px; }
+  td .sw { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 7px; vertical-align: 1px; }
+  tr.click { cursor: pointer; }
+  tr.click:hover td { color: var(--amber); }
+  .vstate { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 10px; }
+  .vs { text-align: center; border: 1px solid var(--line); border-radius: 7px; padding: 5px 2px; font-size: 10.5px; color: var(--muted); cursor: pointer; }
+  .vs b { display: block; font-family: var(--mono); font-size: 10.5px; margin-top: 1px; color: var(--faint); font-weight: 600; }
+  .vs.open { border-color: rgba(60, 245, 156, 0.5); }
+  .vs.open b { color: var(--ecg); }
+
+  /* ---------- inspection drawer ---------- */
+  #drawer { top: 16px; right: 16px; width: 368px; max-height: calc(100% - 32px); padding: 16px 16px 18px; z-index: 7;
+    transform: translateX(calc(100% + 24px)); transition: transform .35s cubic-bezier(.2, .8, .2, 1); background: rgba(9, 12, 19, 0.95); }
+  #drawer.open { transform: none; }
+  .dh { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+  .kind { font-family: var(--cond); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--amber); }
+  .ox { font-family: var(--cond); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; margin-left: 8px; }
+  .ox.deoxy { color: #8db4ff; } .ox.oxy { color: #ff8b97; } .ox.mixed { color: var(--muted); }
+  #dTitle { font-family: var(--cond); font-size: 24px; font-weight: 700; margin: 2px 0 2px; text-wrap: balance; }
+  #dSub { color: var(--muted); margin: 0; font-size: 12.5px; }
+  #dClose { flex: none; width: 32px; height: 32px; padding: 0; font-size: 18px; line-height: 1; }
+  .live { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 14px 0 4px; }
+  .live div { background: #03060a; border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; }
+  .live .k { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-family: var(--cond); }
+  .live .v { font-family: var(--mono); font-size: 15px; font-weight: 600; color: var(--ecg); font-variant-numeric: tabular-nums; }
+  .live .v.warm { color: var(--amber); } .live .v.cold { color: var(--faint); }
+  #drawer h3 { font-family: var(--cond); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 16px 0 6px; font-weight: 600; }
+  #drawer p.body { margin: 0; color: #cdd5e2; font-size: 13px; max-width: 62ch; }
+  #dFacts { margin: 10px 0 0; padding: 0; list-style: none; display: grid; gap: 5px; }
+  #dFacts li { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; border-bottom: 1px solid rgba(150, 172, 205, 0.07); padding-bottom: 5px; }
+  #dFacts li span { color: var(--muted); }
+  #dFacts li b { font-family: var(--mono); font-weight: 500; font-size: 11.5px; text-align: right; }
+
+  /* ---------- in-scene labels ---------- */
+  #labels { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+  .lbl { position: absolute; left: 0; top: 0; pointer-events: auto; font: 600 11px/1 var(--cond); letter-spacing: 0.06em;
+    color: var(--text); background: rgba(5, 8, 13, 0.72); border: 1px solid var(--line); border-radius: 99px; padding: 4px 8px;
+    white-space: nowrap; cursor: pointer; transition: opacity .2s, border-color .15s, color .15s; }
+  .lbl:hover, .lbl.sel { border-color: var(--amber); color: var(--amber); }
+  .lbl.valve { color: #f1dfbd; }
+  .lbl.static { cursor: default; color: var(--muted); font-weight: 500; }
+  .lbl.static:hover { border-color: var(--line); color: var(--muted); }
+  #labels.off .lbl { opacity: 0; pointer-events: none; }
+
+  #tip { position: fixed; z-index: 8; pointer-events: none; background: rgba(5, 8, 13, 0.94); border: 1px solid var(--line-strong);
+    border-radius: 7px; padding: 5px 9px; font-size: 12px; display: none; }
+  #tip small { color: var(--muted); margin-left: 6px; }
+  #hint { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 4; color: var(--faint);
+    font-size: 11.5px; background: rgba(5, 8, 13, 0.6); padding: 5px 12px; border-radius: 99px; border: 1px solid var(--line); white-space: nowrap; }
+  kbd { font-family: var(--mono); font-size: 10px; border: 1px solid var(--line-strong); border-radius: 4px; padding: 0 4px; color: var(--muted); }
+  #menuBtn { display: none; }
+
+  @media (max-width: 1100px) { #controls { width: 250px; } #monitor, #drawer { width: 320px; } }
+  @media (max-width: 820px) {
+    #menuBtn { display: block; position: fixed; top: calc(16px + env(safe-area-inset-top, 0px)); left: 16px; z-index: 9;
+      background: var(--panel-solid); font-family: var(--cond); font-weight: 600; letter-spacing: 0.06em; }
+    #controls { top: calc(62px + env(safe-area-inset-top, 0px)); left: 16px; right: 16px; width: auto; max-height: 58%; display: none; z-index: 9; }
+    #controls.show { display: block; }
+    #monitor { top: auto; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); left: 16px; right: 16px; width: auto; max-height: 36%; }
+    #monitor table, #monitor .keys, #pressWrap { display: none; }
+    #drawer { top: auto; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); left: 16px; right: 16px; width: auto; max-height: 60%;
+      transform: translateY(calc(100% + 40px)); }
+    #hint { display: none; }
+    .mon-hr .big { font-size: 26px; }
+  }
+  @media (prefers-reduced-motion: reduce) { #drawer { transition: none; } .mon-hr svg { transition: none; } }
+</style>
+</head>
+<body>
+
+<div id="stage"></div>
+<div id="labels"></div>
+<button id="menuBtn" aria-controls="controls" aria-expanded="false">Controls</button>
+
+<aside id="controls" class="panel" aria-label="Simulation controls">
+  <header class="brand">
+    <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 28S4 20.5 4 11.8C4 7.5 7.2 4.5 11 4.5c2.3 0 4 1.1 5 2.8 1-1.7 2.7-2.8 5-2.8 3.8 0 7 3 7 7.3C28 20.5 16 28 16 28z" fill="none" stroke="#ff3b4f" stroke-width="1.8"/><path d="M5 16h6l2-4 3 8 2.5-6 1.5 2H27" fill="none" stroke="#3cf59c" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>
+    <div><h1>Cardiac Flow Lab</h1><p>Four chambers, four valves, one cycle</p></div>
+  </header>
+
+  <h2>Heart rate</h2>
+  <div class="hrline"><label for="hr" class="sub" style="margin:0">Target rate</label><output id="hrOut">72<small>BPM</small></output></div>
+  <input id="hr" type="range" min="60" max="150" step="1" value="72" aria-label="Heart rate in beats per minute">
+  <div class="scale"><span>60 rest</span><span>105</span><span>150 workout</span></div>
+  <div class="row mt">
+    <button id="pRest" data-bpm="60">Rest 60</button>
+    <button id="pWalk" data-bpm="100">Walk 100</button>
+    <button id="pRun" data-bpm="150">Sprint 150</button>
+  </div>
+  <p class="note" id="hrNote"></p>
+
+  <h2>Playback</h2>
+  <div class="row">
+    <button id="playBtn" aria-pressed="false">Pause</button>
+    <select id="speed" aria-label="Playback speed">
+      <option value="1">1× real time</option>
+      <option value="0.5">0.5× slow</option>
+      <option value="0.25">0.25× slow</option>
+      <option value="0.1">0.1× valve study</option>
+    </select>
+  </div>
+
+  <h2>View</h2>
+  <label class="check"><input type="checkbox" id="cutaway" checked> Cutaway (open the front walls)</label>
+  <label class="check"><input type="checkbox" id="flow" checked> Blood flow particles</label>
+  <label class="check"><input type="checkbox" id="labelsOn" checked> Structure labels</label>
+  <label class="check"><input type="checkbox" id="autorot"> Slow auto-rotate</label>
+  <button id="resetView" class="mt" style="width:100%">Reset view</button>
+
+  <h2>Inspect</h2>
+  <p class="sub">Chambers</p>
+  <div class="chips" id="chipsCh"></div>
+  <p class="sub" style="margin-top:10px">Valves</p>
+  <div class="chips" id="chipsVa"></div>
+  <p class="sub" style="margin-top:10px">Great vessels</p>
+  <div class="chips" id="chipsVe"></div>
+
+  <div class="legend"><span><i class="dot deoxy"></i>Deoxygenated</span><span><i class="dot oxy"></i>Oxygenated</span></div>
+</aside>
+
+<aside id="monitor" class="panel" aria-label="Live telemetry">
+  <div class="mon-head">
+    <div class="mon-hr">
+      <svg id="beatIcon" width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 28S4 20.5 4 11.8C4 7.5 7.2 4.5 11 4.5c2.3 0 4 1.1 5 2.8 1-1.7 2.7-2.8 5-2.8 3.8 0 7 3 7 7.3C28 20.5 16 28 16 28z" fill="#ff3b4f"/></svg>
+      <div><div class="big" id="mHr">72</div><div class="unit">HR · BPM</div></div>
+    </div>
+    <div class="phase"><span class="pill" id="mPill">Systole</span><div class="name" id="mPhase">Ventricular ejection</div></div>
+  </div>
+
+  <div class="trace">
+    <div class="cap"><span class="lead">ECG · Lead II</span><span>25 mm/s · 1 mV</span></div>
+    <canvas id="ecgCanvas"></canvas>
+  </div>
+  <div class="trace" id="pressWrap">
+    <div class="cap"><span>Pressure · mmHg</span><span>0 – 160</span></div>
+    <canvas id="pressCanvas"></canvas>
+    <div class="keys"><span style="--c:#ffb23e"><i></i>Aorta</span><span style="--c:#ff3b4f"><i></i>Left ventricle</span><span style="--c:#f3a3b0"><i></i>Left atrium</span></div>
+  </div>
+
+  <div class="timing">
+    <div><div class="k">Systole</div><div class="v" id="tSys">–<small>ms</small></div></div>
+    <div><div class="k">Diastole</div><div class="v" id="tDia">–<small>ms</small></div></div>
+    <div><div class="k">Output</div><div class="v" id="tCo">–<small>L/min</small></div></div>
+  </div>
+
+  <table aria-label="Chamber telemetry">
+    <thead><tr><th>Chamber</th><th class="n">Now</th><th class="n">Range</th><th class="n">Volume</th></tr></thead>
+    <tbody id="chTable"></tbody>
+  </table>
+  <div class="vstate" id="vState"></div>
+</aside>
+
+<aside id="drawer" class="panel" aria-hidden="true" aria-labelledby="dTitle">
+  <div class="dh">
+    <div><span class="kind" id="dKind">Valve</span><span class="ox" id="dOx"></span><h2 id="dTitle">–</h2><p id="dSub"></p></div>
+    <button id="dClose" aria-label="Close details">×</button>
+  </div>
+  <div class="live" id="dLive"></div>
+  <h3>What it does</h3>
+  <p class="body" id="dFn"></p>
+  <h3>Pressure mechanics</h3>
+  <p class="body" id="dMech"></p>
+  <ul id="dFacts"></ul>
+</aside>
+
+<div id="tip"></div>
+<div id="hint">Drag to orbit · Scroll to zoom · Click a chamber or valve · <kbd>Space</kbd> pause · <kbd>Esc</kbd> close</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const $ = id => document.getElementById(id);
+const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
+const V = a => v3(a[0], a[1], a[2]);
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = t => t * t * (3 - 2 * t);
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* =====================================================================
+   Renderer, camera, lights
+   ===================================================================== */
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+$('stage').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 120);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 1.6;
+controls.maxDistance = 40;
+controls.autoRotateSpeed = 0.6;
+
+function homeView() {
+  // frame the heart in the space the side panels leave free
+  const freeW = innerWidth > 820 ? Math.max(200, innerWidth - 680) : innerWidth;
+  const aspect = freeW / Math.max(1, innerHeight);
+  const d = Math.max(12, 6.8 / (0.728 * aspect));
+  return { target: v3(0.1, 0.25, -0.3), pos: v3(0.1, 0.25, -0.3).add(v3(0.16, 0.12, 1).normalize().multiplyScalar(d)) };
+}
+{ const h = homeView(); camera.position.copy(h.pos); controls.target.copy(h.target); }
+
+scene.add(new THREE.HemisphereLight(0xc4d6ff, 0x2a0a12, 0.85));
+const key = new THREE.DirectionalLight(0xfff0e4, 2.3);
+key.position.set(4, 7, 8);
+key.castShadow = true;
+key.shadow.mapSize.set(1024, 1024);
+Object.assign(key.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 1, far: 30 });
+key.shadow.bias = -0.0015;
+scene.add(key);
+const rim = new THREE.DirectionalLight(0x6f8dff, 1.5);
+rim.position.set(-6, 3, -7);
+scene.add(rim);
+const inner = new THREE.PointLight(0xffb0a0, 14, 14, 2);
+inner.position.set(0.2, -0.2, 3.2);
+scene.add(inner);
+
+/* =====================================================================
+   Anatomy layout (units ≈ 3 cm). Viewer faces the anterior surface, so the
+   patient's right heart sits on screen-left and the left heart on screen-right.
+   ===================================================================== */
+const CH = {
+  ra: { c: [-1.35, 0.95, 0.1],  r: [0.85, 0.8, 0.8],  rot: 0.15, col: 0x8e3552, inside: 0x3d1020 },
+  rv: { c: [-0.45, -0.75, 0.45], r: [1.0, 1.15, 0.78], rot: 0.3,  col: 0x9a3448, inside: 0x44101c },
+  la: { c: [1.05, 1.1, -0.55],  r: [0.85, 0.68, 0.72], rot: -0.1, col: 0xad3040, inside: 0x4a0f18 },
+  lv: { c: [0.85, -0.95, -0.2], r: [1.05, 1.45, 0.95], rot: 0.3,  col: 0xb8323d, inside: 0x520f18 },
+};
+const VALVE = {
+  tricuspid: { pos: [-1.0, 0.18, 0.36], dir: [0.9, -1.7, 0.35], r: 0.33, n: 3, av: true },
+  mitral:    { pos: [1.0, 0.38, -0.45], dir: [-0.2, -2.05, 0.35], r: 0.31, n: 2, av: true },
+  pulmonary: { pos: [0.02, 0.62, 0.78], dir: [0.3, 1, -0.25], r: 0.25, n: 3, av: false },
+  aortic:    { pos: [0.36, 0.42, 0.02], dir: [-0.25, 1, 0.08], r: 0.27, n: 3, av: false },
+};
+const TRI = VALVE.tricuspid.pos, MIT = VALVE.mitral.pos, PUL = VALVE.pulmonary.pos, AOR = VALVE.aortic.pos;
+
+const AORTA = [AOR, [0.05, 1.5, -0.1], [-0.05, 2.5, -0.25], [0.45, 3.15, -0.75], [1.15, 2.8, -1.35], [1.4, 1.6, -1.65], [1.4, -1.5, -1.75], [1.3, -3.6, -1.75]];
+const PA_TRUNK = [PUL, [0.3, 1.35, 0.55], [0.55, 1.95, -0.1]];
+const LPA = [[0.55, 1.95, -0.1], [1.6, 2.1, -0.3], [2.9, 1.8, -0.4]];
+const RPA = [[0.55, 1.95, -0.1], [0.5, 1.95, -0.7], [-0.3, 1.9, -0.9], [-1.6, 1.9, -0.85], [-2.9, 1.7, -0.5]];
+const SVC = [[-1.4, 3.4, -0.05], [-1.4, 2.4, 0], [-1.38, 1.5, 0.08]];
+const IVC = [[-1.5, -3.2, -0.5], [-1.5, -1.6, -0.45], [-1.45, 0.2, -0.15]];
+const VEIN_Y = { s: 1.45, i: 0.7 };
+const pvOuter = (side, y) => side > 0
+  ? [[3.1, y, -0.95], [2.4, y, -0.95], [1.75, y * 0.75 + 0.25, -0.8]]
+  : [[-3.1, y, -0.95], [-1.5, y, -1.15], [-0.2, y * 0.8 + 0.2, -1.05], [0.45, 1.0, -0.75]];
+
+/* ---------- chamber shells: displaced spheres, optionally cut open at the front ---------- */
+const CUT = 1.95;
+function shellGeometry(cut, seed) {
+  const g = cut
+    ? new THREE.SphereGeometry(1, 72, 48, Math.PI / 2 + CUT / 2, Math.PI * 2 - CUT)
+    : new THREE.SphereGeometry(1, 72, 48);
+  const p = g.attributes.position, v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i);
+    const n = 1 + 0.035 * Math.sin(v.x * 3.1 + seed) * Math.sin(v.y * 2.7 + seed * 1.7) + 0.018 * Math.sin(v.z * 5 + v.y * 3 + seed);
+    v.multiplyScalar(n);
+    p.setXYZ(i, v.x, v.y, v.z);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
+const heart = new THREE.Group();
+scene.add(heart);
+const pickables = [];
+const byKey = {};           // key -> [materials] for highlight
+const register = (key, mesh) => {
+  mesh.userData.key = key;
+  pickables.push(mesh);
+  (byKey[key] ||= []).push(mesh.material);
+};
+
+const chambers = {};
+Object.entries(CH).forEach(([k, d], i) => {
+  const geoCut = shellGeometry(true, i * 2.3 + 1), geoFull = shellGeometry(false, i * 2.3 + 1);
+  const outerMat = new THREE.MeshPhysicalMaterial({ color: d.col, roughness: 0.48, clearcoat: 0.55, clearcoatRoughness: 0.35,
+    sheen: 0.6, sheenColor: new THREE.Color(0xff8a8a), emissive: 0xff9a3a, emissiveIntensity: 0 });
+  const innerMat = new THREE.MeshStandardMaterial({ color: d.inside, roughness: 0.7, side: THREE.BackSide, emissive: 0xff9a3a, emissiveIntensity: 0 });
+  const g = new THREE.Group();
+  g.position.copy(V(d.c));
+  g.rotation.z = d.rot;
+  const outer = new THREE.Mesh(geoCut, outerMat), innerM = new THREE.Mesh(geoCut, innerMat);
+  outer.castShadow = outer.receiveShadow = true;
+  innerM.receiveShadow = true;
+  g.add(outer, innerM);
+  heart.add(g);
+  register(k, outer); register(k, innerM);
+  chambers[k] = { group: g, outer, inner: innerM, geoCut, geoFull, r: V(d.r) };
+});
+
+/* ---------- vessels ---------- */
+const vesselMats = [];
+function tube(key, pts, radius, color, opts = {}) {
+  const curve = new THREE.CatmullRomCurve3(pts.map(V), false, 'centripetal');
+  const geo = new THREE.TubeGeometry(curve, Math.max(24, pts.length * 18), radius, 20, false);
+  const mat = new THREE.MeshPhysicalMaterial({ color, roughness: 0.42, clearcoat: 0.5, clearcoatRoughness: 0.4,
+    emissive: 0xff9a3a, emissiveIntensity: 0, side: THREE.DoubleSide });
+  mat.userData.glass = opts.glass !== false;
+  const m = new THREE.Mesh(geo, mat);
+  m.castShadow = true;
+  heart.add(m);
+  if (key) register(key, m);
+  vesselMats.push(mat);
+  return m;
+}
+const BLUE_V = 0x3d5aa6, RED_V = 0xb8323d;
+tube('aorta', AORTA, 0.3, RED_V);
+[[[0.05, 3.0, -0.45], [-0.05, 3.85, -0.4]], [[0.4, 3.18, -0.72], [0.4, 3.95, -0.75]], [[0.82, 3.05, -1.05], [0.92, 3.8, -1.1]]]
+  .forEach(p => tube('aorta', p, 0.09, RED_V));
+tube('pa', PA_TRUNK, 0.27, BLUE_V);
+tube('pa', LPA, 0.2, BLUE_V);
+tube('pa', RPA, 0.2, BLUE_V);
+tube('svc', SVC, 0.27, BLUE_V);
+tube('ivc', IVC, 0.3, BLUE_V);
+[1, -1].forEach(s => ['s', 'i'].forEach(t => tube('pv', pvOuter(s, VEIN_Y[t]), 0.12, RED_V)));
+// right-ventricular outflow tract (infundibulum) joins the RV body to the pulmonary valve
+tube('rv', [[-0.3, -0.2, 0.72], [-0.12, 0.25, 0.82], PUL], 0.27, CH.rv.col, { glass: false });
+
+/* ---------- lungs: faint capillary beds where the particles pick up oxygen ---------- */
+[1, -1].forEach(s => {
+  const g = new THREE.SphereGeometry(1, 36, 24);
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0xd98a96, transparent: true, opacity: 0.07, depthWrite: false, roughness: 1 }));
+  const w = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xe9a3ae, wireframe: true, transparent: true, opacity: 0.05, depthWrite: false }));
+  [m, w].forEach(o => { o.position.set(s * 3.75, 1.3, -0.75); o.scale.set(1.05, 1.75, 0.95); o.renderOrder = 1; scene.add(o); });
+});
+
+/* ---------- valves: annulus ring + hinged leaflets (+ chordae for the AV valves) ---------- */
+const Y = v3(0, 1, 0);
+const valves = {};
+Object.entries(VALVE).forEach(([k, d]) => {
+  const g = new THREE.Group();
+  g.position.copy(V(d.pos));
+  g.quaternion.setFromUnitVectors(Y, V(d.dir).normalize());
+  heart.add(g);
+  const ringMat = new THREE.MeshStandardMaterial({ color: 0xe2cda6, roughness: 0.5, emissive: 0xff9a3a, emissiveIntensity: 0 });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(d.r, d.r * 0.13, 12, 56), ringMat);
+  ring.rotation.x = Math.PI / 2;
+  g.add(ring);
+  const leafMat = new THREE.MeshStandardMaterial({ color: 0xf1e2c4, roughness: 0.55, side: THREE.DoubleSide, emissive: 0xff9a3a, emissiveIntensity: 0 });
+  const leaflets = [];
+  const half = Math.PI / d.n - 0.035;
+  for (let i = 0; i < d.n; i++) {
+    const th = (i / d.n) * Math.PI * 2 + (d.n === 2 ? 0 : Math.PI / 6);
+    const H = v3(d.r * Math.cos(th), 0, d.r * Math.sin(th));      // hinge at the rim
+    const pos = [0 - H.x, 0.04 * d.r - H.y, 0 - H.z];              // fan centre, slightly billowed
+    const seg = 14;
+    for (let j = 0; j <= seg; j++) {
+      const a = th - half + (2 * half * j) / seg;
+      pos.push(0.97 * d.r * Math.cos(a) - H.x, -H.y, 0.97 * d.r * Math.sin(a) - H.z);
+    }
+    const idx = [];
+    for (let j = 1; j <= seg; j++) idx.push(0, j, j + 1);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const pivot = new THREE.Object3D();
+    pivot.position.copy(H);
+    pivot.add(new THREE.Mesh(geo, leafMat));
+    g.add(pivot);
+    leaflets.push({ pivot, H, axis: v3(-Math.sin(th), 0, Math.cos(th)), th });
+  }
+  // AV valves: chordae tendineae tie each leaflet's free edge to papillary muscles below
+  let chordae = null;
+  if (d.av) {
+    const pap = [];
+    for (let i = 0; i < d.n; i++) {
+      const a = d.n === 2 ? (i ? -Math.PI / 2 : Math.PI / 2) : (i / d.n) * Math.PI * 2 + Math.PI / 6 + Math.PI / d.n;
+      pap.push(v3(0.55 * d.r * Math.cos(a), 1.35 * d.r, 0.55 * d.r * Math.sin(a)));
+      const pm = new THREE.Mesh(new THREE.SphereGeometry(d.r * 0.14, 12, 10), new THREE.MeshStandardMaterial({ color: 0x9c2f3d, roughness: 0.6 }));
+      pm.position.copy(pap[i]);
+      pm.scale.set(1, 1.6, 1);
+      g.add(pm);
+    }
+    const links = [];
+    leaflets.forEach(L => {
+      for (let k = -1; k <= 1; k++) {
+        const a = L.th + k * 0.45 * (Math.PI / d.n);
+        const P = v3(0.4 * d.r * Math.cos(a), 0, 0.4 * d.r * Math.sin(a));
+        let best = 0, bd = 1e9;
+        pap.forEach((q, qi) => { const dd = q.distanceToSquared(P); if (dd < bd) { bd = dd; best = qi; } });
+        links.push({ L, rel: P.clone().sub(L.H), pap: pap[best] });
+      }
+    });
+    const lg = new THREE.BufferGeometry();
+    lg.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(links.length * 6), 3));
+    chordae = { line: new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0xf3e6cc, transparent: true, opacity: 0.75 })), links };
+    g.add(chordae.line);
+  }
+  // Invisible, slightly larger hit proxy so small valves are easy to click
+  const proxy = new THREE.Mesh(new THREE.SphereGeometry(d.r * 1.25, 16, 12), new THREE.MeshBasicMaterial({ visible: false }));
+  g.add(proxy);
+  proxy.userData.key = k;
+  pickables.push(proxy);
+  byKey[k] = [ringMat, leafMat];
+  valves[k] = { group: g, leaflets, chordae, open: 0, maxA: d.av ? 1.2 : 1.35 };
+});
+
+function poseValve(vk) {
+  const vv = valves[vk], q = new THREE.Quaternion(), tmp = new THREE.Vector3();
+  vv.leaflets.forEach(L => {
+    L.q = L.q || new THREE.Quaternion();
+    L.q.setFromAxisAngle(L.axis, -vv.open * vv.maxA);   // negative angle swings the free edge downstream (+Y)
+    L.pivot.quaternion.copy(L.q);
+  });
+  if (vv.chordae) {
+    const arr = vv.chordae.line.geometry.attributes.position.array;
+    vv.chordae.links.forEach((c, i) => {
+      tmp.copy(c.rel).applyQuaternion(c.L.q).add(c.L.H);
+      arr.set([tmp.x, tmp.y, tmp.z, c.pap.x, c.pap.y, c.pap.z], i * 6);
+    });
+    vv.chordae.line.geometry.attributes.position.needsUpdate = true;
+  }
+}
+
+/* =====================================================================
+   THE RHYTHMIC LOOP: cardiac cycle model
+   ---------------------------------------------------------------------
+   One master clock `tv` = seconds since the start of the QRS complex.
+   It runs 0 → T (T = 60 / BPM) and wraps. Every visual quantity is a pure
+   function of tv, so the ECG, pressure traces, chamber squeeze and valve
+   states can never drift apart.
+
+   Event timeline inside one beat:
+     0        QRS onset → AV valves shut → isovolumetric contraction
+     ejS      ventricle pressure passes arterial pressure → semilunar valves open
+     ejE      end of T wave region → semilunar valves shut (dicrotic notch)
+     irE      ventricle falls below atrial pressure → AV valves open, filling
+     afS      P wave fires → atrial systole ("atrial kick") tops up the ventricle
+     T        next QRS
+
+   Systole (QT) scales with sqrt(RR) (Bazett), so raising the heart rate
+   eats mostly into diastole, which is what a real heart does.
+   ===================================================================== */
+function cycleParams(bpm) {
+  const T = 60 / bpm;
+  const QT = 0.39 * Math.sqrt(T);
+  const PR = 0.1 + 0.06 * T;
+  const ejS = 0.05, ejE = QT - 0.01, irE = QT + 0.04 + 0.03 * T;
+  const afS = Math.max(T - PR + 0.02, irE);
+  return { T, QT, PR, ejS, ejE, irE, afS, bpm };
+}
+const passive = t => 0.85 * (1 - Math.exp(-t / 0.08));   // early passive filling fraction
+
+function hemo(bpm) {
+  const x = (bpm - 60) / 90;
+  return {
+    L: { sys: 120 + 30 * x, dia: 80 - 5 * x, edp: 10, min: 4 },
+    R: { sys: 25 + 9 * x, dia: 9 + x, edp: 5, min: 2 },
+    edv: 120 + 5 * x, esv: 50 - 15 * x,
+    redv: 130 + 5 * x, resv: 60 - 15 * x,
+  };
+}
+
+function ventPressure(tv, C, P, cv, u_a) {
+  const pe = P.dia + 0.3 * (P.sys - P.dia);
+  let vent, art;
+  if (tv < C.ejS) vent = P.edp + (P.dia - P.edp) * (tv / C.ejS) ** 2;
+  else if (tv < C.ejE) {
+    const u = (tv - C.ejS) / (C.ejE - C.ejS);
+    vent = P.dia + (P.sys - P.dia - 4) * Math.sin(Math.PI * u ** 0.75) + 0.3 * (P.sys - P.dia) * u;
+  } else if (tv < C.irE) vent = P.min + (pe - P.min) * (1 - (tv - C.ejE) / (C.irE - C.ejE)) ** 2.2;
+  else vent = P.min + (P.edp - P.min) * (1 - cv) ** 1.5 + (u_a >= 0 ? 3 * Math.sin(Math.PI * u_a) * P.edp / 10 : 0);
+
+  if (tv >= C.ejS && tv < C.ejE) art = vent - 1;
+  else {
+    // Windkessel run-off: arterial pressure decays from end-systole to diastolic, with a dicrotic notch at valve closure
+    const since = (tv - C.ejE + C.T) % C.T, total = C.T - C.ejE + C.ejS, span = P.sys - P.dia;
+    art = P.dia + (pe - 1 - P.dia) * Math.max(0, 1 - since / total) ** 1.3
+      - 0.08 * span * Math.exp(-(((since - 0.012) / 0.01) ** 2))
+      + 0.05 * span * Math.exp(-(((since - 0.04) / 0.02) ** 2));
+  }
+  return { vent, art };
+}
+
+const PHASES = {
+  isoC: ['Isovolumetric contraction', 'sys'], eject: ['Ventricular ejection', 'sys'], isoR: ['Isovolumetric relaxation', 'dia'],
+  rapid: ['Rapid passive filling', 'dia'], diastasis: ['Diastasis', 'dia'], atrial: ['Atrial systole', 'dia'],
+};
+
+function cycleState(tv, C) {
+  let cv, fill, ca = 0, phase, ua = -1;
+  if (tv < C.ejS) { cv = 0.05 * tv / C.ejS; fill = tv / C.irE; phase = 'isoC'; }
+  else if (tv < C.ejE) { const u = (tv - C.ejS) / (C.ejE - C.ejS); cv = 0.05 + 0.95 * (1 - (1 - u) ** 2); fill = tv / C.irE; phase = 'eject'; }
+  else if (tv < C.irE) { cv = 1; fill = tv / C.irE; phase = 'isoR'; }
+  else {
+    const p = passive(tv - C.irE), pT = passive(C.T - C.irE);
+    fill = 1 - 0.7 * p / 0.85;
+    cv = 1 - p;
+    if (tv >= C.afS) {
+      ua = (tv - C.afS) / Math.max(1e-3, C.T - C.afS);
+      cv -= (1 - pT) * smooth(ua);          // atrial kick supplies whatever passive filling did not
+      ca = Math.sin(Math.PI * ua);
+      fill *= 1 - smooth(ua);
+      phase = 'atrial';
+    } else phase = tv - C.irE < 0.11 ? 'rapid' : 'diastasis';
+    cv = Math.max(0, cv);
+  }
+  const H = hemo(C.bpm);
+  const L = ventPressure(tv, C, H.L, cv, ua), R = ventPressure(tv, C, H.R, cv, ua);
+  const cw = Math.exp(-(((tv - 0.03) / 0.015) ** 2));
+  return {
+    cv, ca, fill, phase,
+    P: { lv: L.vent, ao: L.art, rv: R.vent, pa: R.art, la: 3 + 5 * ca + 7 * fill + 2 * cw, ra: 1 + 3 * ca + 4 * fill + 1.5 * cw },
+    vol: { lv: H.edv - (H.edv - H.esv) * cv, rv: H.redv - (H.redv - H.resv) * cv },
+    H,
+    target: { av: tv >= C.irE ? 1 : 0, sl: tv >= C.ejS && tv < C.ejE ? 1 : 0 },
+  };
+}
+
+// Synthetic lead-II ECG: Gaussian P, Q, R, S and T waves placed on the same clock
+function ecgAt(tv, C) {
+  const T = C.T;
+  const G = (c, a, w) => { let d = tv - c; d -= T * Math.round(d / T); return a * Math.exp(-0.5 * (d / w) ** 2); };
+  const sT = Math.sqrt(T);
+  return G(T - C.PR + 0.05, 0.13, 0.022) + G(0.012, -0.12, 0.007) + G(0.034, 1.1, 0.009) + G(0.056, -0.26, 0.009)
+    + G(C.QT - 0.09 * sT, 0.3, 0.04 * sT);
+}
+
+/* =====================================================================
+   PARTICLE PATH LOGIC
+   ---------------------------------------------------------------------
+   Blood travels a closed loop split into "legs". Each leg is an arc-length
+   sampled Catmull-Rom spline (a lookup table, so position(s) is O(1)).
+
+     svc/ivc → [tricuspid] → rv → [pulmonary] → pa L/R → lung → pv (4) → [mitral] → lv → [aortic] → aorta → (body) → svc/ivc
+
+   A leg that ends at a valve is "gated": while that valve is shut, a particle
+   cannot advance past  len − q·queue  (q is a per-particle random number), so
+   blood pools as a cloud in the chamber instead of stacking on one point.
+   The moment the valve opens the cloud drains through it.
+
+   Leg speed is driven by the valve openness, so ejection is a visible surge
+   and flow stalls during the isovolumetric phases when every valve is closed.
+   Colour is blue until the lung leg, where it blends to red (gas exchange).
+   ===================================================================== */
+const LEG_SAMPLE = 0.02;
+const legs = [];
+const legIndex = {};
+function leg(id, pts, o) {
+  const curve = new THREE.CatmullRomCurve3(pts.map(V), false, 'centripetal');
+  const len = curve.getLength(), n = Math.max(8, Math.ceil(len / LEG_SAMPLE));
+  const lut = new Float32Array((n + 1) * 3);
+  curve.getSpacedPoints(n).forEach((p, i) => lut.set([p.x, p.y, p.z], i * 3));
+  const L = Object.assign({ id, lut, n, len, gate: null, queue: 0, fadeIn: 0, fadeOut: 0, tint: 'deoxy' }, o);
+  legIndex[id] = legs.length;
+  legs.push(L);
+  return L;
+}
+const S = (a, b, c) => [a, b, c];
+leg('svc', [S(-1.4, 3.4, -0.05), S(-1.4, 2.4, 0), S(-1.38, 1.5, 0.08), S(-1.3, 0.85, 0.2), S(-1.15, 0.45, 0.3), TRI],
+  { gate: 'tricuspid', queue: 0.9, fadeIn: 0.5, jit: [0.12, 0.13, 0.3, 0.34, 0.05], next: () => 'rv', speed: s => (0.75 + 0.5 * s.tricuspid) * s.flow });
+leg('ivc', [S(-1.5, -3.2, -0.5), S(-1.5, -1.6, -0.45), S(-1.45, 0.2, -0.15), S(-1.45, 0.75, 0.1), S(-1.2, 0.55, 0.3), TRI],
+  { gate: 'tricuspid', queue: 0.9, fadeIn: 0.5, jit: [0.14, 0.15, 0.17, 0.34, 0.05], next: () => 'rv', speed: s => (0.75 + 0.5 * s.tricuspid) * s.flow });
+leg('rv', [TRI, S(-0.75, -0.55, 0.45), S(-0.55, -1.35, 0.4), S(-0.2, -1.3, 0.55), S(-0.1, -0.5, 0.7), S(-0.12, 0.2, 0.8), PUL],
+  { gate: 'pulmonary', queue: 1.0, jit: [0.05, 0.4, 0.42, 0.3, 0.06], next: () => (Math.random() < 0.5 ? 'paL' : 'paR'),
+    speed: s => 0.05 + 1.5 * s.tricuspid + 3.8 * s.pulmonary });
+leg('paL', [...PA_TRUNK, ...LPA.slice(1)], { jit: [0.07, 0.14, 0.12, 0.1, 0.1], next: () => (Math.random() < 0.5 ? 'lungLs' : 'lungLi'),
+  speed: s => (0.8 + 3.2 * s.pulmonary) * s.flow });
+leg('paR', [...PA_TRUNK, ...RPA.slice(1)], { jit: [0.07, 0.14, 0.12, 0.1, 0.1], next: () => (Math.random() < 0.5 ? 'lungRs' : 'lungRi'),
+  speed: s => (0.8 + 3.2 * s.pulmonary) * s.flow });
+[1, -1].forEach(side => ['s', 'i'].forEach(t => {
+  const y = VEIN_Y[t], tag = (side > 0 ? 'L' : 'R') + t;
+  const start = side > 0 ? LPA[LPA.length - 1] : RPA[RPA.length - 1];
+  leg('lung' + tag, [start, S(side * 3.7, 2.7, -0.45), S(side * 4.4, 1.7, -0.8), S(side * 4.1, 0.2, -1.0), S(side * 3.5, y - 0.1, -1.0), S(side * 3.1, y, -0.95)],
+    { tint: 'lung', jit: [0.1, 0.45, 0.55, 0.4, 0.06], next: () => 'pv' + tag, speed: s => 0.85 * s.flow });
+  const outer = pvOuter(side, y);
+  const inLA = side > 0 ? [S(1.1, 1.0, -0.55), S(1.0, 0.7, -0.5), MIT] : [S(1.0, 0.9, -0.5), MIT];
+  leg('pv' + tag, [...outer, ...inLA], { tint: 'oxy', gate: 'mitral', queue: 0.9, jit: [0.06, 0.06, 0.1, 0.3, 0.05],
+    next: () => 'lv', speed: s => (0.8 + 0.5 * s.mitral) * s.flow });
+}));
+leg('lv', [MIT, S(1.0, -0.4, -0.35), S(1.2, -1.5, -0.25), S(1.15, -2.0, -0.15), S(0.75, -1.5, 0), S(0.45, -0.5, 0.05), AOR],
+  { tint: 'oxy', gate: 'aortic', queue: 1.1, jit: [0.05, 0.4, 0.45, 0.35, 0.06], next: () => 'ao',
+    speed: s => 0.05 + 1.5 * s.mitral + 3.9 * s.aortic });
+leg('ao', AORTA, { tint: 'oxy', fadeOut: 1.2, jit: [0.08, 0.18, 0.18, 0.18, 0.18], next: () => (Math.random() < 0.34 ? 'svc' : 'ivc'),
+  speed: s => (1.0 + 3.8 * s.aortic) * s.flow });
+
+const N = 1500;
+const pLeg = new Uint8Array(N), pS = new Float32Array(N), pQ = new Float32Array(N), pOff = new Float32Array(N * 3);
+const pPos = new Float32Array(N * 3), pCol = new Float32Array(N * 3), pAlpha = new Float32Array(N), pSize = new Float32Array(N);
+{
+  const total = legs.reduce((a, L) => a + L.len, 0);
+  for (let i = 0; i < N; i++) {
+    let r = Math.random() * total, li = 0;
+    while (r > legs[li].len) { r -= legs[li].len; li++; }
+    pLeg[i] = li;
+    pS[i] = r;
+    pQ[i] = Math.random();
+    let x, y, z;
+    do { x = Math.random() * 2 - 1; y = Math.random() * 2 - 1; z = Math.random() * 2 - 1; } while (x * x + y * y + z * z > 1);
+    pOff.set([x, y, z], i * 3);
+    pSize[i] = 0.07 + Math.random() * 0.045;
+  }
+}
+const pGeo = new THREE.BufferGeometry();
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+pGeo.setAttribute('aColor', new THREE.BufferAttribute(pCol, 3));
+pGeo.setAttribute('aAlpha', new THREE.BufferAttribute(pAlpha, 1));
+pGeo.setAttribute('aSize', new THREE.BufferAttribute(pSize, 1));
+const pMat = new THREE.ShaderMaterial({
+  uniforms: { uPix: { value: innerHeight * renderer.getPixelRatio() / 2 } },
+  vertexShader: `
+    attribute vec3 aColor; attribute float aAlpha; attribute float aSize;
+    uniform float uPix; varying vec3 vC; varying float vA;
+    void main() {
+      vC = aColor; vA = aAlpha;
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      gl_Position = projectionMatrix * mv;
+      gl_PointSize = aSize * projectionMatrix[1][1] * uPix / -mv.z;
+    }`,
+  fragmentShader: `
+    varying vec3 vC; varying float vA;
+    void main() {
+      float r = length(gl_PointCoord - 0.5);
+      if (r > 0.5) discard;
+      float a = smoothstep(0.5, 0.12, r);
+      gl_FragColor = vec4(vC * (0.8 + 0.7 * (1.0 - 2.0 * r)), a * vA);
+    }`,
+  transparent: true, depthWrite: false,
+});
+const points = new THREE.Points(pGeo, pMat);
+points.frustumCulled = false;
+points.renderOrder = 10;
+scene.add(points);
+
+const DEOXY = [0.29, 0.52, 1.0], OXY = [1.0, 0.23, 0.31];
+function stepParticles(dt, st) {
+  const legSpeed = legs.map(L => L.speed(st));
+  for (let i = 0; i < N; i++) {
+    let L = legs[pLeg[i]];
+    let s = pS[i] + legSpeed[pLeg[i]] * dt;
+    if (L.gate && valves[L.gate].open < 0.35) {
+      const cap = L.len - pQ[i] * L.queue;
+      s = pS[i] <= cap ? Math.min(s, cap) : pS[i];   // hold behind a closed valve, never flow backwards
+    }
+    if (s >= L.len) {
+      s -= L.len;
+      pLeg[i] = legIndex[L.next()];
+      L = legs[pLeg[i]];
+    }
+    pS[i] = s;
+    // position from the arc-length lookup table
+    const f = clamp(s / L.len, 0, 1) * L.n, k = Math.min(L.n - 1, f | 0), t = f - k, a = k * 3, b = a + 3;
+    // jitter envelope: narrow in vessels and at valve orifices, wide inside chambers
+    const jf = f / L.n * (L.jit.length - 1), jk = Math.min(L.jit.length - 2, jf | 0);
+    const jr = lerp(L.jit[jk], L.jit[jk + 1], jf - jk);
+    const o = i * 3;
+    pPos[o] = lerp(L.lut[a], L.lut[b], t) + pOff[o] * jr;
+    pPos[o + 1] = lerp(L.lut[a + 1], L.lut[b + 1], t) + pOff[o + 1] * jr;
+    pPos[o + 2] = lerp(L.lut[a + 2], L.lut[b + 2], t) + pOff[o + 2] * jr;
+    const m = L.tint === 'deoxy' ? 0 : L.tint === 'oxy' ? 1 : smooth(clamp((s / L.len - 0.3) / 0.45, 0, 1));
+    pCol[o] = lerp(DEOXY[0], OXY[0], m); pCol[o + 1] = lerp(DEOXY[1], OXY[1], m); pCol[o + 2] = lerp(DEOXY[2], OXY[2], m);
+    let al = 0.95;
+    if (L.fadeIn) al *= clamp(s / L.fadeIn, 0, 1);
+    if (L.fadeOut) al *= clamp((L.len - s) / L.fadeOut, 0, 1);
+    pAlpha[i] = al;
+  }
+  pGeo.attributes.position.needsUpdate = true;
+  pGeo.attributes.aColor.needsUpdate = true;
+  pGeo.attributes.aAlpha.needsUpdate = true;
+}
+
+/* =====================================================================
+   Sweep traces (bedside-monitor style: a cursor writes over the old trace)
+   ===================================================================== */
+class Sweep {
+  constructor(canvas, series, min, max, grid, seconds) {
+    Object.assign(this, { canvas, series, min, max, grid, seconds, ctx: canvas.getContext('2d'), acc: 0, x: 0 });
+    this.resize();
+  }
+  resize() {
+    const dpr = Math.min(devicePixelRatio, 2);
+    this.w = Math.max(40, Math.round(this.canvas.clientWidth));
+    this.h = Math.max(30, Math.round(this.canvas.clientHeight));
+    this.canvas.width = this.w * dpr; this.canvas.height = this.h * dpr;
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.buf = this.series.map(() => new Float32Array(this.w).fill(NaN));
+    this.x = 0;
+  }
+  // advance the write cursor by dt seconds of simulated time, sampling fn(tv) per pixel column
+  advance(tv0, dt, T, fn) {
+    this.acc += dt * this.w / this.seconds;
+    const n = Math.floor(this.acc);
+    if (!n) return;
+    this.acc -= n;
+    for (let k = 1; k <= n; k++) {
+      const vals = fn((tv0 + dt * k / n) % T);
+      this.buf.forEach((b, i) => { b[this.x] = vals[i]; });
+      this.x = (this.x + 1) % this.w;
+    }
+  }
+  draw() {
+    const { ctx, w, h } = this, yOf = v => h - 4 - ((v - this.min) / (this.max - this.min)) * (h - 8);
+    ctx.clearRect(0, 0, w, h);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(60, 245, 156, 0.07)';
+    for (let gx = 0; gx < w; gx += 20) { ctx.beginPath(); ctx.moveTo(gx + 0.5, 0); ctx.lineTo(gx + 0.5, h); ctx.stroke(); }
+    this.grid.forEach(g => {
+      ctx.strokeStyle = 'rgba(143, 154, 172, 0.16)';
+      ctx.beginPath(); ctx.moveTo(0, Math.round(yOf(g)) + 0.5); ctx.lineTo(w, Math.round(yOf(g)) + 0.5); ctx.stroke();
+      if (this.gridLabels) { ctx.fillStyle = 'rgba(143, 154, 172, 0.55)'; ctx.font = '9px "IBM Plex Mono", monospace'; ctx.fillText(g, 2, yOf(g) - 2); }
+    });
+    const gap = 14;
+    this.series.forEach((s, si) => {
+      const b = this.buf[si];
+      ctx.strokeStyle = s.color; ctx.lineWidth = s.width || 1.6; ctx.setLineDash(s.dash || []);
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      let pen = false;
+      for (let x = 0; x < w; x++) {
+        const d = (x - this.x + w) % w;
+        const v = b[x];
+        if (d < gap || isNaN(v)) { pen = false; continue; }
+        const y = yOf(v);
+        if (!pen) { ctx.moveTo(x, y); pen = true; } else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const lx = (this.x - 1 + w) % w;
+      if (!isNaN(b[lx]) && si === 0) { ctx.fillStyle = s.color; ctx.beginPath(); ctx.arc(lx, yOf(b[lx]), 2.4, 0, Math.PI * 2); ctx.fill(); }
+    });
+  }
+}
+const ecgSweep = new Sweep($('ecgCanvas'), [{ color: '#3cf59c', width: 1.7 }], -0.45, 1.25, [0], 3.2);
+const pressSweep = new Sweep($('pressCanvas'), [{ color: '#ffb23e', width: 1.6 }, { color: '#ff3b4f', width: 1.6 }, { color: '#f3a3b0', width: 1.3, dash: [3, 3] }], 0, 165, [0, 40, 80, 120], 3.2);
+pressSweep.gridLabels = true;
+
+/* =====================================================================
+   Structure reference data (drawer content)
+   ===================================================================== */
+const INFO = {
+  ra: { kind: 'Chamber', ox: 'deoxy', title: 'Right atrium', sub: 'Receiving chamber for the body’s venous return',
+    fn: 'Collects deoxygenated blood from the superior and inferior venae cavae and the coronary sinus. It works as a reservoir while the tricuspid valve is shut, a passive conduit in early diastole, and a primer pump when it contracts at the end of diastole. The sinoatrial node, the heart’s natural pacemaker, sits in its wall near the SVC.',
+    mech: 'Pressure stays low, about 2–8 mmHg. The a-wave comes from atrial contraction, the c-wave from the tricuspid bulging back as the ventricle tenses, and the v-wave from venous filling against the closed valve. When RA pressure exceeds RV pressure, the tricuspid opens.',
+    facts: [['Normal mean pressure', '2–6 mmHg'], ['Wall thickness', '≈2 mm'], ['Atrial kick share of filling', '15–25 % at rest'], ['Pacemaker', 'SA node, 60–100 /min']] },
+  rv: { kind: 'Chamber', ox: 'deoxy', title: 'Right ventricle', sub: 'Low-pressure pump for the lungs',
+    fn: 'Pumps deoxygenated blood through the pulmonary valve into the lungs. It wraps around the septum in a crescent and relies on a bellows-like squeeze plus the tug of the left ventricle’s contraction.',
+    mech: 'The pulmonary circuit has about one-tenth the resistance of the systemic circuit, so the RV moves the same stroke volume as the LV at about one-fifth the pressure: roughly 25/0–5 mmHg. The pulmonary valve opens once RV pressure passes pulmonary diastolic pressure (≈10 mmHg).',
+    facts: [['Pressure', '15–30 / 2–8 mmHg'], ['Wall thickness', '3–5 mm'], ['End-diastolic volume', '≈130 mL'], ['Ejection fraction', '45–60 %']] },
+  la: { kind: 'Chamber', ox: 'oxy', title: 'Left atrium', sub: 'Collects oxygenated blood from four pulmonary veins',
+    fn: 'Receives oxygen-rich blood from the lungs and passes it through the mitral valve. Its contraction matters more at high heart rates, when the passive filling window shrinks, and in stiff ventricles.',
+    mech: 'Mean pressure runs about 4–12 mmHg and tracks the LV’s end-diastolic pressure while the mitral valve is open. If LA pressure climbs past about 20 mmHg, fluid is pushed into the lungs (pulmonary congestion).',
+    facts: [['Mean pressure', '4–12 mmHg'], ['Inflow', '4 pulmonary veins'], ['Volume', '≈50–60 mL'], ['Arrhythmia to know', 'Atrial fibrillation']] },
+  lv: { kind: 'Chamber', ox: 'oxy', title: 'Left ventricle', sub: 'High-pressure pump for the whole body',
+    fn: 'Ejects oxygenated blood through the aortic valve into the systemic circulation. Its fibres run in helices, so each contraction wrings the chamber: it shortens, thickens and twists at the same time.',
+    mech: 'Pressure goes from about 10 mmHg at end-diastole to about 120 mmHg at peak systole. It stays sealed (isovolumetric) until it overtakes aortic diastolic pressure, about 80 mmHg, and only then does the aortic valve open. In this model, exercise raises peak pressure and ejection fraction.',
+    facts: [['Pressure', '100–140 / 3–12 mmHg'], ['Wall thickness', '9–11 mm'], ['Stroke volume', '60–100 mL'], ['Ejection fraction', '55–70 %']] },
+  tricuspid: { kind: 'Valve', ox: 'deoxy', title: 'Tricuspid valve', sub: 'Right atrioventricular valve · 3 leaflets',
+    fn: 'Lets blood pass from the right atrium to the right ventricle during diastole and seals during systole. Anterior, posterior and septal leaflets are tethered by chordae tendineae to papillary muscles, which stop the leaflets flipping back into the atrium.',
+    mech: 'It is passive and moves only on pressure difference. It opens when RA pressure exceeds RV pressure at the end of isovolumetric relaxation, and it closes at the start of ventricular contraction as RV pressure rises past RA pressure. Its closure is part of the first heart sound, S1.',
+    facts: [['Orifice area', '7–9 cm²'], ['Leaflets', 'Anterior · posterior · septal'], ['Heart sound', 'S1 (T1)'], ['Common lesion', 'Functional regurgitation']] },
+  mitral: { kind: 'Valve', ox: 'oxy', title: 'Mitral valve', sub: 'Left atrioventricular valve · 2 leaflets',
+    fn: 'Controls flow from the left atrium into the left ventricle. Its large anterior and crescent-shaped posterior leaflets are anchored by chordae to two papillary muscles, which contract with the ventricle to keep the leaflets from prolapsing.',
+    mech: 'It shuts when LV pressure passes LA pressure at the start of systole (the loudest part of S1). It stays shut through ejection and isovolumetric relaxation, then opens when LV pressure falls below LA pressure. The early rush of blood through it is the E-wave on echocardiography, and the atrial kick is the A-wave.',
+    facts: [['Orifice area', '4–6 cm²'], ['Leaflets', 'Anterior · posterior'], ['Heart sound', 'S1 (M1)'], ['Stenosis when', '< 1.5 cm²']] },
+  pulmonary: { kind: 'Valve', ox: 'deoxy', title: 'Pulmonary valve', sub: 'Right semilunar valve · 3 cusps',
+    fn: 'Opens to let the right ventricle eject into the pulmonary trunk, then closes to stop blood falling back during diastole. It has three pocket-shaped cusps and no chordae; the cusps seal because back-pressure fills them.',
+    mech: 'It opens when RV pressure exceeds pulmonary artery diastolic pressure (≈10 mmHg) and closes when RV pressure falls below PA pressure at the end of ejection. That closure is P2 of the second heart sound. On inspiration P2 comes later, which splits S2.',
+    facts: [['Orifice area', '≈2 cm² / m²'], ['Cusps', 'Anterior · left · right'], ['Heart sound', 'S2 (P2)'], ['Opens at', '≈10 mmHg']] },
+  aortic: { kind: 'Valve', ox: 'oxy', title: 'Aortic valve', sub: 'Left semilunar valve · 3 cusps',
+    fn: 'The outlet of the left ventricle. The right and left coronary arteries leave from the sinuses of Valsalva just above two of its three cusps, so the heart feeds its own muscle from the first blood out of this valve.',
+    mech: 'It opens only once LV pressure beats aortic diastolic pressure, about 80 mmHg, and it snaps shut as LV pressure falls under aortic pressure. That closure makes A2 and the dicrotic notch on the aortic trace. The coronaries fill mostly in diastole, so faster heart rates cut their perfusion time.',
+    facts: [['Orifice area', '3–4 cm²'], ['Cusps', 'Right · left · non-coronary'], ['Heart sound', 'S2 (A2)'], ['Severe stenosis', '< 1.0 cm²']] },
+  aorta: { kind: 'Great vessel', ox: 'oxy', title: 'Aorta', sub: 'Elastic outflow to the systemic circulation',
+    fn: 'Carries oxygenated blood from the left ventricle to the body. The arch gives off the brachiocephalic, left common carotid and left subclavian arteries, then the descending aorta runs down behind the heart.',
+    mech: 'Its elastic wall acts as a Windkessel. During systole it stretches to store about half the stroke volume, then recoils in diastole to keep blood moving while the valve is shut. That is why arterial pressure only drops to about 80 mmHg, not zero.',
+    facts: [['Pressure', '≈120 / 80 mmHg'], ['Root diameter', '2.5–3.5 cm'], ['Arch branches', '3'], ['Peak velocity', '≈1 m/s']] },
+  pa: { kind: 'Great vessel', ox: 'deoxy', title: 'Pulmonary artery', sub: 'Trunk and right/left branches to the lungs',
+    fn: 'Carries deoxygenated blood from the right ventricle to both lungs. After birth, this is the only artery that carries oxygen-poor blood. It splits under the aortic arch; the right branch passes behind the ascending aorta and the SVC.',
+    mech: 'Pressure is about 25/10 mmHg, with a mean under 20. A resting mean above 20 mmHg defines pulmonary hypertension, which makes the right ventricle work harder over time.',
+    facts: [['Pressure', '15–30 / 4–12 mmHg'], ['Mean', '< 20 mmHg'], ['Trunk diameter', '≈2.5 cm'], ['SpO₂ carried', '≈75 %']] },
+  pv: { kind: 'Great vessel', ox: 'oxy', title: 'Pulmonary veins', sub: 'Four veins from the lungs into the left atrium',
+    fn: 'Return freshly oxygenated blood from the lung capillaries to the left atrium. Two drain each lung (superior and inferior). Sleeves of atrial muscle around their openings are the usual trigger site for atrial fibrillation.',
+    mech: 'They have no valves, so their pressure follows the left atrium (about 5–12 mmHg). Pulmonary vein flow speeds up in ventricular systole, when the descending AV plane stretches the atrium, and again in early diastole.',
+    facts: [['Count', '4 (2 per lung)'], ['Pressure', '5–12 mmHg'], ['SpO₂ carried', '≈98 %'], ['Valves', 'None']] },
+  svc: { kind: 'Great vessel', ox: 'deoxy', title: 'Superior vena cava', sub: 'Venous return from the head, neck and arms',
+    fn: 'Drains the upper body into the top of the right atrium. It has no valve at the atrial junction, so right-atrial pressure waves travel straight back up into the jugular veins; that is why clinicians read the jugular venous pulse.',
+    mech: 'Pressure is about 2–8 mmHg (the central venous pressure). Blood moves forward because of the small gradient between peripheral veins and the right atrium, helped by breathing in, which lowers chest pressure.',
+    facts: [['Pressure (CVP)', '2–8 mmHg'], ['Share of venous return', '≈1/3'], ['Diameter', '≈2 cm'], ['Valve', 'None']] },
+  ivc: { kind: 'Great vessel', ox: 'deoxy', title: 'Inferior vena cava', sub: 'Venous return from the abdomen and legs',
+    fn: 'Carries blood from everything below the diaphragm into the lower right atrium. A flap called the Eustachian valve guards its entrance; before birth it steered oxygenated blood across the foramen ovale.',
+    mech: 'It shares central venous pressure with the SVC. Muscle pumping in the legs and the drop in chest pressure on each breath in push blood upward, so venous return climbs with exercise.',
+    facts: [['Pressure', '2–8 mmHg'], ['Share of venous return', '≈2/3'], ['Diameter', '1.5–2.5 cm'], ['Collapses on sniff', '> 50 % is normal']] },
+};
+const ORDER = { ch: ['ra', 'rv', 'la', 'lv'], va: ['tricuspid', 'pulmonary', 'mitral', 'aortic'], ve: ['svc', 'ivc', 'pa', 'pv', 'aorta'] };
+const SHORT = { ra: 'RA', rv: 'RV', la: 'LA', lv: 'LV', tricuspid: 'Tricuspid', pulmonary: 'Pulmonary', mitral: 'Mitral', aortic: 'Aortic',
+  svc: 'SVC', ivc: 'IVC', pa: 'Pulm. artery', pv: 'Pulm. veins', aorta: 'Aorta' };
+
+/* ---------- focus targets for camera snapping ---------- */
+const FOCUS = {
+  ra: { p: CH.ra.c, d: 4.4 }, rv: { p: CH.rv.c, d: 5 }, la: { p: CH.la.c, d: 4.4, pref: [0.35, 0.35, 1] }, lv: { p: CH.lv.c, d: 5.2 },
+  aorta: { p: [0.5, 1.6, -0.8], d: 8 }, pa: { p: [0.6, 1.6, 0.0], d: 6.5 }, svc: { p: [-1.4, 2.4, 0], d: 5 },
+  ivc: { p: [-1.5, -1.4, -0.4], d: 5.5 }, pv: { p: [0.8, 1.1, -1.0], d: 8, pref: [0.25, 0.45, -1] },
+};
+Object.entries(VALVE).forEach(([k, d]) => {
+  const flow = V(d.dir).normalize();
+  FOCUS[k] = { p: d.pos, d: 2.6, pref: flow.multiplyScalar(-0.9).add(v3(0.15, 0.25, 1)).toArray() };
+});
+
+/* =====================================================================
+   Labels
+   ===================================================================== */
+const LABELS = [
+  ['ra', [-2.2, 1.55, 0.3]], ['rv', [-1.2, -1.95, 0.9]], ['la', [1.75, 1.75, -0.3]], ['lv', [1.8, -2.1, 0.3]],
+  ['tricuspid', TRI], ['mitral', MIT], ['pulmonary', PUL], ['aortic', AOR],
+  ['aorta', [0.5, 3.5, -0.8]], ['pa', [1.7, 2.35, -0.25]], ['svc', [-1.45, 3.65, 0]], ['ivc', [-1.5, -3.45, -0.5]], ['pv', [2.7, 0.35, -0.95]],
+  [null, [-3.8, 3.3, -0.7], 'Right lung · gas exchange'], [null, [3.8, 3.3, -0.7], 'Left lung · gas exchange'],
+];
+const labelEls = LABELS.map(([k, p, txt]) => {
+  const el = document.createElement(k ? 'button' : 'div');
+  el.className = 'lbl' + (k && VALVE[k] ? ' valve' : '') + (k ? '' : ' static');
+  el.textContent = k ? (VALVE[k] ? INFO[k].title : SHORT[k]) : txt;
+  if (k) { el.addEventListener('click', () => select(k)); el.dataset.key = k; el.tabIndex = -1; }
+  $('labels').appendChild(el);
+  return { el, p: V(p), k };
+});
+const tmpV = new THREE.Vector3();
+function updateLabels() {
+  const w = innerWidth, h = innerHeight;
+  labelEls.forEach(L => {
+    tmpV.copy(L.p).project(camera);
+    const off = tmpV.z > 1 || Math.abs(tmpV.x) > 1.2 || Math.abs(tmpV.y) > 1.2;
+    L.el.style.visibility = off ? 'hidden' : 'visible';
+    if (!off) L.el.style.transform = `translate(${((tmpV.x + 1) / 2) * w}px, ${((1 - tmpV.y) / 2) * h}px) translate(-50%, -50%)`;
+  });
+}
+
+/* =====================================================================
+   Selection, drawer, camera snapping
+   ===================================================================== */
+let selected = null, hovered = null, tween = null;
+function flyTo(target, pos) {
+  if (reduceMotion) { controls.target.copy(target); camera.position.copy(pos); return; }
+  tween = { t: 0, dur: 0.9, p0: camera.position.clone(), t0: controls.target.clone(), p1: pos, t1: target };
+}
+function focusOn(k) {
+  const f = FOCUS[k];
+  const target = V(f.p);
+  const cur = camera.position.clone().sub(controls.target).normalize();
+  const pref = V(f.pref || [0.25, 0.2, 1]).normalize();
+  const dir = cur.multiplyScalar(0.25).add(pref.multiplyScalar(0.75)).normalize();
+  flyTo(target, target.clone().add(dir.multiplyScalar(f.d)));
+}
+function setEmissive(k, v) { (byKey[k] || []).forEach(m => { m.emissiveIntensity = v; }); }
+
+function select(k) {
+  if (selected && selected !== k) setEmissive(selected, 0);
+  selected = k;
+  if (VALVE[k] && !$('cutaway').checked) { $('cutaway').checked = true; applyCutaway(); }
+  focusOn(k);
+  const I = INFO[k];
+  $('dKind').textContent = I.kind;
+  $('dOx').textContent = I.ox === 'oxy' ? 'Oxygenated' : 'Deoxygenated';
+  $('dOx').className = 'ox ' + I.ox;
+  $('dTitle').textContent = I.title;
+  $('dSub').textContent = I.sub;
+  $('dFn').textContent = I.fn;
+  $('dMech').textContent = I.mech;
+  $('dFacts').innerHTML = I.facts.map(([a, b]) => `<li><span>${a}</span><b>${b}</b></li>`).join('');
+  $('drawer').classList.add('open');
+  $('drawer').setAttribute('aria-hidden', 'false');
+  document.querySelectorAll('.chip').forEach(c => c.classList.toggle('sel', c.dataset.key === k));
+  labelEls.forEach(L => L.el.classList.toggle('sel', L.k === k));
+  if (innerWidth <= 820) { $('controls').classList.remove('show'); $('menuBtn').setAttribute('aria-expanded', 'false'); }
+  updateDrawerLive();
+}
+function closeDrawer() {
+  if (selected) setEmissive(selected, 0);
+  selected = null;
+  $('drawer').classList.remove('open');
+  $('drawer').setAttribute('aria-hidden', 'true');
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('sel'));
+  labelEls.forEach(L => L.el.classList.remove('sel'));
+}
+$('dClose').addEventListener('click', closeDrawer);
+
+function chips(id, keys) {
+  $(id).innerHTML = '';
+  keys.forEach(k => {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.dataset.key = k; b.textContent = SHORT[k];
+    b.addEventListener('click', () => select(k));
+    $(id).appendChild(b);
+  });
+}
+chips('chipsCh', ORDER.ch); chips('chipsVa', ORDER.va); chips('chipsVe', ORDER.ve);
+
+/* ---------- pointer picking (click vs drag) ---------- */
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let downAt = null;
+function pick(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObjects(pickables, false)[0];
+  return hit ? hit.object.userData.key : null;
+}
+renderer.domElement.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
+  const k = pick(e);
+  if (k) select(k);
+});
+let hoverPending = false;
+renderer.domElement.addEventListener('pointermove', e => {
+  if (e.pointerType !== 'mouse' || hoverPending) return;
+  hoverPending = true;
+  requestAnimationFrame(() => {
+    hoverPending = false;
+    const k = e.buttons ? null : pick(e);
+    if (hovered && hovered !== selected) setEmissive(hovered, 0);
+    hovered = k;
+    if (k && k !== selected) setEmissive(k, 0.12);
+    renderer.domElement.style.cursor = k ? 'pointer' : '';
+    const tip = $('tip');
+    if (k) {
+      tip.innerHTML = `${INFO[k].title}<small>click to inspect</small>`;
+      tip.style.display = 'block';
+      tip.style.left = Math.min(innerWidth - 200, e.clientX + 14) + 'px';
+      tip.style.top = e.clientY + 14 + 'px';
+    } else tip.style.display = 'none';
+  });
+});
+renderer.domElement.addEventListener('pointerleave', () => { $('tip').style.display = 'none'; });
+
+/* =====================================================================
+   Controls wiring
+   ===================================================================== */
+let targetBpm = 72, bpm = 72, speed = 1, paused = false;
+const hr = $('hr');
+function setTarget(v) {
+  targetBpm = +v; hr.value = v;
+  $('hrOut').innerHTML = `${v}<small>BPM</small>`;
+  ['pRest', 'pWalk', 'pRun'].forEach(id => $(id).classList.toggle('on', +$(id).dataset.bpm === +v));
+}
+hr.addEventListener('input', () => setTarget(hr.value));
+['pRest', 'pWalk', 'pRun'].forEach(id => $(id).addEventListener('click', () => setTarget($(id).dataset.bpm)));
+function togglePause() {
+  paused = !paused;
+  $('playBtn').textContent = paused ? 'Play' : 'Pause';
+  $('playBtn').setAttribute('aria-pressed', String(paused));
+  $('playBtn').classList.toggle('on', paused);
+}
+$('playBtn').addEventListener('click', togglePause);
+$('speed').addEventListener('change', e => { speed = +e.target.value; });
+
+function applyCutaway() {
+  const cut = $('cutaway').checked;
+  Object.values(chambers).forEach(c => { c.outer.geometry = c.inner.geometry = cut ? c.geoCut : c.geoFull; });
+  vesselMats.forEach(m => {
+    const glass = cut && m.userData.glass;
+    m.transparent = glass; m.opacity = glass ? 0.4 : 1; m.depthWrite = !glass; m.needsUpdate = true;
+  });
+}
+$('cutaway').addEventListener('change', applyCutaway);
+applyCutaway();
+$('flow').addEventListener('change', e => { points.visible = e.target.checked; });
+$('labelsOn').addEventListener('change', e => $('labels').classList.toggle('off', !e.target.checked));
+$('autorot').addEventListener('change', e => { controls.autoRotate = e.target.checked; });
+$('resetView').addEventListener('click', () => { const h = homeView(); flyTo(h.target, h.pos); });
+$('menuBtn').addEventListener('click', () => {
+  const s = $('controls').classList.toggle('show');
+  $('menuBtn').setAttribute('aria-expanded', String(s));
+});
+addEventListener('keydown', e => {
+  if (e.target.matches('input, select')) return;
+  if (e.code === 'Space') { e.preventDefault(); togglePause(); }
+  else if (e.key === 'Escape') closeDrawer();
+  else if (e.key === 'r' || e.key === 'R') { const h = homeView(); flyTo(h.target, h.pos); }
+});
+setTarget(72);
+
+/* ---------- monitor table + valve strip ---------- */
+const TABLE = [
+  ['ra', 'Right atrium', '#4a8bff', '2–8'], ['rv', 'Right ventricle', '#4a8bff', '25 / 4'], ['pa', 'Pulm. artery', '#4a8bff', '25 / 10'],
+  ['la', 'Left atrium', '#ff3b4f', '4–12'], ['lv', 'Left ventricle', '#ff3b4f', '120 / 8'], ['aorta', 'Aorta', '#ff3b4f', '120 / 80'],
+];
+$('chTable').innerHTML = TABLE.map(([k, n, c, r]) =>
+  `<tr class="click" data-key="${k}"><td><span class="sw" style="background:${c}"></span>${n}</td><td class="n" id="tp_${k}">–</td><td class="n" id="tr_${k}">${r}</td><td class="n" id="tv_${k}">${k === 'lv' || k === 'rv' ? '–' : '<span style="color:var(--faint)">·</span>'}</td></tr>`).join('');
+$('chTable').querySelectorAll('tr').forEach(tr => tr.addEventListener('click', () => select(tr.dataset.key)));
+$('vState').innerHTML = ORDER.va.map(k => `<div class="vs" id="vs_${k}" data-key="${k}">${SHORT[k]}<b>SHUT</b></div>`).join('');
+$('vState').querySelectorAll('.vs').forEach(d => d.addEventListener('click', () => select(d.dataset.key)));
+
+/* =====================================================================
+   Live readouts
+   ===================================================================== */
+let st = null, C = cycleParams(72);
+const f0 = x => Math.round(x);
+function liveRows(k) {
+  const P = st.P, vs = kk => (valves[kk].open > 0.5 ? 'OPEN' : 'SHUT');
+  const cell = (k2, v, cls = '') => ({ k: k2, v, cls });
+  switch (k) {
+    case 'ra': return [cell('RA pressure', f0(P.ra) + ' mmHg'), cell('Tricuspid', vs('tricuspid'), valves.tricuspid.open > 0.5 ? '' : 'warm'), cell('Atrial state', st.ca > 0.05 ? 'Contracting' : 'Filling'), cell('Phase', PHASES[st.phase][0].split(' ')[0])];
+    case 'la': return [cell('LA pressure', f0(P.la) + ' mmHg'), cell('Mitral', vs('mitral'), valves.mitral.open > 0.5 ? '' : 'warm'), cell('Atrial state', st.ca > 0.05 ? 'Contracting' : 'Filling'), cell('Phase', PHASES[st.phase][0].split(' ')[0])];
+    case 'rv': return [cell('RV pressure', f0(P.rv) + ' mmHg'), cell('RV volume', f0(st.vol.rv) + ' mL'), cell('Inflow · outflow', vs('tricuspid')[0] + ' · ' + vs('pulmonary')[0]), cell('Stroke volume', f0(st.H.redv - st.H.resv) + ' mL')];
+    case 'lv': return [cell('LV pressure', f0(P.lv) + ' mmHg'), cell('LV volume', f0(st.vol.lv) + ' mL'), cell('Ejection fraction', f0(100 * (st.H.edv - st.H.esv) / st.H.edv) + ' %'), cell('Stroke volume', f0(st.H.edv - st.H.esv) + ' mL')];
+    case 'tricuspid': return valveRows('tricuspid', 'RA', P.ra, 'RV', P.rv);
+    case 'mitral': return valveRows('mitral', 'LA', P.la, 'LV', P.lv);
+    case 'pulmonary': return valveRows('pulmonary', 'RV', P.rv, 'PA', P.pa);
+    case 'aortic': return valveRows('aortic', 'LV', P.lv, 'Aorta', P.ao);
+    case 'aorta': return [cell('Aortic pressure', f0(P.ao) + ' mmHg'), cell('Aortic valve', vs('aortic')), cell('Mean arterial (est.)', f0(st.H.L.dia + (st.H.L.sys - st.H.L.dia) / 3) + ' mmHg'), cell('Output', (st.H.edv - st.H.esv) * bpm / 1000 > 0 ? ((st.H.edv - st.H.esv) * bpm / 1000).toFixed(1) + ' L/min' : '–')];
+    case 'pa': return [cell('PA pressure', f0(P.pa) + ' mmHg'), cell('Pulmonary valve', vs('pulmonary')), cell('Mean PA (est.)', f0(st.H.R.dia + (st.H.R.sys - st.H.R.dia) / 3) + ' mmHg'), cell('Blood', 'Deoxygenated')];
+    case 'pv': return [cell('Vein pressure ≈ LA', f0(P.la) + ' mmHg'), cell('Mitral', vs('mitral')), cell('SpO₂', '≈98 %'), cell('Blood', 'Oxygenated')];
+    case 'svc': case 'ivc': return [cell('Central venous', f0(P.ra) + ' mmHg'), cell('Tricuspid', vs('tricuspid')), cell('SpO₂', '≈75 %'), cell('Blood', 'Deoxygenated')];
+  }
+  return [];
+}
+function valveRows(k, up, pu, down, pd) {
+  const open = valves[k].open > 0.5, g = pu - pd;
+  return [
+    { k: 'State', v: open ? 'OPEN' : 'SHUT', cls: open ? '' : 'warm' },
+    { k: 'Gradient ' + up + '→' + down, v: (g >= 0 ? '+' : '') + f0(g) + ' mmHg', cls: g > 0 ? '' : 'cold' },
+    { k: up + ' pressure', v: f0(pu) + ' mmHg' },
+    { k: down + ' pressure', v: f0(pd) + ' mmHg' },
+  ];
+}
+function updateDrawerLive() {
+  if (!selected || !st) return;
+  $('dLive').innerHTML = liveRows(selected).map(r => `<div><div class="k">${r.k}</div><div class="v ${r.cls || ''}">${r.v}</div></div>`).join('');
+}
+function updateMonitor() {
+  $('mHr').textContent = Math.round(bpm);
+  const [name, kind] = PHASES[st.phase];
+  $('mPhase').textContent = name;
+  $('mPill').textContent = kind === 'sys' ? 'Systole' : 'Diastole';
+  $('mPill').className = 'pill' + (kind === 'sys' ? '' : ' dia');
+  const sys = C.ejE * 1000, dia = (C.T - C.ejE) * 1000;
+  $('tSys').innerHTML = `${f0(sys)}<small>ms</small>`;
+  $('tDia').innerHTML = `${f0(dia)}<small>ms</small>`;
+  $('tCo').innerHTML = `${((st.H.edv - st.H.esv) * bpm / 1000).toFixed(1)}<small>L/min</small>`;
+  const P = { ra: st.P.ra, rv: st.P.rv, pa: st.P.pa, la: st.P.la, lv: st.P.lv, aorta: st.P.ao };
+  Object.entries(P).forEach(([k, v]) => { $('tp_' + k).textContent = f0(v); });
+  $('tv_lv').textContent = f0(st.vol.lv) + ' mL';
+  $('tv_rv').textContent = f0(st.vol.rv) + ' mL';
+  ORDER.va.forEach(k => {
+    const o = valves[k].open > 0.5, el = $('vs_' + k);
+    el.classList.toggle('open', o);
+    el.querySelector('b').textContent = o ? 'OPEN' : 'SHUT';
+  });
+  const tag = bpm < 70 ? 'Resting sinus rhythm' : bpm < 100 ? 'Normal sinus rhythm' : bpm <= 125 ? 'Moderate exercise' : 'Vigorous exercise';
+  $('hrNote').innerHTML = `${tag}. Each beat lasts <b>${f0(C.T * 1000)} ms</b>; diastole gets <b>${f0(dia)} ms</b> of it.`;
+}
+
+/* =====================================================================
+   Main loop
+   ===================================================================== */
+let tv = 0.3, uiTimer = 0;
+const clock = new THREE.Clock();
+const dpr0 = renderer.getPixelRatio();
+
+function frame() {
+  fitViewport();   // also catches a page that loaded while its frame had zero size
+  const real = Math.min(clock.getDelta(), 0.05);
+  const dt = paused ? 0 : real * speed;
+
+  // heart rate eases toward the slider target like sympathetic drive would
+  if (!paused) bpm += (targetBpm - bpm) * (1 - Math.exp(-dt * 1.2));
+  C = cycleParams(bpm);
+
+  const tv0 = tv;
+  tv += dt;
+  if (tv >= C.T) tv -= C.T;
+  if (tv0 < 0.034 && tv >= 0.034 && !reduceMotion) {
+    $('beatIcon').classList.add('beat');
+    setTimeout(() => $('beatIcon').classList.remove('beat'), 140);
+  }
+
+  // feed the monitor traces with every pixel column this frame covers
+  if (dt > 0) {
+    ecgSweep.advance(tv0, dt, C.T, t => [ecgAt(t, C) + (Math.random() - 0.5) * 0.012]);
+    pressSweep.advance(tv0, dt, C.T, t => { const s = cycleState(t, C); return [s.P.ao, s.P.lv, s.P.la]; });
+  }
+
+  st = cycleState(tv, C);
+
+  // valves chase their pressure-driven target with a ~25 ms time constant
+  const k = 1 - Math.exp(-dt / 0.025);
+  valves.tricuspid.open += (st.target.av - valves.tricuspid.open) * k;
+  valves.mitral.open += (st.target.av - valves.mitral.open) * k;
+  valves.pulmonary.open += (st.target.sl - valves.pulmonary.open) * k;
+  valves.aortic.open += (st.target.sl - valves.aortic.open) * k;
+  Object.keys(valves).forEach(poseValve);
+
+  // chamber squeeze: ventricles shorten more along the long axis; atria swell while filling, shrink on the kick
+  const sv = st.cv;
+  ['rv', 'lv'].forEach(kk => {
+    const c = chambers[kk];
+    c.group.scale.set(c.r.x * (1 - 0.12 * sv), c.r.y * (1 - 0.17 * sv), c.r.z * (1 - 0.12 * sv));
+  });
+  const sa = 1 + 0.05 * st.fill - 0.12 * st.ca;
+  ['ra', 'la'].forEach(kk => { const c = chambers[kk]; c.group.scale.copy(c.r).multiplyScalar(sa); });
+
+  if (points.visible && dt > 0) stepParticles(dt, {
+    tricuspid: valves.tricuspid.open, mitral: valves.mitral.open, pulmonary: valves.pulmonary.open, aortic: valves.aortic.open,
+    flow: Math.sqrt(bpm / 60),
+  });
+
+  if (selected) setEmissive(selected, 0.2 + 0.12 * Math.sin(performance.now() / 260));
+
+  if (tween) {
+    tween.t += real / tween.dur;
+    const e = tween.t >= 1 ? 1 : (tween.t < 0.5 ? 4 * tween.t ** 3 : 1 - (-2 * tween.t + 2) ** 3 / 2);
+    camera.position.lerpVectors(tween.p0, tween.p1, e);
+    controls.target.lerpVectors(tween.t0, tween.t1, e);
+    if (tween.t >= 1) tween = null;
+  }
+  controls.update();
+
+  uiTimer -= real;
+  if (uiTimer <= 0) { uiTimer = 0.1; updateMonitor(); updateDrawerLive(); }
+  ecgSweep.draw();
+  pressSweep.draw();
+  updateLabels();
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+let sizeKey = '';
+function fitViewport() {
+  const w = Math.max(1, innerWidth), h = Math.max(1, innerHeight);
+  if (sizeKey === w + 'x' + h) return;
+  sizeKey = w + 'x' + h;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  pMat.uniforms.uPix.value = h * dpr0 / 2;
+  ecgSweep.resize(); pressSweep.resize();
+}
+addEventListener('resize', fitViewport);
+
+// warm the particles into a settled distribution before the first frame
+{
+  const warm = cycleParams(72);
+  for (let i = 0; i < 240; i++) {
+    tv = (tv + 1 / 60) % warm.T;
+    const s = cycleState(tv, warm);
+    Object.keys(valves).forEach(kk => { valves[kk].open = VALVE[kk].av ? s.target.av : s.target.sl; });
+    stepParticles(1 / 60, { tricuspid: valves.tricuspid.open, mitral: valves.mitral.open, pulmonary: valves.pulmonary.open, aortic: valves.aortic.open, flow: 1.1 });
+  }
+}
+controls.update();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

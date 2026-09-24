@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interactive 3D Lab</title>
+<meta name="description" content="Nine interactive Three.js explorers covering chips, AI, anatomy, energy and space. Each one is a single HTML file that runs in the browser.">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #05080f; --card: #0b111d; --border: rgba(120, 150, 210, 0.16); --text: #e6ecf7;
+    --muted: #8a97b0; --accent: #38d6ff; --accent-2: #7c5cff;
+  }
+  :root[data-theme="light"] { --bg: #f5f7fb; --card: #ffffff; --border: rgba(30, 50, 90, 0.12); --text: #111827; --muted: #5b6477; --accent: #0a86b0; --accent-2: #5b3fd6; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: Inter, system-ui, sans-serif; line-height: 1.5; }
+  main { max-width: 1120px; margin: 0 auto; padding: 56px 16px 64px; }
+  .eyebrow { font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase; }
+  h1 { font-size: clamp(30px, 5vw, 44px); margin: 8px 0 10px; letter-spacing: -0.02em; }
+  .lede { color: var(--muted); max-width: 640px; margin: 0 0 36px; font-size: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  a.card { display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: inherit; background: var(--card);
+    border: 1px solid var(--border); border-radius: 14px; padding: 18px; transition: border-color .15s, transform .15s; }
+  a.card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  a.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .tag { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .card h2 { margin: 0; font-size: 17px; }
+  .card p { margin: 0; color: var(--muted); font-size: 14px; }
+  .go { margin-top: auto; padding-top: 8px; font-size: 13px; font-weight: 600; color: var(--accent); }
+  footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
+  footer a { color: var(--accent); }
+  @media (prefers-reduced-motion: reduce) { a.card { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Three.js · single-file explorers</div>
+  <h1>Interactive 3D Lab</h1>
+  <p class="lede">Nine interactive explorers covering chips, AI, anatomy, energy and space. Each one is a single HTML file: orbit, zoom, click parts to inspect them, and change the settings live.</p>
+  <div class="grid">
+    <a class="card" href="chip-depth-explorer/"><span class="tag">Semiconductors</span><h2>Chip Depth Explorer</h2><p>Zoom continuously from a packaged processor on its board down to a single 18 nm FinFET gate.</p><span class="go">Open →</span></a>
+    <a class="card" href="attention-lens/"><span class="tag">AI · Transformers</span><h2>Attention Lens</h2><p>Step through a transformer block: embeddings, attention heads and the residual stream in 3D.</p><span class="go">Open →</span></a>
+    <a class="card" href="neural-network-lab/"><span class="tag">AI · Neural nets</span><h2>Neural Network Lab</h2><p>Watch signals move through a feedforward network, edit its weights, and see backpropagation animated.</p><span class="go">Open →</span></a>
+    <a class="card" href="q-learning-grid-world/"><span class="tag">AI · Reinforcement learning</span><h2>Q-Learning Grid World</h2><p>Train a tabular Q-learning agent live, with a Q-table view and live training metrics.</p><span class="go">Open →</span></a>
+    <a class="card" href="ev-teardown-explorer/"><span class="tag">Automotive</span><h2>EV Teardown Explorer</h2><p>Take apart a dual-motor electric sedan: exploded view, system layers and component specs.</p><span class="go">Open →</span></a>
+    <a class="card" href="microgrid-flow/"><span class="tag">Energy</span><h2>Microgrid Flow</h2><p>Balance supply and demand across a smart-city microgrid, with energy flows shown live in 3D.</p><span class="go">Open →</span></a>
+    <a class="card" href="cardiac-flow-lab/"><span class="tag">Physiology</span><h2>Cardiac Flow Lab</h2><p>Four chambers, four valves, one cardiac cycle: follow blood flow through the heart.</p><span class="go">Open →</span></a>
+    <a class="card" href="glass-body-atlas/"><span class="tag">Anatomy</span><h2>Glass Body Atlas</h2><p>A see-through 3D anatomy atlas where you can inspect organ systems one layer at a time.</p><span class="go">Open →</span></a>
+    <a class="card" href="heliocentric-orrery/"><span class="tag">Astronomy</span><h2>Heliocentric Orrery</h2><p>A 3D solar system with orbiting planets and adjustable time speed.</p><span class="go">Open →</span></a>
+  </div>
+  <footer>Built by <a href="https://github.com/eshaanjain26">Eshaan Jain</a> with Three.js. Each page runs as a single HTML file.</footer>
+</main>
+</body>
+</html>

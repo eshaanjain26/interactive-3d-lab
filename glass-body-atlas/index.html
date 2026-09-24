@@ -1,0 +1,1724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Glass Body Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Spectral:ital,wght@0,500;0,600;1,400&display=swap">
+<style>
+  /* ---------- Design tokens (light is the base; dark redefines tokens only) ---------- */
+  :root {
+    --ground: #E4EBEE;
+    --ground-deep: #C6D3D9;
+    --panel: rgba(247, 250, 251, 0.9);
+    --panel-solid: #F7FAFB;
+    --ink: #13232C;
+    --ink-2: #4A5D67;
+    --ink-3: #74868F;
+    --line: rgba(19, 35, 44, 0.12);
+    --line-strong: rgba(19, 35, 44, 0.24);
+    --track: rgba(19, 35, 44, 0.14);
+    --accent: #0E767C;
+    --accent-ink: #FFFFFF;
+    --accent-soft: rgba(14, 118, 124, 0.1);
+    --skin: #D7A68C;
+    --shadow: 0 14px 34px -10px rgba(18, 38, 48, 0.28), 0 2px 6px rgba(18, 38, 48, 0.08);
+    --f-display: "Spectral", Georgia, "Times New Roman", serif;
+    --f-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --gutter: 16px;
+    --panel-w: 300px;
+    --drawer-w: 368px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0E181E;
+      --ground-deep: #060B0F;
+      --panel: rgba(15, 25, 31, 0.88);
+      --panel-solid: #111C23;
+      --ink: #E3EBEE;
+      --ink-2: #A2B4BC;
+      --ink-3: #72858F;
+      --line: rgba(227, 235, 238, 0.1);
+      --line-strong: rgba(227, 235, 238, 0.22);
+      --track: rgba(227, 235, 238, 0.14);
+      --accent: #4CC3C6;
+      --accent-ink: #062629;
+      --accent-soft: rgba(76, 195, 198, 0.12);
+      --shadow: 0 14px 34px -10px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.3);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0E181E;
+    --ground-deep: #060B0F;
+    --panel: rgba(15, 25, 31, 0.88);
+    --panel-solid: #111C23;
+    --ink: #E3EBEE;
+    --ink-2: #A2B4BC;
+    --ink-3: #72858F;
+    --line: rgba(227, 235, 238, 0.1);
+    --line-strong: rgba(227, 235, 238, 0.22);
+    --track: rgba(227, 235, 238, 0.14);
+    --accent: #4CC3C6;
+    --accent-ink: #062629;
+    --accent-soft: rgba(76, 195, 198, 0.12);
+    --shadow: 0 14px 34px -10px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.3);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    overflow: hidden;
+    background-color: var(--ground);
+    background-image: radial-gradient(120% 90% at 58% 38%, var(--ground) 0%, var(--ground-deep) 100%);
+    color: var(--ink);
+    font: 14px/1.45 var(--f-ui);
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; }
+
+  /* ---------- 3D viewport ---------- */
+  #viewport { position: fixed; inset: 0; }
+  #viewport canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  #viewport.hovering canvas { cursor: pointer; }
+  .fallback {
+    position: absolute; inset: 0; display: grid; place-items: center; padding: 24px;
+    text-align: center; color: var(--ink-2); max-width: 48ch; margin: auto;
+  }
+
+  /* ---------- Shared glass surface ---------- */
+  .glass {
+    background: var(--panel);
+    -webkit-backdrop-filter: blur(16px) saturate(1.15);
+    backdrop-filter: blur(16px) saturate(1.15);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+  }
+  .label {
+    font: 500 10.5px/1.2 var(--f-mono);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0;
+  }
+
+  /* ---------- Layers sidebar ---------- */
+  .panel {
+    position: fixed; z-index: 5;
+    top: calc(var(--gutter) + env(safe-area-inset-top, 0px));
+    bottom: calc(var(--gutter) + env(safe-area-inset-bottom, 0px));
+    left: var(--gutter);
+    width: var(--panel-w);
+    border-radius: 14px;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .panel-scroll { overflow: auto; padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 18px; }
+  .brand { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .brand h1 { font: 600 27px/1.02 var(--f-display); letter-spacing: -0.015em; margin: 0; text-wrap: balance; }
+  .brand p { margin-top: 7px; }
+  .panel .sheet-close { display: none; }
+
+  .peel {
+    display: grid; gap: 8px; padding: 12px 12px 10px; margin-top: 4px;
+    border-radius: 10px; background: var(--accent-soft);
+  }
+  .peel-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .peel-head span { font-weight: 600; }
+  .peel-head output { font: 500 12px var(--f-mono); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .peel-scale { display: flex; justify-content: space-between; }
+  .peel-scale button {
+    border: 0; background: none; padding: 2px 0; cursor: pointer;
+    font: 500 10.5px var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3);
+  }
+  .peel-scale button:hover { color: var(--accent); }
+  .peel-scale button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+  .sys-list { display: flex; flex-direction: column; }
+  .sys-row { display: grid; gap: 4px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .sys-row:first-child { border-top: 0; padding-top: 4px; }
+  .sys-toggle {
+    display: grid; grid-template-columns: auto 10px 1fr auto; align-items: center;
+    gap: 10px; cursor: pointer; user-select: none;
+  }
+  .sys-toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+  .switch { width: 30px; height: 18px; border-radius: 9px; background: var(--track); position: relative; transition: background 0.2s; }
+  .switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%;
+    background: var(--panel-solid); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); transition: transform 0.2s;
+  }
+  .sys-toggle input:checked + .switch { background: var(--accent); }
+  .sys-toggle input:checked + .switch::after { transform: translateX(12px); }
+  .sys-toggle input:focus-visible + .switch { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .swatch { width: 10px; height: 10px; border-radius: 3px; background: var(--sys); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18); }
+  .sys-name { font-weight: 500; line-height: 1.25; }
+  .sys-name small { display: block; font-size: 11.5px; font-weight: 400; color: var(--ink-3); }
+  .sys-count { font: 500 11px var(--f-mono); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .sys-row.off .sys-name { color: var(--ink-3); }
+  .sys-op { padding-left: 40px; display: grid; grid-template-columns: 1fr 34px; align-items: center; gap: 8px; }
+  .sys-op output { font: 500 11px var(--f-mono); color: var(--ink-3); text-align: right; font-variant-numeric: tabular-nums; }
+
+  .views { display: grid; gap: 8px; }
+  .view-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .chip-btn {
+    height: 32px; border-radius: 8px; border: 1px solid var(--line-strong); background: transparent;
+    font-size: 12.5px; font-weight: 500; cursor: pointer; color: var(--ink);
+  }
+  .chip-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
+  .chip-btn:focus-visible, .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .rotate-toggle { grid-template-columns: auto 1fr; }
+
+  /* ---------- Range inputs ---------- */
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 22px; margin: 0;
+    background: transparent; cursor: pointer; --pct: 50%; --fill: var(--accent);
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 4px; border-radius: 2px;
+    background: linear-gradient(to right, var(--fill) 0 var(--pct), var(--track) var(--pct) 100%);
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%;
+    background: var(--panel-solid); border: 2px solid var(--fill); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  }
+  input[type="range"]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--track); }
+  input[type="range"]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--fill); }
+  input[type="range"]::-moz-range-thumb {
+    width: 12px; height: 12px; border-radius: 50%; background: var(--panel-solid); border: 2px solid var(--fill);
+  }
+  input[type="range"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  input[type="range"]:disabled { opacity: 0.35; cursor: default; }
+  /* The skin-peel track fades from opaque skin to nothing, the same thing the slider does to the model */
+  #peel { height: 26px; }
+  #peel::-webkit-slider-runnable-track {
+    height: 8px; border-radius: 4px;
+    background: linear-gradient(to right, var(--skin), rgba(215, 166, 140, 0.06));
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  #peel::-webkit-slider-thumb { width: 20px; height: 20px; margin-top: -6px; border-color: var(--ink); }
+  #peel::-moz-range-track { height: 8px; border-radius: 4px; background: linear-gradient(to right, var(--skin), rgba(215, 166, 140, 0.06)); }
+  #peel::-moz-range-progress { background: transparent; }
+  #peel::-moz-range-thumb { width: 16px; height: 16px; border-color: var(--ink); }
+
+  /* ---------- Search ---------- */
+  .top {
+    position: fixed; z-index: 6;
+    top: calc(var(--gutter) + env(safe-area-inset-top, 0px));
+    left: calc(var(--panel-w) + var(--gutter) * 2);
+    right: var(--gutter);
+    display: flex; justify-content: center; gap: 8px;
+    pointer-events: none;
+  }
+  .top > * { pointer-events: auto; }
+  .layers-btn {
+    display: none; align-items: center; gap: 6px; height: 44px; padding: 0 14px; border-radius: 12px;
+    font-weight: 500; cursor: pointer; color: var(--ink);
+  }
+  .search-box { position: relative; width: min(440px, 100%); }
+  .search-box svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--ink-3); pointer-events: none; }
+  .search-box input {
+    width: 100%; height: 44px; padding: 0 44px 0 40px; border-radius: 12px; color: var(--ink);
+    font: 15px var(--f-ui); outline: none;
+  }
+  .search-box input::placeholder { color: var(--ink-3); }
+  .search-box input:focus-visible { border-color: var(--accent); box-shadow: var(--shadow), 0 0 0 3px var(--accent-soft); }
+  .search-box input::-webkit-search-cancel-button { display: none; }
+  .search-box kbd {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    font: 500 11px var(--f-mono); color: var(--ink-3); border: 1px solid var(--line-strong); border-radius: 5px; padding: 1px 6px;
+  }
+  .results {
+    position: absolute; top: calc(100% + 6px); left: 0; right: 0; margin: 0; padding: 6px; list-style: none;
+    background: var(--panel-solid); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow);
+    max-height: min(380px, 60vh); overflow: auto;
+  }
+  .results li {
+    display: grid; grid-template-columns: 10px 1fr auto; gap: 10px; align-items: center;
+    padding: 9px 10px; border-radius: 8px; cursor: pointer;
+  }
+  .results li[aria-selected="true"], .results li:hover { background: var(--accent-soft); }
+  .results .res-name { font-weight: 500; }
+  .results .res-alt { display: block; font-size: 12px; color: var(--ink-3); }
+  .results .res-sys { font: 500 10.5px var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+  .results li.empty { display: block; cursor: default; color: var(--ink-2); line-height: 1.5; }
+  .results li.empty:hover { background: none; }
+
+  /* ---------- Info drawer ---------- */
+  .drawer {
+    position: fixed; z-index: 5;
+    top: calc(var(--gutter) * 2 + 44px + env(safe-area-inset-top, 0px));
+    bottom: calc(var(--gutter) + env(safe-area-inset-bottom, 0px));
+    right: var(--gutter);
+    width: var(--drawer-w);
+    border-radius: 14px; overflow: auto;
+    transform: translateX(calc(100% + 32px)); visibility: hidden;
+    transition: transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s linear 0.38s;
+  }
+  .drawer.open { transform: none; visibility: visible; transition: transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .drawer-inner { padding: 18px 22px 24px; display: flex; flex-direction: column; gap: 14px; }
+  .drawer-head { display: flex; justify-content: space-between; align-items: center; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; }
+  .chip i { width: 9px; height: 9px; border-radius: 3px; background: var(--sys); }
+  .icon-btn {
+    width: 32px; height: 32px; border-radius: 8px; border: 1px solid transparent; background: none;
+    display: grid; place-items: center; cursor: pointer; color: var(--ink-2);
+  }
+  .icon-btn:hover { background: var(--accent-soft); color: var(--ink); }
+  .icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .drawer h2 { font: 600 33px/1.04 var(--f-display); letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+  .latin { margin: -8px 0 0; font: italic 400 17px/1.3 var(--f-display); color: var(--ink-2); }
+  .parent-link {
+    align-self: flex-start; border: 0; background: none; padding: 0; cursor: pointer;
+    color: var(--accent); font-size: 13px; font-weight: 500;
+  }
+  .parent-link:hover { text-decoration: underline; }
+  .stats {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 0;
+    background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+  }
+  .stats div { background: var(--panel-solid); padding: 10px 12px; }
+  .stats div:last-child:nth-child(odd) { grid-column: span 2; }
+  .stats dt { font: 500 10px/1.3 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+  .stats dd { margin: 4px 0 0; font: 500 15px/1.25 var(--f-mono); font-variant-numeric: tabular-nums; }
+  .drawer h3 { margin: 6px 0 -6px; }
+  .drawer p.func { margin: 0; line-height: 1.58; max-width: 62ch; }
+  .facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .facts li { position: relative; padding-left: 16px; line-height: 1.52; }
+  .facts li::before {
+    content: ""; position: absolute; left: 0; top: 0.6em; width: 6px; height: 6px; border-radius: 50%; background: var(--sys);
+  }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .btn {
+    height: 36px; padding: 0 14px; border-radius: 9px; cursor: pointer;
+    border: 1px solid var(--line-strong); background: transparent; font-size: 13px; font-weight: 500; color: var(--ink);
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+  /* ---------- Hint + hover label ---------- */
+  .hint {
+    position: fixed; z-index: 4;
+    bottom: calc(var(--gutter) + env(safe-area-inset-bottom, 0px));
+    left: calc(var(--panel-w) + var(--gutter) * 2); right: var(--gutter);
+    text-align: center; pointer-events: none;
+    font: 500 11px/1.4 var(--f-mono); letter-spacing: 0.04em; color: var(--ink-3);
+    transition: right 0.38s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  body.info-open .hint { right: calc(var(--drawer-w) + var(--gutter) * 2); }
+  .hint .touch { display: none; }
+  .tip {
+    position: fixed; z-index: 7; left: 0; top: 0; pointer-events: none;
+    display: flex; align-items: center; gap: 7px; padding: 5px 9px; border-radius: 7px;
+    background: var(--panel-solid); border: 1px solid var(--line); box-shadow: var(--shadow);
+    font-size: 12.5px; font-weight: 500; white-space: nowrap;
+  }
+  .tip i { width: 8px; height: 8px; border-radius: 2px; background: var(--sys); }
+
+  /* ---------- Phone layout: both panels become bottom sheets ---------- */
+  @media (max-width: 759px) {
+    :root { --gutter: 12px; }
+    .top { left: var(--gutter); right: var(--gutter); }
+    .layers-btn { display: inline-flex; }
+    .search-box { flex: 1; width: auto; }
+    .search-box kbd { display: none; }
+    .panel, .drawer {
+      top: auto; left: 8px; right: 8px; width: auto;
+      bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+      transform: translateY(calc(100% + 32px)); visibility: hidden;
+      transition: transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s linear 0.38s;
+    }
+    .panel { max-height: 64%; }
+    .drawer { max-height: 58%; }
+    .panel.open, .drawer.open { transform: none; visibility: visible; transition: transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1); }
+    .panel-scroll { padding-top: 14px; }
+    .panel .sheet-close { display: grid; }
+    .brand h1 { font-size: 23px; }
+    .drawer h2 { font-size: 27px; }
+    .drawer-inner { padding: 14px 18px 20px; }
+    .hint { left: var(--gutter); right: var(--gutter); }
+    .hint .mouse { display: none; }
+    .hint .touch { display: inline; }
+    body.sheet-open .hint { visibility: hidden; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .panel, .drawer, .hint, .switch, .switch::after { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="viewport" aria-label="3D anatomical model. Drag to rotate, scroll or pinch to zoom, click a structure for details."></div>
+
+<!-- Search (top) -->
+<div class="top">
+  <button class="layers-btn glass" id="layers-btn" aria-controls="layers" aria-expanded="false">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5z"/><path d="m3 13 9 5 9-5"/></svg>
+    Layers
+  </button>
+  <div class="search-box">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="search" class="glass" type="search" autocomplete="off" spellcheck="false"
+      placeholder="Find a structure: liver, femur, left ventricle"
+      role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="results" aria-label="Search anatomy">
+    <kbd aria-hidden="true">/</kbd>
+    <ul class="results" id="results" role="listbox" hidden></ul>
+  </div>
+</div>
+
+<!-- System / layer sidebar -->
+<aside class="panel glass" id="layers" aria-label="Body systems">
+  <div class="panel-scroll">
+    <div class="brand">
+      <div>
+        <h1>Glass Body Atlas</h1>
+        <p class="label" id="brand-count"></p>
+      </div>
+      <button class="icon-btn sheet-close" id="layers-close" aria-label="Close layers">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <div>
+      <p class="label" style="margin-bottom:6px">Systems</p>
+      <div class="sys-list" id="sys-list"></div>
+    </div>
+    <div class="views">
+      <p class="label">Camera</p>
+      <div class="view-row">
+        <button class="chip-btn" data-view="front">Front</button>
+        <button class="chip-btn" data-view="side">Side</button>
+        <button class="chip-btn" data-view="back">Back</button>
+        <button class="chip-btn" data-view="reset">Reset</button>
+      </div>
+      <label class="sys-toggle rotate-toggle" for="autorotate">
+        <input type="checkbox" id="autorotate" autocomplete="off"><span class="switch" aria-hidden="true"></span>
+        <span class="sys-name">Turntable rotation</span>
+      </label>
+    </div>
+  </div>
+</aside>
+
+<!-- Info drawer: filled when a structure is clicked or searched -->
+<aside class="drawer glass" id="info" aria-labelledby="info-name">
+  <div class="drawer-inner">
+    <div class="drawer-head">
+      <span class="chip label"><i></i><span id="info-system"></span></span>
+      <button class="icon-btn" id="info-close" aria-label="Close details">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <h2 id="info-name"></h2>
+    <p class="latin" id="info-latin"></p>
+    <button class="parent-link" id="info-parent" hidden></button>
+    <dl class="stats" id="info-stats"></dl>
+    <h3 class="label">Function</h3>
+    <p class="func" id="info-func"></p>
+    <h3 class="label">Worth knowing</h3>
+    <ul class="facts" id="info-facts"></ul>
+    <div class="actions">
+      <button class="btn primary" id="info-focus">Zoom to structure</button>
+      <button class="btn" id="info-isolate"></button>
+    </div>
+  </div>
+</aside>
+
+<p class="hint">
+  <span class="mouse">Drag to orbit · Scroll to zoom · Right-drag to pan · Click any structure</span>
+  <span class="touch">Drag to orbit · Pinch to zoom · Two fingers to pan · Tap a structure</span>
+</p>
+<div class="tip" id="tip" hidden><i></i><span></span></div>
+
+<!-- Three.js r147 is the last release that ships the non-module examples/js OrbitControls build -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+'use strict';
+
+/* =====================================================================
+   1. CONTENT: body systems and the structures inside them
+   ---------------------------------------------------------------------
+   Every clickable mesh carries userData.partId, which keys into PARTS.
+   The model is built in metres: feet at y = 0, crown at y ≈ 1.78.
+   The figure faces +z, so the patient's LEFT side is +x.
+   ===================================================================== */
+
+const SYSTEMS = {
+  integumentary: { label: 'Integumentary', sub: 'Skin & surface',            color: '#D7A68C', on: true,  opacity: 0.3 },
+  skeletal:      { label: 'Skeletal',      sub: 'Bones & cartilage',         color: '#E9DFC7', on: true,  opacity: 1 },
+  muscular:      { label: 'Muscular',      sub: 'Superficial muscles',       color: '#9E2F2F', on: false, opacity: 0.9 },
+  cardiovascular:{ label: 'Cardiovascular',sub: 'Heart & major vessels',     color: '#C3303B', on: true,  opacity: 1 },
+  respiratory:   { label: 'Respiratory',   sub: 'Airway, lungs, diaphragm',  color: '#E4A0A5', on: true,  opacity: 1 },
+  digestive:     { label: 'Digestive',     sub: 'Gut & accessory organs',    color: '#C98266', on: true,  opacity: 1 },
+  nervous:       { label: 'Nervous',       sub: 'Brain, cord, major nerves', color: '#E2BC45', on: true,  opacity: 1 }
+};
+
+function P(id, system, name, latin, aliases, func, facts, stats, extra) {
+  return Object.assign({ id, system, name, latin, aliases, func, facts, stats }, extra || {});
+}
+
+const PARTS_LIST = [
+  // ---- Integumentary
+  P('skin', 'integumentary', 'Skin', 'Cutis', ['integument', 'epidermis', 'dermis', 'surface'],
+    'Wraps the body in a waterproof, self-repairing barrier. It blocks microbes, controls temperature through sweat and blood flow, senses touch, heat and pain, and makes vitamin D in sunlight.',
+    ['The outer layer, the epidermis, replaces itself roughly every 4 to 6 weeks.',
+     'It is the body’s largest organ, around 15% of total body weight.',
+     'Daily broad-spectrum SPF 30+ sunscreen cuts UV damage, the main driver of skin cancer and visible ageing.'],
+    [['Area', '1.5–2 m²'], ['Thickness', '0.5–4 mm']]),
+
+  // ---- Skeletal
+  P('skull', 'skeletal', 'Skull', 'Cranium', ['head', 'cranium', 'braincase'],
+    'Encases and protects the brain, supports the face, and houses the eyes, inner ears and the openings for breathing and eating.',
+    ['An adult skull has 22 bones: 8 form the braincase and 14 form the face.',
+     'At birth soft fontanelles separate the plates so the head can flex during delivery; the largest closes by about age 2.',
+     'This model shows the skull cap removed so the brain stays visible.'],
+    [['Bones', '22'], ['Cranial volume', '≈1,300–1,500 cm³']]),
+  P('mandible', 'skeletal', 'Mandible', 'Mandibula', ['jaw', 'jawbone', 'lower jaw'],
+    'The lower jaw. It holds the lower teeth and moves at the temporomandibular joints for chewing, speaking and swallowing.',
+    ['It is the only skull bone that moves freely.',
+     'It is the largest and strongest bone of the face.',
+     'Jaw clicking or pain usually comes from the temporomandibular joint, not the bone itself.'],
+    [['Joints', '2 (TMJ)'], ['Teeth held', 'up to 16']]),
+  P('spine', 'skeletal', 'Vertebral Column', 'Columna vertebralis', ['spine', 'backbone', 'vertebrae', 'vertebra', 'cervical', 'thoracic', 'lumbar', 'sacrum', 'coccyx', 'tailbone'],
+    'Carries the weight of the head and trunk, protects the spinal cord in its central canal, and bends and twists through dozens of small joints.',
+    ['It has 33 vertebrae: 7 cervical, 12 thoracic, 5 lumbar, plus fused ones forming the sacrum and coccyx.',
+     'Intervertebral discs lose water through the day, so you are about 1 cm shorter at night than in the morning.',
+     'Its S-shaped curves absorb shock with every step.'],
+    [['Vertebrae', '33 (24 movable)'], ['Length', '≈70 cm']]),
+  P('ribs', 'skeletal', 'Rib Cage', 'Costae', ['ribs', 'rib', 'thorax', 'thoracic cage', 'costal cartilage'],
+    'Twelve pairs of curved bones that shield the heart and lungs and swing outward with each breath to expand the chest.',
+    ['Pairs 1–7 are “true” ribs joined straight to the sternum, 8–10 are “false” ribs, and 11–12 float free at the front.',
+     'Flexible costal cartilage (shown pale blue) lets the cage spring back after compression.',
+     'Roughly 0.5–1% of people have an extra “cervical rib” above the first pair.'],
+    [['Pairs', '12'], ['True / false / floating', '7 / 3 / 2']]),
+  P('sternum', 'skeletal', 'Sternum', 'Sternum', ['breastbone', 'breast bone', 'xiphoid', 'manubrium'],
+    'The flat breastbone at the front of the chest. It anchors the rib cartilages and collarbones and shields the heart.',
+    ['It has three parts: the manubrium, the body and the small xiphoid process.',
+     'In adult CPR, compressions push the sternum down 5–6 cm at 100–120 per minute.',
+     'Its marrow keeps making blood cells throughout adult life.'],
+    [['Length', '≈15–17 cm'], ['Parts', '3']]),
+  P('clavicle', 'skeletal', 'Clavicle', 'Clavicula', ['collarbone', 'collar bone'],
+    'The collarbone. It braces the shoulder out to the side so the arm can swing freely, and passes forces from the arm to the trunk.',
+    ['It is one of the most commonly broken bones, usually from a fall onto the shoulder or an outstretched hand.',
+     'It is the first bone to start ossifying in the embryo (around week 5) and one of the last to finish, in the mid-20s.',
+     'It is the only long bone that lies horizontally.'],
+    [['Length', '≈15 cm'], ['Per side', '1']]),
+  P('scapula', 'skeletal', 'Scapula', 'Scapula', ['shoulder blade', 'shoulderblade', 'shoulder'],
+    'The shoulder blade. Its shallow socket forms the shoulder joint with the humerus, and it glides over the back of the ribs to extend the arm’s reach.',
+    ['Seventeen muscles attach to each scapula.',
+     'The socket is shallow, which allows huge range of motion but makes the shoulder the most frequently dislocated major joint.'],
+    [['Muscle attachments', '17']]),
+  P('humerus', 'skeletal', 'Humerus', 'Humerus', ['upper arm', 'arm bone'],
+    'The upper arm bone. Its rounded head fits the shoulder socket and its lower end forms the hinge of the elbow.',
+    ['The “funny bone” tingle is the ulnar nerve being pressed against the humerus at the elbow.',
+     'The radial nerve spirals around the shaft, so mid-shaft fractures can cause wrist drop.'],
+    [['Length', '≈30–36 cm']]),
+  P('radius', 'skeletal', 'Radius', 'Radius', ['forearm', 'wrist'],
+    'The thumb-side forearm bone. It rotates around the ulna to turn the palm up or down.',
+    ['The lower end of the radius is the most common fracture from a fall on an outstretched hand.',
+     'Your pulse is usually taken over the radial artery, which runs beside it at the wrist.'],
+    [['Length', '≈24 cm']]),
+  P('ulna', 'skeletal', 'Ulna', 'Ulna', ['forearm', 'elbow', 'olecranon'],
+    'The little-finger-side forearm bone. Its hooked upper end, the olecranon, locks into the humerus to form the elbow hinge.',
+    ['The point of your elbow is the olecranon of the ulna.',
+     'A tough interosseous membrane binds the radius and ulna along their length.'],
+    [['Length', '≈26 cm']]),
+  P('hand', 'skeletal', 'Hand Bones', 'Ossa manus', ['hand', 'fingers', 'phalanges', 'carpals', 'metacarpals', 'scaphoid', 'thumb'],
+    'Carpals, metacarpals and phalanges give the hand its mix of power grip and fine precision.',
+    ['Each hand has 27 bones: 8 carpals, 5 metacarpals and 14 phalanges.',
+     'Hands and feet together hold more than half of the body’s 206 bones.',
+     'The scaphoid, a small wrist bone, heals slowly because of its fragile blood supply.'],
+    [['Bones per hand', '27']]),
+  P('pelvis', 'skeletal', 'Pelvis', 'Pelvis', ['hip bone', 'hips', 'hip', 'ilium', 'ischium', 'pubis', 'coxal'],
+    'A basin of bone that transfers upper-body weight to the legs, anchors powerful hip muscles, and protects the bladder, reproductive organs and lower bowel.',
+    ['Each hip bone forms from three bones (ilium, ischium and pubis) that fuse in the teens.',
+     'The female pelvis is typically wider with a rounder inlet, an adaptation for childbirth.',
+     'The “sit bones” you rest on are the ischial tuberosities.'],
+    [['Bones fused per side', '3']]),
+  P('femur', 'skeletal', 'Femur', 'Femur', ['thigh bone', 'thighbone', 'thigh'],
+    'The thigh bone, the longest and strongest bone in the body. It carries body weight from hip to knee and anchors the large thigh muscles.',
+    ['Its length is about a quarter of standing height, which forensic scientists use to estimate stature.',
+     'Hip fractures usually happen at the narrow femoral neck; weight-bearing exercise plus enough calcium and vitamin D help keep it strong.'],
+    [['Length', '≈45–48 cm'], ['Share of height', '≈26%']]),
+  P('patella', 'skeletal', 'Patella', 'Patella', ['kneecap', 'knee cap', 'knee'],
+    'The kneecap. It sits inside the quadriceps tendon, protects the front of the knee and increases the leverage of the thigh muscles.',
+    ['It is the largest sesamoid bone, a bone that grows inside a tendon.',
+     'A baby’s kneecap is cartilage; it ossifies between about ages 3 and 6.'],
+    [['Type', 'Sesamoid']]),
+  P('tibia', 'skeletal', 'Tibia', 'Tibia', ['shin bone', 'shinbone', 'shin'],
+    'The shin bone. It carries most of the body’s weight from knee to ankle.',
+    ['Its front edge lies just under the skin, which is why knocks to the shin hurt so much.',
+     'It is the second-longest bone after the femur.'],
+    [['Length', '≈36–40 cm']]),
+  P('fibula', 'skeletal', 'Fibula', 'Fibula', ['calf bone', 'ankle'],
+    'The slim outer bone of the lower leg. It bears little weight but anchors muscles and forms the outer ankle knob.',
+    ['Surgeons can harvest part of it to rebuild a jaw (the fibula free flap); the leg manages without that section.',
+     'The bump on the outside of your ankle is its lower end, the lateral malleolus.'],
+    [['Length', '≈36 cm']]),
+  P('foot', 'skeletal', 'Foot Bones', 'Ossa pedis', ['foot', 'feet', 'toes', 'tarsals', 'metatarsals', 'heel', 'calcaneus', 'talus'],
+    'Tarsals, metatarsals and phalanges form springy arches that bear weight and push off with each step.',
+    ['Each foot has 26 bones and 33 joints.',
+     'The heel bone (calcaneus) is the largest bone of the foot.',
+     'Metatarsal stress fractures often follow a sudden jump in running mileage.'],
+    [['Bones per foot', '26'], ['Joints', '33']]),
+
+  // ---- Muscular
+  P('deltoid', 'muscular', 'Deltoid', 'Musculus deltoideus', ['shoulder muscle', 'delts', 'shoulder'],
+    'Caps the shoulder and lifts the arm out to the side, forward and back.',
+    ['It is a common injection site for vaccines.',
+     'Its name comes from the Greek letter delta (Δ), after its triangular shape.'],
+    [['Main action', 'Arm abduction']]),
+  P('pectoralis', 'muscular', 'Pectoralis Major', 'Musculus pectoralis major', ['chest', 'pecs', 'pectoral'],
+    'The large fan-shaped chest muscle. It pulls the arm across the body and rotates it inward, as in pushing or hugging.',
+    ['It has two heads: clavicular (from the collarbone) and sternocostal (from the sternum and ribs).',
+     'Push-ups and bench presses are its classic training movements.'],
+    [['Heads', '2']]),
+  P('biceps', 'muscular', 'Biceps Brachii', 'Musculus biceps brachii', ['biceps', 'bicep', 'upper arm'],
+    'Bends the elbow and turns the palm upward.',
+    ['It is a powerful supinator: turning a screwdriver or a doorknob leans on it heavily.',
+     '“Biceps” means two heads, and both start on the scapula.'],
+    [['Heads', '2']]),
+  P('triceps', 'muscular', 'Triceps Brachii', 'Musculus triceps brachii', ['triceps', 'back of arm'],
+    'Straightens the elbow, powering pushing and throwing.',
+    ['It makes up about two-thirds of the upper arm’s muscle mass.',
+     'Its long head also crosses the shoulder and helps pull the arm back.'],
+    [['Heads', '3']]),
+  P('forearm', 'muscular', 'Forearm Flexors', 'Musculi flexores antebrachii', ['forearm muscles', 'grip', 'wrist flexors'],
+    'Bend the wrist and fingers and power the grip.',
+    ['Most finger strength comes from these forearm muscles; long tendons carry the pull to the fingers.',
+     'Nine flexor tendons pass through the carpal tunnel beside the median nerve.'],
+    [['Tendons in carpal tunnel', '9']]),
+  P('rectus', 'muscular', 'Rectus Abdominis', 'Musculus rectus abdominis', ['abs', 'six pack', 'six-pack', 'abdominal', 'abdomen'],
+    'Flexes the trunk, as in a sit-up, and braces the abdomen for lifting, coughing and childbirth.',
+    ['The “six-pack” look comes from tendinous bands that cross the muscle.',
+     'Its left and right halves meet at the linea alba, which can separate after pregnancy (diastasis recti).'],
+    [['Main action', 'Trunk flexion']]),
+  P('obliques', 'muscular', 'External Obliques', 'Musculus obliquus externus abdominis', ['obliques', 'side abs', 'waist'],
+    'Rotate and bend the trunk sideways and squeeze the abdomen.',
+    ['Their fibres run down and forward, the direction your hands take when slipped into front pockets.',
+     'Twisting to the right uses the left external oblique.'],
+    [['Main action', 'Trunk rotation']]),
+  P('trapezius', 'muscular', 'Trapezius', 'Musculus trapezius', ['traps', 'upper back', 'neck muscle'],
+    'Moves and steadies the shoulder blades: shrugging, squeezing them together and rotating them as the arm goes overhead.',
+    ['Left and right together form a trapezoid, which gives it the name.',
+     'Long hours hunched at a screen keep its upper fibres tense, a frequent source of neck ache.'],
+    [['Parts', 'Upper, middle, lower']]),
+  P('lats', 'muscular', 'Latissimus Dorsi', 'Musculus latissimus dorsi', ['lats', 'back muscle', 'latissimus', 'back'],
+    'The broadest back muscle. It pulls the arm down and back, as in pull-ups, rowing and swimming.',
+    ['Its name means “widest of the back”.',
+     'Surgeons often use it as a tissue flap in breast reconstruction.'],
+    [['Main action', 'Arm extension']]),
+  P('glutes', 'muscular', 'Gluteus Maximus', 'Musculus gluteus maximus', ['glutes', 'buttocks', 'buttock'],
+    'Extends the hip to push you up stairs, out of a chair and forward when running.',
+    ['It is the largest muscle in the body by mass.',
+     'Weak glutes are linked to knee and lower-back pain because other muscles take over their work.'],
+    [['Rank', 'Largest muscle']]),
+  P('quadriceps', 'muscular', 'Quadriceps Femoris', 'Musculus quadriceps femoris', ['quads', 'quadriceps', 'front thigh'],
+    'Four muscles that straighten the knee; one of them, rectus femoris, also lifts the thigh.',
+    ['All four join one tendon that wraps the patella and attaches to the tibia.',
+     'Quadriceps weakness is a strong predictor of falls in older adults.'],
+    [['Muscles', '4']]),
+  P('hamstrings', 'muscular', 'Hamstrings', 'Musculi ischiocrurales', ['hamstring', 'back thigh'],
+    'Three muscles that bend the knee and extend the hip.',
+    ['Hamstring strains are among the most common sprinting injuries.',
+     'All three start at the ischial tuberosity, the “sit bone”.'],
+    [['Muscles', '3']]),
+  P('gastrocnemius', 'muscular', 'Gastrocnemius', 'Musculus gastrocnemius', ['calf', 'calves', 'calf muscle', 'achilles'],
+    'The calf muscle. It points the foot and helps bend the knee, powering walking, running and jumping.',
+    ['It joins the soleus to form the Achilles tendon, the thickest and strongest tendon in the body.',
+     'Its two heads give the calf its diamond-shaped bulge.'],
+    [['Heads', '2']]),
+  P('tibialis', 'muscular', 'Tibialis Anterior', 'Musculus tibialis anterior', ['shin muscle', 'front of shin'],
+    'Lifts the front of the foot (dorsiflexion) so the toes clear the ground as you walk.',
+    ['Weakness or nerve damage here causes “foot drop”, a slapping gait.',
+     'Shin splints often involve irritation where it attaches to the tibia.'],
+    [['Main action', 'Dorsiflexion']]),
+  P('scm', 'muscular', 'Sternocleidomastoid', 'Musculus sternocleidomastoideus', ['neck', 'scm'],
+    'Turns the head to the opposite side and tilts it; both sides together bend the neck forward.',
+    ['Its name lists its attachments: sternum, clavicle and the mastoid process behind the ear.',
+     'It also lifts the rib cage during hard breathing.'],
+    [['Main action', 'Head rotation']]),
+
+  // ---- Cardiovascular
+  P('heart', 'cardiovascular', 'Heart', 'Cor', ['cardiac'],
+    'A four-chambered muscular pump about the size of a fist. The right side sends blood to the lungs; the left side sends it to the rest of the body.',
+    ['It beats about 100,000 times a day.',
+     'At rest it moves about 5 litres of blood a minute.',
+     '150 minutes a week of moderate exercise measurably lowers cardiovascular risk.'],
+    [['Mass', '250–350 g'], ['Output at rest', '≈5 L/min']],
+    { members: ['right-atrium', 'right-ventricle', 'left-atrium', 'left-ventricle'] }),
+  P('right-atrium', 'cardiovascular', 'Right Atrium', 'Atrium dextrum', ['ra', 'atrium', 'sinoatrial node', 'pacemaker'],
+    'Collects oxygen-poor blood returning from the body through the venae cavae and passes it to the right ventricle.',
+    ['Its wall holds the sinoatrial node, the heart’s natural pacemaker that starts each beat.',
+     'It works at very low pressure, only a few mmHg.'],
+    [['Pressure', '≈2–6 mmHg'], ['Inflows', 'SVC, IVC']], { parent: 'heart' }),
+  P('right-ventricle', 'cardiovascular', 'Right Ventricle', 'Ventriculus dexter', ['rv', 'ventricle'],
+    'Pumps oxygen-poor blood through the pulmonary trunk to the lungs.',
+    ['Its wall is about a third as thick as the left ventricle’s because the lungs need far less pressure.',
+     'It forms most of the front surface of the heart.'],
+    [['Systolic pressure', '≈15–30 mmHg'], ['Wall', '3–5 mm']], { parent: 'heart' }),
+  P('left-atrium', 'cardiovascular', 'Left Atrium', 'Atrium sinistrum', ['la', 'atrium'],
+    'Receives oxygen-rich blood from the pulmonary veins and fills the left ventricle.',
+    ['In atrial fibrillation, clots most often form in its small pouch, the left atrial appendage.',
+     'It sits at the back of the heart, directly in front of the esophagus.'],
+    [['Inflows', '4 pulmonary veins']], { parent: 'heart' }),
+  P('left-ventricle', 'cardiovascular', 'Left Ventricle', 'Ventriculus sinister', ['lv', 'ventricle', 'main pumping chamber'],
+    'The heart’s main pumping chamber. It drives oxygen-rich blood into the aorta and out to the whole body.',
+    ['Its muscular wall is about 1 cm thick, the thickest of the four chambers.',
+     'Ejection fraction, the share of blood pushed out per beat, is normally 50–70%.',
+     'Long-term high blood pressure thickens this wall (hypertrophy), a strain that raises heart-failure risk.'],
+    [['Systolic pressure', '≈120 mmHg'], ['Wall', '8–12 mm'], ['Stroke volume', '≈70 mL']], { parent: 'heart' }),
+  P('aorta', 'cardiovascular', 'Aorta', 'Aorta', ['aortic arch', 'artery', 'arteries'],
+    'The body’s largest artery. It carries oxygen-rich blood from the left ventricle, arches over the heart and runs down in front of the spine, branching to every organ.',
+    ['Its elastic wall stretches with each beat and recoils to keep blood flowing between beats.',
+     'Men aged 65–75 who have ever smoked are advised to get a one-time ultrasound screen for aortic aneurysm.'],
+    [['Diameter at root', '2.5–3 cm']]),
+  P('pulmonary-trunk', 'cardiovascular', 'Pulmonary Arteries', 'Truncus pulmonalis', ['pulmonary artery', 'pulmonary trunk'],
+    'Carry oxygen-poor blood from the right ventricle to the lungs.',
+    ['After birth they are the only arteries carrying oxygen-poor blood, which is why diagrams colour them blue.',
+     'A clot lodged here is a pulmonary embolism, often travelling up from a leg vein.'],
+    [['Systolic pressure', '≈15–30 mmHg']]),
+  P('pulmonary-veins', 'cardiovascular', 'Pulmonary Veins', 'Venae pulmonales', ['pulmonary vein'],
+    'Return freshly oxygenated blood from the lungs to the left atrium.',
+    ['They are the only veins that carry oxygen-rich blood.',
+     'Atrial fibrillation often starts from electrical triggers around their openings; catheter ablation isolates them.'],
+    [['Count', 'usually 4']]),
+  P('svc', 'cardiovascular', 'Superior Vena Cava', 'Vena cava superior', ['vena cava', 'svc', 'vein', 'veins'],
+    'Drains oxygen-poor blood from the head, neck and arms into the right atrium.',
+    ['It has no valve where it enters the heart.',
+     'Central venous catheters are usually placed with their tips in its lower part.'],
+    [['Diameter', '≈2 cm']]),
+  P('ivc', 'cardiovascular', 'Inferior Vena Cava', 'Vena cava inferior', ['vena cava', 'ivc', 'vein', 'veins'],
+    'Returns blood from the legs, pelvis and abdomen to the right atrium.',
+    ['It is the largest vein in the body.',
+     'It runs through a groove in the back of the liver on its way to the heart.'],
+    [['Diameter', 'up to ≈2.5 cm']]),
+  P('carotid', 'cardiovascular', 'Common Carotid Arteries', 'Arteria carotis communis', ['carotid', 'neck artery'],
+    'Supply oxygen-rich blood to the head, neck and brain.',
+    ['You can feel the carotid pulse beside the windpipe.',
+     'Plaque where each carotid divides is a major source of stroke-causing clots.'],
+    [['Per side', '1']]),
+  P('jugular', 'cardiovascular', 'Internal Jugular Veins', 'Vena jugularis interna', ['jugular', 'neck vein'],
+    'Drain blood from the brain, face and neck back toward the heart.',
+    ['Clinicians read jugular venous pressure at the neck to judge fluid overload in heart failure.',
+     'The right internal jugular is a common access route for central lines.'],
+    [['Per side', '1']]),
+  P('brachial', 'cardiovascular', 'Arm Arteries', 'Arteria subclavia et brachialis', ['brachial artery', 'subclavian', 'radial artery', 'arm artery', 'blood pressure'],
+    'The subclavian artery becomes the brachial artery in the upper arm, then divides into the radial and ulnar arteries in the forearm.',
+    ['A blood pressure cuff squeezes the brachial artery; a healthy adult reading is under 120/80 mmHg.',
+     'Cardiologists increasingly thread catheters in through the radial artery at the wrist.'],
+    [['Healthy BP', '<120/80 mmHg']]),
+  P('femoral-artery', 'cardiovascular', 'Femoral Arteries', 'Arteria femoralis', ['femoral artery', 'leg artery', 'iliac artery'],
+    'Continue from the iliac arteries to supply the thigh and lower leg.',
+    ['The femoral pulse can be felt in the groin, midway between the hip bone and the pubic bone.',
+     'Narrowing here causes calf pain on walking (claudication), a sign of peripheral artery disease.'],
+    [['Per side', '1']]),
+  P('femoral-vein', 'cardiovascular', 'Femoral Veins', 'Vena femoralis', ['femoral vein', 'leg vein', 'deep vein', 'dvt'],
+    'Carry blood from the legs back up toward the inferior vena cava.',
+    ['Deep vein thrombosis often forms in leg veins during long immobility; flexing your calves on long flights helps.',
+     'Calf muscles squeeze the deep veins while one-way valves stop blood falling back.'],
+    [['Per side', '1']]),
+
+  // ---- Respiratory
+  P('larynx', 'respiratory', 'Larynx', 'Larynx', ['voice box', 'adams apple', 'adam’s apple', 'vocal cords', 'vocal folds'],
+    'The voice box. It guards the airway during swallowing and holds the vocal folds that vibrate to make sound.',
+    ['Vocal folds vibrate roughly 100–120 times a second in typical adult male speech and 200–220 in female speech.',
+     'The “Adam’s apple” is the thyroid cartilage, which grows larger in males at puberty.'],
+    [['Speech pitch', '≈85–255 Hz']]),
+  P('trachea', 'respiratory', 'Trachea', 'Trachea', ['windpipe', 'wind pipe', 'airway'],
+    'The windpipe. It carries air from the larynx down to the bronchi.',
+    ['16–20 C-shaped cartilage rings hold it open; the open side faces the esophagus so food can pass.',
+     'Cilia lining it sweep mucus and trapped dust upward to be swallowed or coughed out.'],
+    [['Length', '10–12 cm'], ['Rings', '16–20']]),
+  P('bronchi', 'respiratory', 'Main Bronchi', 'Bronchi principales', ['bronchus', 'bronchi', 'airways'],
+    'Split the airflow into each lung, then keep branching about 23 times down to the alveoli.',
+    ['The right main bronchus is wider, shorter and more vertical, so inhaled objects lodge there more often.',
+     'Asthma narrows the smaller branches through muscle spasm and inflammation.'],
+    [['Branching generations', '≈23']]),
+  P('right-lung', 'respiratory', 'Right Lung', 'Pulmo dexter', ['lung', 'lungs'],
+    'Exchanges gases: oxygen moves from air into blood and carbon dioxide moves out.',
+    ['It has three lobes and is slightly larger than the left lung.',
+     'Together the lungs hold roughly 480 million alveoli with about 70 m² of gas-exchange surface.'],
+    [['Lobes', '3'], ['Total capacity', '≈6 L (both)']]),
+  P('left-lung', 'respiratory', 'Left Lung', 'Pulmo sinister', ['lung', 'lungs', 'cardiac notch'],
+    'Exchanges oxygen and carbon dioxide between air and blood, sharing chest space with the heart.',
+    ['It has two lobes and a cardiac notch that makes room for the heart.',
+     'Within months of quitting smoking, coughing and breathlessness ease as the airway cilia recover.'],
+    [['Lobes', '2'], ['Breaths at rest', '12–20 /min']]),
+  P('diaphragm', 'respiratory', 'Diaphragm', 'Diaphragma', ['breathing muscle'],
+    'The dome-shaped muscle under the lungs. It contracts and flattens to draw air in, and relaxes to let it out.',
+    ['It does most of the work of quiet breathing, more than 20,000 times a day.',
+     'Hiccups are sudden involuntary spasms of this muscle.',
+     'The esophagus, aorta and inferior vena cava all pass through openings in it.'],
+    [['Breaths per day', '≈17,000–29,000']]),
+
+  // ---- Digestive
+  P('esophagus', 'digestive', 'Esophagus', 'Oesophagus', ['oesophagus', 'food pipe', 'gullet'],
+    'A muscular tube that pushes swallowed food to the stomach with waves of contraction called peristalsis.',
+    ['Swallowed food reaches the stomach in about 5–10 seconds, even if you are upside down.',
+     'Frequent heartburn is acid reflux; persistent reflux deserves a check because it can damage the lining.'],
+    [['Length', '≈25 cm']]),
+  P('stomach', 'digestive', 'Stomach', 'Gaster', ['gastric', 'belly'],
+    'Stores food, churns it with acid and enzymes into a paste called chyme, and releases it slowly into the small intestine.',
+    ['A constantly renewed mucus layer stops the stomach digesting itself.',
+     'Most stomach ulcers come from H. pylori infection or regular NSAID use, not stress.'],
+    [['Typical capacity', '≈1–1.5 L'], ['Acidity', 'pH 1.5–3.5']]),
+  P('liver', 'digestive', 'Liver', 'Hepar', ['hepatic'],
+    'The largest internal organ. It processes blood from the gut, makes bile, stores glycogen and vitamins, builds blood proteins and breaks down toxins and drugs.',
+    ['It can regrow to full size after up to about two-thirds is surgically removed.',
+     'Fatty liver disease affects roughly a quarter to a third of adults worldwide and is often silent.'],
+    [['Mass', '≈1.5 kg'], ['Blood flow', '≈1.5 L/min']]),
+  P('gallbladder', 'digestive', 'Gallbladder', 'Vesica biliaris', ['gall bladder', 'bile'],
+    'Stores and concentrates bile from the liver, then squeezes it into the small intestine to help digest fat.',
+    ['Gallstones are very common, and people live normally after the gallbladder is removed.',
+     'A fatty meal triggers the hormone CCK, which makes it contract.'],
+    [['Capacity', '30–50 mL']]),
+  P('pancreas', 'digestive', 'Pancreas', 'Pancreas', ['insulin', 'islets', 'glucagon'],
+    'A dual-purpose gland: it releases digestive enzymes into the small intestine and hormones such as insulin and glucagon into the blood.',
+    ['The hormone-making islets are only about 1–2% of its mass.',
+     'It secretes roughly 1.2–1.5 litres of digestive juice a day.'],
+    [['Length', '≈15 cm']]),
+  P('small-intestine', 'digestive', 'Small Intestine', 'Intestinum tenue', ['small bowel', 'duodenum', 'jejunum', 'ileum', 'gut', 'intestine', 'intestines', 'bowel'],
+    'Where most digestion and nutrient absorption happen, across millions of finger-like villi.',
+    ['Its length depends on muscle tone: about 3–5 m in a living adult, longer after death.',
+     'It has three parts: duodenum, jejunum and ileum.',
+     'Recent measurements put its absorptive surface near 30 m², far below the old “tennis court” claim.'],
+    [['Length', '≈3–5 m'], ['Surface', '≈30 m²']]),
+  P('large-intestine', 'digestive', 'Large Intestine', 'Intestinum crassum', ['colon', 'large bowel', 'rectum', 'bowel', 'intestine', 'intestines', 'cecum', 'caecum'],
+    'Absorbs water and salts from what the small intestine leaves, houses the gut microbiome, and forms and stores stool.',
+    ['It hosts tens of trillions of bacteria, roughly as many as the body’s own cells.',
+     'In the US, colorectal cancer screening is recommended from age 45 for adults at average risk.',
+     'Fibre feeds its bacteria, which make short-chain fatty acids that nourish the colon lining.'],
+    [['Length', '≈1.5 m']]),
+  P('appendix', 'digestive', 'Appendix', 'Appendix vermiformis', ['vermiform appendix'],
+    'A small finger-shaped pouch off the start of the large intestine. It contains immune tissue and may shelter helpful gut bacteria.',
+    ['Appendicitis is the most common reason for emergency abdominal surgery.',
+     'Pain that starts near the navel and moves to the lower right abdomen is a classic warning sign.'],
+    [['Length', '≈8–10 cm']]),
+
+  // ---- Nervous
+  P('cerebrum', 'nervous', 'Cerebrum', 'Cerebrum', ['brain', 'cortex', 'cerebral hemispheres', 'hemisphere', 'frontal lobe'],
+    'The largest part of the brain. Its folded cortex handles thought, memory, language, voluntary movement and the senses.',
+    ['The brain is about 2% of body weight but uses about 20% of the body’s energy at rest.',
+     'Each hemisphere controls the opposite side of the body.',
+     'Deep sleep helps clear metabolic waste from brain tissue.'],
+    [['Brain mass', '≈1.3–1.4 kg'], ['Cortical neurons', '≈16 billion']]),
+  P('cerebellum', 'nervous', 'Cerebellum', 'Cerebellum', ['little brain', 'balance', 'brain'],
+    'Coordinates movement, balance and timing, fine-tuning commands from the cerebrum.',
+    ['It is about 10% of brain volume but holds around 80% of the brain’s neurons.',
+     'Alcohol affects it early, which is why roadside tests check balance and coordination.'],
+    [['Neurons', '≈69 billion']]),
+  P('brainstem', 'nervous', 'Brainstem', 'Truncus encephali', ['brain stem', 'medulla', 'pons', 'midbrain', 'brain'],
+    'Connects the brain to the spinal cord and runs automatic functions: breathing, heart rate, blood pressure and the sleep–wake cycle.',
+    ['Ten of the twelve cranial nerves emerge from it.',
+     'Every signal between the brain and the body passes through it.'],
+    [['Parts', 'Midbrain, pons, medulla']]),
+  P('spinal-cord', 'nervous', 'Spinal Cord', 'Medulla spinalis', ['cord', 'spinal nerves', 'cauda equina'],
+    'The main cable between brain and body. It carries sensory and motor signals and handles fast reflexes on its own.',
+    ['It ends around the first or second lumbar vertebra, so lumbar punctures are done below that level.',
+     '31 pairs of spinal nerves branch from it.'],
+    [['Length', '≈42–45 cm'], ['Nerve pairs', '31']]),
+  P('sciatic', 'nervous', 'Sciatic Nerve', 'Nervus ischiadicus', ['sciatica', 'leg nerve', 'nerve'],
+    'The longest and thickest nerve. It controls most muscles of the back of the thigh, the leg and the foot, and carries sensation from them.',
+    ['Near its origin it is about as wide as a thumb.',
+     'Sciatica is pain along its path, often from a lumbar disc pressing on its roots.'],
+    [['Width', 'up to ≈2 cm']]),
+  P('arm-nerves', 'nervous', 'Arm Nerves', 'Plexus brachialis', ['median nerve', 'ulnar nerve', 'radial nerve', 'brachial plexus', 'carpal tunnel', 'nerve'],
+    'Branches of the brachial plexus, chiefly the median, ulnar and radial nerves, control the arm and hand muscles and carry touch from the skin.',
+    ['Carpal tunnel syndrome is compression of the median nerve at the wrist, numbing the thumb and first fingers.',
+     'The ulnar nerve is the “funny bone” nerve at the elbow.'],
+    [['Main nerves', '3']]),
+  P('eyes', 'nervous', 'Eyes', 'Oculi', ['eye', 'retina', 'vision', 'optic nerve'],
+    'Focus light onto the retina, where photoreceptors turn it into signals sent along the optic nerves to the brain.',
+    ['The retina develops from brain tissue, making it the only part of the central nervous system visible without surgery.',
+     'Each eye has a blind spot where the optic nerve leaves; the brain fills in the gap.',
+     'For screen strain, every 20 minutes look at something 20 feet (6 m) away for 20 seconds.'],
+    [['Diameter', '≈24 mm']])
+];
+const PARTS = Object.fromEntries(PARTS_LIST.map(p => [p.id, p]));
+
+/* =====================================================================
+   2. RENDERER, SCENE, CAMERA, CONTROLS
+   ===================================================================== */
+const viewport = document.getElementById('viewport');
+if (!window.THREE || !THREE.OrbitControls) {
+  viewport.innerHTML = '<p class="fallback">The 3D engine did not load. This page fetches Three.js from cdn.jsdelivr.net, so check your connection and reload.</p>';
+  throw new Error('Three.js unavailable');
+}
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+} catch (err) {
+  viewport.innerHTML = '<p class="fallback">This browser could not start WebGL, which the 3D model needs. Try a current version of Chrome, Safari, Firefox or Edge.</p>';
+  throw err;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setClearColor(0x000000, 0);  // transparent: the CSS gradient behind the canvas is the theme-aware backdrop
+viewport.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50);
+scene.add(camera);
+
+const HOME_TARGET = new THREE.Vector3(0, 0.92, 0);
+const HOME_POS = new THREE.Vector3(1.05, 1.18, 3.3);
+camera.position.copy(HOME_POS);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.copy(HOME_TARGET);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.rotateSpeed = 0.8;
+controls.minDistance = 0.22;
+controls.maxDistance = 6;
+controls.autoRotateSpeed = 1.2;
+
+// Lighting: a sky/ground fill, a key light that rides with the camera so whatever you face is lit, and a cool rim.
+scene.add(new THREE.HemisphereLight(0xf4f8ff, 0x3a3230, 0.8));
+const keyLight = new THREE.DirectionalLight(0xffffff, 0.75);
+keyLight.position.set(0.6, 1.0, 1.0);
+camera.add(keyLight);
+const rimLight = new THREE.DirectionalLight(0xbfd8ff, 0.35);
+rimLight.position.set(-2, 3, -2.5);
+scene.add(rimLight);
+
+// Soft contact shadow under the feet (decorative, never pickable)
+(function addFloorShadow() {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(0,0,0,0.28)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = grad; g.fillRect(0, 0, 128, 128);
+  const disc = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9),
+    new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false }));
+  disc.rotation.x = -Math.PI / 2; disc.position.y = 0.001;
+  scene.add(disc);
+})();
+
+/* =====================================================================
+   3. SYSTEM REGISTRY
+   ---------------------------------------------------------------------
+   Each system gets its own THREE.Group so it can be hidden in one call,
+   plus a flat mesh list so its opacity can be changed per material.
+   pickables  -> every mesh the raycaster may hit
+   partMeshes -> partId -> [meshes] (a bilateral part like "femur" has several)
+   ===================================================================== */
+const root = new THREE.Group();
+scene.add(root);
+const sysGroups = {}, sysMeshes = {}, sysState = {};
+const partMeshes = {};
+const pickables = [];
+for (const [key, s] of Object.entries(SYSTEMS)) {
+  const g = new THREE.Group(); g.name = key; root.add(g);
+  sysGroups[key] = g; sysMeshes[key] = [];
+  sysState[key] = { on: s.on, opacity: s.opacity };
+}
+
+const v = (x, y, z) => new THREE.Vector3(x, y, z);
+const UP = v(0, 1, 0);
+const SIDES = [-1, 1];              // -1 = patient's right, +1 = patient's left
+const SPHERE = new THREE.SphereGeometry(1, 28, 18);
+const SPHERE_LO = new THREE.SphereGeometry(1, 12, 8);
+
+// Every mesh gets its own material instance so a single structure can glow when selected.
+function add(sys, id, geo, opts = {}) {
+  const mat = new THREE.MeshStandardMaterial({
+    color: opts.color || SYSTEMS[sys].color,
+    roughness: opts.roughness ?? 0.62,
+    metalness: 0,
+    side: opts.side || THREE.FrontSide
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.userData = { partId: id, system: sys, baseOpacity: opts.opacity ?? 1 };
+  sysGroups[sys].add(mesh);
+  sysMeshes[sys].push(mesh);
+  pickables.push(mesh);
+  (partMeshes[id] = partMeshes[id] || []).push(mesh);
+  return mesh;
+}
+// Point a mesh's local +Y axis from a to b and centre it between them.
+function orient(mesh, a, b) {
+  const dir = v(0, 0, 0).subVectors(b, a);
+  mesh.position.copy(a).add(b).multiplyScalar(0.5);
+  mesh.quaternion.setFromUnitVectors(UP, dir.normalize());
+  return mesh;
+}
+function rod(sys, id, a, b, r, opts) {
+  return orient(add(sys, id, new THREE.CapsuleGeometry(r, a.distanceTo(b), 4, 12), opts), a, b);
+}
+function taper(sys, id, a, b, rA, rB, opts) {        // truncated cone: radius rA at a, rB at b
+  return orient(add(sys, id, new THREE.CylinderGeometry(rB, rA, a.distanceTo(b), 20, 1, false), opts), a, b);
+}
+function blob(sys, id, a, b, rx, rz, opts) {          // ellipsoid stretched between two points
+  const m = orient(add(sys, id, SPHERE, opts), a, b);
+  m.scale.set(rx, a.distanceTo(b) / 2, rz);
+  return m;
+}
+function ellipsoid(sys, id, c, rx, ry, rz, opts) {
+  const m = add(sys, id, (opts && opts.geo) || SPHERE, opts);
+  m.position.copy(c); m.scale.set(rx, ry, rz);
+  return m;
+}
+function sphere(sys, id, c, r, opts) { return ellipsoid(sys, id, c, r, r, r, opts); }
+function tube(sys, id, pts, r, opts = {}) {
+  const curve = new THREE.CatmullRomCurve3(pts);
+  const m = add(sys, id, new THREE.TubeGeometry(curve, Math.max(24, pts.length * 16), r, 10, false), opts);
+  for (const end of [pts[0], pts[pts.length - 1]]) {  // round caps so the open tube ends never show
+    const cap = add(sys, id, SPHERE_LO, opts); cap.position.copy(end); cap.scale.setScalar(r);
+  }
+  return m;
+}
+// Start from a unit sphere and push its vertices around: lungs, liver and brain folds all come from this.
+function deformedSphere(fn, ws = 40, hs = 28) {
+  const g = new THREE.SphereGeometry(1, ws, hs);
+  const p = g.attributes.position, u = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) { u.fromBufferAttribute(p, i); fn(u); p.setXYZ(i, u.x, u.y, u.z); }
+  g.computeVertexNormals();
+  return g;
+}
+
+/* =====================================================================
+   4. PROCEDURAL ANATOMY
+   ===================================================================== */
+
+// ---------- 4a. Integumentary: the outer skin ----------
+function buildSkin() {
+  const S = 'integumentary', id = 'skin';
+  const profile = [
+    [0.001, 0.83], [0.1, 0.845], [0.158, 0.89], [0.172, 0.95], [0.16, 1.02], [0.144, 1.09], [0.15, 1.17],
+    [0.165, 1.26], [0.176, 1.35], [0.186, 1.42], [0.172, 1.47], [0.11, 1.505], [0.058, 1.52], [0.05, 1.535]
+  ].map(([r, y]) => new THREE.Vector2(r, y));
+  const torso = add(S, id, new THREE.LatheGeometry(profile, 48));
+  torso.scale.set(1, 1, 0.74);                       // oval cross-section: wider than deep
+  ellipsoid(S, id, v(0, 1.685, 0.012), 0.094, 0.116, 0.11);   // head
+  taper(S, id, v(0, 1.49, -0.005), v(0, 1.63, 0.0), 0.056, 0.048); // neck
+  for (const s of SIDES) {
+    const sh = v(s * 0.18, 1.43, 0), el = v(s * 0.25, 1.17, -0.01), wr = v(s * 0.3, 0.93, 0.02);
+    sphere(S, id, sh, 0.058);
+    taper(S, id, sh, el, 0.046, 0.034);
+    sphere(S, id, el, 0.034);
+    taper(S, id, el, wr, 0.034, 0.024);
+    sphere(S, id, wr, 0.024);
+    blob(S, id, wr, v(s * 0.31, 0.765, 0.028), 0.042, 0.017);   // hand, palm forward
+    const hip = v(s * 0.09, 0.9, 0), kn = v(s * 0.097, 0.5, 0.005), an = v(s * 0.1, 0.08, -0.01);
+    taper(S, id, hip, kn, 0.082, 0.05);
+    sphere(S, id, kn, 0.05);
+    taper(S, id, kn, an, 0.047, 0.03);
+    ellipsoid(S, id, v(s * 0.1, 0.34, -0.018), 0.05, 0.13, 0.056);  // calf
+    sphere(S, id, an, 0.031);
+    blob(S, id, v(s * 0.1, 0.03, -0.04), v(s * 0.108, 0.02, 0.165), 0.042, 0.03);   // foot
+  }
+}
+
+// ---------- 4b. Skeletal ----------
+const BONE = '#E9DFC7', CARTILAGE = '#BCD3DB';
+const spineZ = y => -0.045 - 0.014 * Math.sin(Math.PI * THREE.MathUtils.clamp((y - 1.0) / 0.56, 0, 1));
+const CORD_OFFSET = 0.026;   // spinal canal sits this far behind each vertebral body
+
+function buildSkeleton() {
+  const S = 'skeletal';
+  // Skull: a sphere with the calvaria (skull cap) cut away, the classic atlas view that exposes the brain.
+  const cranium = add(S, 'skull', new THREE.SphereGeometry(1, 44, 30, 0, Math.PI * 2, 0.95, Math.PI - 0.95 - 0.5),
+    { side: THREE.DoubleSide });
+  cranium.position.set(0, 1.69, 0); cranium.scale.set(0.082, 0.095, 0.1);
+  ellipsoid(S, 'skull', v(0, 1.628, 0.058), 0.05, 0.034, 0.04);          // maxilla / facial block
+  for (const s of SIDES) ellipsoid(S, 'skull', v(s * 0.07, 1.655, 0.035), 0.012, 0.01, 0.03);  // cheekbones
+  const jaw = add(S, 'mandible', new THREE.TorusGeometry(0.047, 0.0075, 10, 32, Math.PI));
+  jaw.rotation.x = Math.PI / 2; jaw.position.set(0, 1.598, 0.022); jaw.scale.set(1, 1.1, 1);
+  for (const s of SIDES) rod(S, 'mandible', v(s * 0.047, 1.598, 0.02), v(s * 0.05, 1.64, 0.006), 0.007);
+
+  // Vertebral column: 7 cervical, 12 thoracic, 5 lumbar. Each = body + neural arch ring + spinous process.
+  let y = 1.565;
+  const regions = [[7, 0.016, 0.011], [12, 0.024, 0.015], [5, 0.033, 0.019]];
+  for (const [count, step, r] of regions) {
+    for (let i = 0; i < count; i++) {
+      const yc = y - step / 2, z = spineZ(yc);
+      const body = add(S, 'spine', new THREE.CylinderGeometry(r, r, step * 0.68, 18));
+      body.position.set(0, yc, z);
+      const arch = add(S, 'spine', new THREE.TorusGeometry(0.0085, 0.0028, 8, 18));
+      arch.rotation.x = Math.PI / 2; arch.position.set(0, yc, z - CORD_OFFSET);
+      rod(S, 'spine', v(0, yc, z - CORD_OFFSET - 0.008), v(0, yc - step * 0.35, z - CORD_OFFSET - 0.024), 0.0032);
+      y -= step;
+    }
+  }
+  const sacrum = ellipsoid(S, 'spine', v(0, 0.945, -0.06), 0.045, 0.058, 0.018);
+  sacrum.rotation.x = -0.35;
+  rod(S, 'spine', v(0, 0.9, -0.075), v(0, 0.875, -0.062), 0.006);          // coccyx
+
+  // Rib cage: each rib is a tube swept along a half-ellipse that drops as it wraps forward.
+  const widths = [0.06, 0.085, 0.1, 0.113, 0.123, 0.13, 0.135, 0.137, 0.136, 0.132, 0.124, 0.114];
+  const cz = 0.015;
+  let rib7End = {};
+  for (let i = 0; i < 12; i++) {
+    const y0 = 1.445 - i * 0.022, a = widths[i], b = 0.055 + 0.03 * Math.min(1, i / 4);
+    const tEnd = i < 7 ? 0.86 * Math.PI : i < 10 ? 0.76 * Math.PI : 0.5 * Math.PI;
+    for (const s of SIDES) {
+      const pts = [];
+      for (let k = 0; k <= 12; k++) {
+        const t = 0.1 * Math.PI + (tEnd - 0.1 * Math.PI) * k / 12;
+        pts.push(v(s * a * Math.sin(t), y0 - 0.055 * (t / Math.PI), cz - b * Math.cos(t)));
+      }
+      tube(S, 'ribs', pts, 0.0052);
+      const end = pts[pts.length - 1];
+      if (i < 7) {        // true ribs: costal cartilage runs straight to the sternum
+        const st = v(s * 0.017, end.y - 0.006, 0.098);
+        tube(S, 'ribs', [end, st], 0.0048, { color: CARTILAGE });
+        if (i === 6) rib7End[s] = st;
+      } else if (i < 10) { // false ribs: cartilage joins the cartilage above
+        tube(S, 'ribs', [end, v(s * (0.05 - (i - 7) * 0.008), end.y + 0.018, 0.088), v(s * 0.03, 1.258, 0.096)], 0.0042, { color: CARTILAGE });
+      }
+    }
+  }
+  const manubrium = ellipsoid(S, 'sternum', v(0, 1.392, 0.088), 0.026, 0.024, 0.007); manubrium.rotation.x = -0.18;
+  const body = add(S, 'sternum', new THREE.BoxGeometry(0.032, 0.13, 0.011)); body.position.set(0, 1.31, 0.098); body.rotation.x = -0.15;
+  ellipsoid(S, 'sternum', v(0, 1.235, 0.104), 0.008, 0.016, 0.005);      // xiphoid
+
+  for (const s of SIDES) {
+    // Shoulder girdle
+    tube(S, 'clavicle', [v(s * 0.022, 1.455, 0.086), v(s * 0.09, 1.466, 0.07), v(s * 0.165, 1.468, 0.012), v(s * 0.18, 1.458, -0.004)], 0.0062);
+    const blade = new THREE.Shape();
+    blade.moveTo(0, 0); blade.lineTo(0.09, 0.008); blade.lineTo(0.004, -0.14); blade.closePath();
+    const scap = add(S, 'scapula', new THREE.ExtrudeGeometry(blade, { depth: 0.006, bevelEnabled: false }), { side: THREE.DoubleSide });
+    scap.position.set(s * 0.075, 1.43, -0.088); scap.scale.set(s, 1, 1); scap.rotation.y = s * -0.45;
+    rod(S, 'scapula', v(s * 0.08, 1.41, -0.094), v(s * 0.17, 1.44, -0.03), 0.0045);   // spine of scapula / acromion
+
+    // Arm
+    sphere(S, 'humerus', v(s * 0.178, 1.428, -0.004), 0.02);
+    rod(S, 'humerus', v(s * 0.19, 1.42, 0), v(s * 0.245, 1.185, -0.01), 0.0105);
+    ellipsoid(S, 'humerus', v(s * 0.247, 1.175, -0.01), 0.024, 0.012, 0.014);
+    rod(S, 'radius', v(s * 0.258, 1.16, 0.002), v(s * 0.306, 0.94, 0.018), 0.0072);
+    rod(S, 'ulna', v(s * 0.238, 1.165, -0.012), v(s * 0.29, 0.94, 0.01), 0.0068);
+    sphere(S, 'ulna', v(s * 0.24, 1.182, -0.022), 0.0095);
+    ellipsoid(S, 'hand', v(s * 0.3, 0.912, 0.018), 0.022, 0.013, 0.009);   // carpals
+    for (let f = 0; f < 4; f++) {                                           // f = 0 little finger, 3 index
+      const base = v(s * (0.284 + f * 0.011), 0.9, 0.018);
+      const knuckle = v(s * (0.288 + f * 0.012), 0.838, 0.021);
+      rod(S, 'hand', base, knuckle, 0.0042);
+      rod(S, 'hand', knuckle, v(s * (0.291 + f * 0.0135), 0.772 + (f === 0 ? 0.014 : f === 3 ? 0.004 : 0), 0.024), 0.0036);
+    }
+    rod(S, 'hand', v(s * 0.316, 0.905, 0.022), v(s * 0.34, 0.852, 0.032), 0.005);    // thumb (lateral in anatomical position)
+    rod(S, 'hand', v(s * 0.34, 0.852, 0.032), v(s * 0.352, 0.818, 0.036), 0.0042);
+
+    // Pelvis: iliac wings + acetabulum (the ring itself is added once below)
+    const wing = ellipsoid(S, 'pelvis', v(s * 0.1, 0.99, -0.022), 0.052, 0.048, 0.011);
+    wing.rotation.y = s * 1.05; wing.rotation.z = s * -0.25;
+    sphere(S, 'pelvis', v(s * 0.085, 0.9, 0.006), 0.026);
+
+    // Leg
+    sphere(S, 'femur', v(s * 0.083, 0.9, 0.006), 0.022);
+    rod(S, 'femur', v(s * 0.086, 0.898, 0.005), v(s * 0.116, 0.878, 0), 0.0105);
+    sphere(S, 'femur', v(s * 0.126, 0.886, -0.006), 0.015);                 // greater trochanter
+    rod(S, 'femur', v(s * 0.116, 0.875, 0), v(s * 0.099, 0.52, 0), 0.013);
+    ellipsoid(S, 'femur', v(s * 0.098, 0.506, -0.003), 0.028, 0.018, 0.025);
+    ellipsoid(S, 'patella', v(s * 0.098, 0.51, 0.031), 0.019, 0.023, 0.008);
+    ellipsoid(S, 'tibia', v(s * 0.098, 0.482, -0.002), 0.03, 0.011, 0.024);
+    rod(S, 'tibia', v(s * 0.096, 0.472, 0), v(s * 0.1, 0.09, -0.008), 0.0118);
+    sphere(S, 'tibia', v(s * 0.088, 0.074, -0.006), 0.011);                 // medial malleolus
+    rod(S, 'fibula', v(s * 0.125, 0.466, -0.013), v(s * 0.122, 0.085, -0.016), 0.0054);
+    sphere(S, 'fibula', v(s * 0.123, 0.07, -0.016), 0.009);                 // lateral malleolus
+    ellipsoid(S, 'foot', v(s * 0.1, 0.054, -0.006), 0.018, 0.014, 0.022);    // talus
+    ellipsoid(S, 'foot', v(s * 0.1, 0.03, -0.03), 0.017, 0.018, 0.03);       // calcaneus
+    ellipsoid(S, 'foot', v(s * 0.096, 0.036, 0.022), 0.026, 0.012, 0.024);   // midfoot tarsals
+    for (let f = 0; f < 5; f++) {                                            // f = 0 big toe (medial)
+      const base = v(s * (0.085 + f * 0.009), 0.03, 0.035);
+      const head = v(s * (0.076 + f * 0.014), 0.013, 0.105);
+      rod(S, 'foot', base, head, f === 0 ? 0.0065 : 0.0048);
+      rod(S, 'foot', head, v(s * (0.074 + f * 0.0152), 0.009, 0.14 - f * 0.006), f === 0 ? 0.006 : 0.0042);
+    }
+  }
+  const ring = add(S, 'pelvis', new THREE.TorusGeometry(0.074, 0.0135, 12, 40));
+  ring.position.set(0, 0.93, -0.004); ring.rotation.x = Math.PI / 2 + 0.5; ring.scale.set(1.18, 1, 1);
+}
+
+// ---------- 4c. Muscular (superficial muscles only) ----------
+function buildMuscles() {
+  const S = 'muscular', dark = '#8C2A2C';
+  const rectus = ellipsoid(S, 'rectus', v(0, 1.09, 0.086), 0.052, 0.15, 0.011);
+  ellipsoid(S, 'trapezius', v(0, 1.4, -0.086), 0.11, 0.1, 0.03);
+  for (const s of SIDES) {
+    const pec = ellipsoid(S, 'pectoralis', v(s * 0.07, 1.36, 0.098), 0.07, 0.05, 0.012);
+    pec.rotation.z = s * -0.2;
+    const obl = ellipsoid(S, 'obliques', v(s * 0.112, 1.09, 0.052), 0.034, 0.11, 0.04, { color: dark });
+    obl.rotation.y = s * 0.8;
+    const delt = ellipsoid(S, 'deltoid', v(s * 0.195, 1.415, 0), 0.042, 0.065, 0.05);
+    delt.rotation.z = s * 0.3;
+    blob(S, 'biceps', v(s * 0.205, 1.37, 0.02), v(s * 0.24, 1.2, 0.012), 0.02, 0.018);
+    blob(S, 'triceps', v(s * 0.198, 1.38, -0.022), v(s * 0.24, 1.2, -0.028), 0.022, 0.02, { color: dark });
+    blob(S, 'forearm', v(s * 0.255, 1.15, 0.008), v(s * 0.295, 0.965, 0.02), 0.024, 0.019);
+    const lat = ellipsoid(S, 'lats', v(s * 0.092, 1.24, -0.074), 0.06, 0.1, 0.02, { color: dark });
+    lat.rotation.z = s * 0.3; lat.rotation.y = s * -0.5;
+    ellipsoid(S, 'glutes', v(s * 0.075, 0.9, -0.066), 0.07, 0.075, 0.045);
+    blob(S, 'quadriceps', v(s * 0.105, 0.84, 0.034), v(s * 0.1, 0.54, 0.034), 0.042, 0.03);
+    blob(S, 'hamstrings', v(s * 0.095, 0.84, -0.035), v(s * 0.097, 0.55, -0.03), 0.035, 0.028, { color: dark });
+    ellipsoid(S, 'gastrocnemius', v(s * 0.1, 0.36, -0.034), 0.038, 0.11, 0.03);
+    blob(S, 'tibialis', v(s * 0.112, 0.45, 0.02), v(s * 0.108, 0.14, 0.018), 0.012, 0.012, { color: dark });
+    blob(S, 'scm', v(s * 0.045, 1.63, -0.01), v(s * 0.015, 1.47, 0.05), 0.01, 0.01);
+  }
+  return rectus;
+}
+
+// ---------- 4d. Cardiovascular ----------
+function buildCardio() {
+  const S = 'cardiovascular', ART = '#C8323C', VEIN = '#3F5FA8';
+  // Heart: four chambers modelled separately so each one is its own clickable target.
+  blob(S, 'left-ventricle', v(0.012, 1.325, 0.025), v(0.065, 1.235, 0.065), 0.033, 0.033, { color: '#A42B35' });
+  blob(S, 'right-ventricle', v(-0.018, 1.32, 0.048), v(0.045, 1.24, 0.08), 0.026, 0.018, { color: '#BC4750' });
+  ellipsoid(S, 'right-atrium', v(-0.035, 1.325, 0.025), 0.024, 0.028, 0.024, { color: '#8E3A52' });
+  ellipsoid(S, 'left-atrium', v(0.02, 1.345, -0.015), 0.026, 0.02, 0.02, { color: '#B5424C' });
+
+  tube(S, 'aorta', [v(0.01, 1.33, 0.03), v(0.003, 1.39, 0.03), v(0.012, 1.43, 0.01), v(0.03, 1.42, -0.022),
+    v(0.03, 1.37, -0.033), v(0.025, 1.25, -0.028), v(0.018, 1.12, -0.012), v(0.01, 1.0, -0.005), v(0.006, 0.975, -0.002)], 0.0085, { color: ART });
+  tube(S, 'svc', [v(-0.036, 1.34, 0.028), v(-0.034, 1.39, 0.03), v(-0.03, 1.445, 0.03)], 0.008, { color: VEIN });
+  tube(S, 'ivc', [v(-0.03, 1.3, 0.015), v(-0.028, 1.2, -0.006), v(-0.02, 1.1, -0.006), v(-0.015, 0.99, -0.001), v(-0.01, 0.97, 0)], 0.009, { color: VEIN });
+  tube(S, 'pulmonary-trunk', [v(0.01, 1.33, 0.062), v(0.015, 1.375, 0.05), v(0.05, 1.37, 0.018), v(0.085, 1.335, 0.005)], 0.0065, { color: '#4466B0' });
+  tube(S, 'pulmonary-trunk', [v(0.015, 1.375, 0.05), v(-0.02, 1.372, 0.016), v(-0.08, 1.335, 0.005)], 0.006, { color: '#4466B0' });
+  for (const s of SIDES) {
+    tube(S, 'pulmonary-veins', [v(s * 0.07, 1.3, -0.004), v(s * 0.04, 1.33, -0.014), v(0.02, 1.345, -0.016)], 0.0045, { color: '#D0474F' });
+    tube(S, 'carotid', [v(s * 0.012, 1.425, 0.014), v(s * 0.025, 1.5, 0.024), v(s * 0.028, 1.61, 0.02)], 0.0045, { color: ART });
+    tube(S, 'jugular', [v(s * 0.04, 1.63, 0.008), v(s * 0.042, 1.52, 0.026), v(-0.028, 1.448, 0.03)], 0.005, { color: VEIN });
+    tube(S, 'brachial', [v(s * 0.018, 1.425, 0.012), v(s * 0.08, 1.455, 0.02), v(s * 0.17, 1.43, 0.012), v(s * 0.215, 1.3, 0.012),
+      v(s * 0.245, 1.17, 0.012), v(s * 0.3, 0.94, 0.028)], 0.0035, { color: ART });
+    tube(S, 'femoral-artery', [v(0.006, 0.975, -0.002), v(s * 0.05, 0.94, 0.01), v(s * 0.08, 0.87, 0.04), v(s * 0.095, 0.72, 0.035),
+      v(s * 0.095, 0.52, -0.03), v(s * 0.1, 0.3, -0.02), v(s * 0.105, 0.09, 0.005)], 0.005, { color: ART });
+    tube(S, 'femoral-vein', [v(-0.01, 0.97, 0), v(s * 0.045, 0.935, -0.002), v(s * 0.07, 0.87, 0.03), v(s * 0.085, 0.72, 0.026),
+      v(s * 0.087, 0.52, -0.04), v(s * 0.092, 0.3, -0.03), v(s * 0.097, 0.09, -0.006)], 0.005, { color: VEIN });
+  }
+  partMeshes.heart = PARTS.heart.members.flatMap(id => partMeshes[id]);  // "Heart" = all four chambers
+}
+
+// ---------- 4e. Respiratory ----------
+function lungGeo(s) {
+  return deformedSphere(u => {
+    if (u.y > 0) { const k = 1 - 0.42 * u.y * u.y; u.x *= k; u.z *= k; }      // narrow apex
+    if (u.x * s < 0) u.x *= 0.55;                                             // flat face toward the heart
+    if (s > 0 && u.x < 0 && u.y < 0.25 && u.z > -0.1) u.x *= 0.45;            // cardiac notch, left lung only
+    if (u.y < -0.55) u.y = -0.55 + (u.y + 0.55) * 0.3;                        // base flattened on the diaphragm
+  });
+}
+function buildRespiratory() {
+  const S = 'respiratory';
+  taper(S, 'larynx', v(0, 1.525, 0.034), v(0, 1.57, 0.036), 0.013, 0.017, { color: '#E6C6C0' });
+  tube(S, 'trachea', [v(0, 1.528, 0.034), v(0, 1.45, 0.025), v(0, 1.38, 0.012)], 0.0085);
+  const trachea = new THREE.CatmullRomCurve3([v(0, 1.528, 0.034), v(0, 1.45, 0.025), v(0, 1.38, 0.012)]);
+  for (let k = 0.05; k < 0.98; k += 0.058) {           // cartilage rings along the windpipe
+    const ringMesh = add(S, 'trachea', new THREE.TorusGeometry(0.0094, 0.0017, 6, 20), { color: '#F3DDD8' });
+    ringMesh.position.copy(trachea.getPoint(k)); ringMesh.rotation.x = Math.PI / 2;
+  }
+  for (const s of SIDES) {
+    tube(S, 'bronchi', [v(0, 1.38, 0.012), v(s * 0.02, 1.362, 0.008), v(s * 0.048, 1.334, 0.004)], s < 0 ? 0.0072 : 0.0062);
+    const lung = add(S, s < 0 ? 'right-lung' : 'left-lung', lungGeo(s), { color: s < 0 ? '#E4A0A5' : '#E8A8AC', roughness: 0.8 });
+    lung.position.set(s * 0.082, 1.3, 0.012); lung.scale.set(0.058, 0.125, 0.07);
+  }
+  const dome = add(S, 'diaphragm', new THREE.SphereGeometry(1, 36, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+    { color: '#C4636A', side: THREE.DoubleSide, opacity: 0.92 });
+  dome.position.set(0, 1.16, 0.005); dome.scale.set(0.135, 0.055, 0.09);
+}
+
+// ---------- 4f. Digestive ----------
+function buildDigestive() {
+  const S = 'digestive';
+  tube(S, 'esophagus', [v(0, 1.54, 0.016), v(0, 1.45, -0.002), v(0.004, 1.35, -0.02), v(0.012, 1.25, -0.02), v(0.025, 1.18, -0.005), v(0.036, 1.155, 0.01)], 0.0062, { color: '#D98F86' });
+  sphere(S, 'stomach', v(0.06, 1.152, 0.026), 0.03, { color: '#D98B79' });   // fundus
+  tube(S, 'stomach', [v(0.04, 1.155, 0.014), v(0.07, 1.145, 0.03), v(0.085, 1.11, 0.05), v(0.07, 1.078, 0.064), v(0.03, 1.074, 0.066), v(0, 1.082, 0.058), v(-0.018, 1.09, 0.05)], 0.022, { color: '#D98B79' });
+  const liver = add(S, 'liver', deformedSphere(u => {
+    if (u.x > 0) { u.y *= 1 - 0.6 * u.x; u.z *= 1 - 0.28 * u.x; }            // thin left lobe
+    if (u.y < 0) u.y *= 0.65;                                                // flatter underside
+  }), { color: '#7B3028', roughness: 0.45 });
+  liver.position.set(-0.045, 1.125, 0.03); liver.scale.set(0.092, 0.058, 0.07);
+  blob(S, 'gallbladder', v(-0.052, 1.086, 0.07), v(-0.057, 1.056, 0.086), 0.011, 0.011, { color: '#6E8B3D' });
+  ellipsoid(S, 'pancreas', v(-0.025, 1.08, 0.004), 0.02, 0.018, 0.016, { color: '#E3B46E' });
+  blob(S, 'pancreas', v(-0.025, 1.085, 0), v(0.088, 1.102, -0.006), 0.013, 0.012, { color: '#E3B46E' });
+
+  // Small intestine: duodenal C-loop, then a serpentine coil packed inside the colon's frame.
+  const si = [v(-0.018, 1.09, 0.05), v(-0.036, 1.08, 0.04), v(-0.045, 1.06, 0.03), v(-0.02, 1.052, 0.032)];
+  for (let r = 0; r < 6; r++) {
+    const yr = 1.036 - r * 0.019;
+    const xs = r % 2 ? [0.06, 0.02, -0.02, -0.06] : [-0.06, -0.02, 0.02, 0.06];
+    xs.forEach((x, i) => si.push(v(x, yr + (i % 2 ? 0.006 : -0.004), 0.05 + 0.02 * Math.sin(r * 1.7 + i * 1.3))));
+  }
+  si.push(v(-0.07, 0.945, 0.05));
+  tube(S, 'small-intestine', si, 0.0095, { color: '#E2A695' });
+
+  tube(S, 'large-intestine', [v(-0.078, 0.945, 0.05), v(-0.09, 0.99, 0.052), v(-0.092, 1.04, 0.05), v(-0.085, 1.062, 0.058),
+    v(-0.03, 1.056, 0.08), v(0.03, 1.058, 0.08), v(0.085, 1.07, 0.056), v(0.095, 1.035, 0.05), v(0.092, 0.98, 0.05),
+    v(0.08, 0.94, 0.05), v(0.05, 0.915, 0.04), v(0.015, 0.918, 0.02), v(0.002, 0.9, -0.02), v(0, 0.86, -0.03)], 0.016, { color: '#C98266' });
+  sphere(S, 'large-intestine', v(-0.08, 0.945, 0.05), 0.02, { color: '#C98266' });   // cecum
+  tube(S, 'appendix', [v(-0.076, 0.928, 0.052), v(-0.068, 0.91, 0.056), v(-0.058, 0.9, 0.06)], 0.004, { color: '#B9735A' });
+}
+
+// ---------- 4g. Nervous ----------
+function buildNervous() {
+  const S = 'nervous', NERVE = '#E2BC45';
+  for (const s of SIDES) {
+    // Cerebral hemisphere: sphere + layered sine noise for gyri, flattened on the midline to leave the fissure.
+    const hemi = add(S, 'cerebrum', deformedSphere(u => {
+      u.multiplyScalar(1 + 0.035 * (Math.sin(u.x * 17 + u.z * 11) * Math.sin(u.y * 19 - u.z * 13) + 0.6 * Math.sin(u.z * 29 + u.y * 7) * Math.sin(u.x * 23)));
+      if (u.x * s < 0) u.x *= 0.35;
+      if (u.y < -0.2) u.y = -0.2 + (u.y + 0.2) * 0.6;
+    }, 72, 48), { color: '#E1B7B0', roughness: 0.7 });
+    hemi.position.set(s * 0.021, 1.708, -0.005); hemi.scale.set(0.042, 0.06, 0.085);
+
+    sphere(S, 'eyes', v(s * 0.032, 1.675, 0.088), 0.0115, { color: '#F3F1EC', roughness: 0.25 });
+    ellipsoid(S, 'eyes', v(s * 0.032, 1.675, 0.0985), 0.0052, 0.0052, 0.0016, { color: '#3B6E8F', roughness: 0.2 });
+
+    tube(S, 'sciatic', [v(s * 0.03, 0.96, -0.06), v(s * 0.07, 0.92, -0.07), v(s * 0.1, 0.86, -0.05), v(s * 0.098, 0.7, -0.036),
+      v(s * 0.097, 0.53, -0.03), v(s * 0.1, 0.35, -0.03), v(s * 0.1, 0.12, -0.02)], 0.0045, { color: NERVE });
+    tube(S, 'arm-nerves', [v(s * 0.03, 1.5, -0.024), v(s * 0.09, 1.46, -0.002), v(s * 0.175, 1.42, -0.002), v(s * 0.215, 1.3, 0.004),
+      v(s * 0.243, 1.17, 0.003), v(s * 0.28, 1.02, 0.015), v(s * 0.303, 0.92, 0.02)], 0.003, { color: NERVE });
+  }
+  const cb = add(S, 'cerebellum', deformedSphere(u => u.multiplyScalar(1 + 0.04 * Math.sin(u.y * 42)), 48, 36), { color: '#D29B95' });
+  cb.position.set(0, 1.642, -0.055); cb.scale.set(0.05, 0.027, 0.035);
+  taper(S, 'brainstem', v(0, 1.575, -0.03), v(0, 1.66, -0.016), 0.009, 0.013, { color: '#D8ACA5' });
+  // Spinal cord threads through the ring of every vertebral arch, then thins into the filum near L1-L2.
+  const cord = [];
+  for (let y = 1.58; y >= 1.13; y -= 0.03) cord.push(v(0, y, spineZ(y) - CORD_OFFSET));
+  tube(S, 'spinal-cord', cord, 0.0052, { color: NERVE });
+  const filum = [];
+  for (let y = 1.13; y >= 0.96; y -= 0.034) filum.push(v(0, y, spineZ(y) - CORD_OFFSET));
+  tube(S, 'spinal-cord', filum, 0.0025, { color: NERVE });
+}
+
+buildSkin(); buildSkeleton(); buildMuscles(); buildCardio(); buildRespiratory(); buildDigestive(); buildNervous();
+
+/* ---------- Skin depth pre-pass ----------
+   The skin is many overlapping primitives. Drawn transparent as-is, the overlaps would stack into dark seams.
+   So each skin piece gets an invisible twin that only writes depth (renderOrder 1); the visible skin (renderOrder 2)
+   then uses depthFunc LessEqual and only its front-most surface survives. Organs are drawn earlier, so they show through. */
+for (const m of [...sysMeshes.integumentary]) {
+  const twin = new THREE.Mesh(m.geometry, new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: true, transparent: true }));
+  twin.position.copy(m.position); twin.quaternion.copy(m.quaternion); twin.scale.copy(m.scale);
+  twin.renderOrder = 1; twin.userData.depthOnly = true;
+  sysGroups.integumentary.add(twin);
+  m.renderOrder = 2;
+  m.material.depthFunc = THREE.LessEqualDepth;
+  m.material.roughness = 0.55;
+}
+
+/* =====================================================================
+   5. SYSTEM VISIBILITY + OPACITY
+   ===================================================================== */
+function applySystem(sys) {
+  const st = sysState[sys];
+  sysGroups[sys].visible = st.on && st.opacity > 0.005;
+  for (const m of sysMeshes[sys]) {
+    const o = st.opacity * m.userData.baseOpacity;
+    m.material.opacity = o;
+    const transparent = sys === 'integumentary' || o < 0.999;
+    if (m.material.transparent !== transparent) { m.material.transparent = transparent; m.material.needsUpdate = true; }
+    // Semi-opaque layers still write depth so they sort cleanly against themselves; ghosted layers don't.
+    m.material.depthWrite = sys === 'integumentary' ? false : o > 0.6;
+  }
+}
+Object.keys(SYSTEMS).forEach(applySystem);
+
+/* =====================================================================
+   6. RAYCASTING (click / tap / hover picking)
+   ---------------------------------------------------------------------
+   Pointer position -> normalised device coords -> ray from the camera.
+   intersectObjects returns hits sorted near-to-far; we take the first hit
+   whose system is switched on and opaque enough to count as "there".
+   A ghosted skin (< 50%) is skipped, so clicks fall through to organs.
+   ===================================================================== */
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+function isPickableNow(mesh) {
+  const st = sysState[mesh.userData.system];
+  if (!st.on) return false;
+  return mesh.userData.system === 'integumentary' ? st.opacity >= 0.5 : st.opacity >= 0.12;
+}
+function pickAt(clientX, clientY) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);          // works with setViewOffset: the projection matrix already includes it
+  for (const hit of raycaster.intersectObjects(pickables, false)) {
+    if (isPickableNow(hit.object)) return hit.object.userData.partId;
+  }
+  return null;
+}
+
+/* =====================================================================
+   7. UI: sidebar, search, info drawer
+   ===================================================================== */
+const $ = sel => document.querySelector(sel);
+const isPhone = () => window.matchMedia('(max-width: 759px)').matches;
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const panel = $('#layers'), info = $('#info'), layersBtn = $('#layers-btn');
+
+const counts = {};
+PARTS_LIST.forEach(p => { if (!p.members) counts[p.system] = (counts[p.system] || 0) + 1; });
+$('#brand-count').textContent = `${PARTS_LIST.filter(p => !p.members).length} structures · 7 systems`;
+
+function setRangeFill(input) { input.style.setProperty('--pct', input.value + '%'); }
+
+// Build one row per system. Integumentary gets the dedicated Skin Peel slider instead of a plain opacity slider.
+const sysList = $('#sys-list');
+for (const [key, s] of Object.entries(SYSTEMS)) {
+  const row = document.createElement('div');
+  row.className = 'sys-row'; row.dataset.sys = key; row.style.setProperty('--sys', s.color);
+  row.innerHTML = `
+    <label class="sys-toggle" for="sys-${key}">
+      <input type="checkbox" id="sys-${key}" autocomplete="off"><span class="switch" aria-hidden="true"></span>
+      <span class="swatch"></span>
+      <span class="sys-name">${s.label}<small>${s.sub}</small></span>
+      <span class="sys-count">${counts[key]}</span>
+    </label>` + (key === 'integumentary' ? `
+    <div class="peel">
+      <div class="peel-head"><span>Skin peel</span><output id="peel-out" for="peel"></output></div>
+      <input type="range" id="peel" autocomplete="off" min="0" max="100" step="1" aria-label="Skin peel: slide right to make the skin transparent">
+      <div class="peel-scale">
+        <button type="button" data-peel="0">Opaque</button>
+        <button type="button" data-peel="80">Ghost</button>
+        <button type="button" data-peel="100">Peeled</button>
+      </div>
+    </div>` : `
+    <div class="sys-op">
+      <input type="range" id="op-${key}" autocomplete="off" min="0" max="100" step="1" aria-label="${s.label} opacity">
+      <output id="op-${key}-out" for="op-${key}"></output>
+    </div>`);
+  sysList.appendChild(row);
+
+  $(`#sys-${key}`).addEventListener('change', e => {
+    const st = sysState[key];
+    st.on = e.target.checked;
+    if (st.on && st.opacity < 0.05) st.opacity = key === 'integumentary' ? 0.3 : 1;
+    isolateSnapshot = null;
+    applySystem(key); syncUI(key); updateIsolateLabel();
+  });
+  if (key === 'integumentary') {
+    $('#peel').addEventListener('input', e => {
+      sysState.integumentary.opacity = (100 - Number(e.target.value)) / 100;   // slider right = more peeled
+      sysState.integumentary.on = true;
+      applySystem('integumentary'); syncUI('integumentary');
+    });
+    row.querySelectorAll('[data-peel]').forEach(b => b.addEventListener('click', () => {
+      $('#peel').value = b.dataset.peel; $('#peel').dispatchEvent(new Event('input'));
+    }));
+  } else {
+    $(`#op-${key}`).addEventListener('input', e => {
+      sysState[key].opacity = Number(e.target.value) / 100;
+      applySystem(key); syncUI(key);
+    });
+  }
+}
+function syncUI(key) {
+  const st = sysState[key];
+  $(`#sys-${key}`).checked = st.on;
+  $(`.sys-row[data-sys="${key}"]`).classList.toggle('off', !st.on);
+  if (key === 'integumentary') {
+    const peel = $('#peel');
+    peel.value = Math.round(100 - st.opacity * 100);
+    peel.disabled = !st.on;
+    $('#peel-out').textContent = st.on ? `Opacity ${Math.round(st.opacity * 100)}%` : 'Hidden';
+  } else {
+    const r = $(`#op-${key}`);
+    r.value = Math.round(st.opacity * 100); r.disabled = !st.on; setRangeFill(r);
+    $(`#op-${key}-out`).textContent = `${r.value}%`;
+  }
+}
+Object.keys(SYSTEMS).forEach(syncUI);
+
+// Camera presets + turntable
+const VIEWS = { front: v(0, 1.0, 3.4), side: v(3.4, 1.0, 0), back: v(0, 1.0, -3.4) };
+document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
+  const name = b.dataset.view;
+  flyTo(HOME_TARGET.clone(), (name === 'reset' ? HOME_POS : VIEWS[name]).clone());
+}));
+$('#autorotate').addEventListener('change', e => { controls.autoRotate = e.target.checked; });
+
+// Phone: the layers panel is a bottom sheet
+function setLayersOpen(open) {
+  panel.classList.toggle('open', open);
+  layersBtn.setAttribute('aria-expanded', String(open));
+  if (open && isPhone()) closeInfo();
+  document.body.classList.toggle('sheet-open', open || info.classList.contains('open'));
+  updateInsets();
+}
+layersBtn.addEventListener('click', () => setLayersOpen(!panel.classList.contains('open')));
+$('#layers-close').addEventListener('click', () => setLayersOpen(false));
+
+/* ---------- Selection + info drawer ---------- */
+let selectedId = null, hoveredId = null, isolateSnapshot = null;
+const HILITE = new THREE.Color('#2FD3DA');
+
+function clearGlow(id) { if (id && partMeshes[id]) partMeshes[id].forEach(m => m.material.emissive.setHex(0x000000)); }
+
+// Make sure the chosen structure is actually visible: switch its system on and thin out the layers in front of it.
+function revealFor(sys) {
+  const st = sysState[sys];
+  if (!st.on) st.on = true;
+  if (st.opacity < 0.3) st.opacity = sys === 'integumentary' ? 0.7 : 1;
+  applySystem(sys); syncUI(sys);
+  const thin = (s, max) => {
+    if (s !== sys && sysState[s].on && sysState[s].opacity > max) { sysState[s].opacity = max; applySystem(s); syncUI(s); }
+  };
+  if (sys !== 'integumentary') thin('integumentary', 0.15);
+  if (sys !== 'integumentary' && sys !== 'muscular') thin('muscular', 0.2);
+  if (sys === 'nervous') thin('skeletal', 0.35);
+}
+
+function select(id, { focus = false, reveal = true } = {}) {
+  clearGlow(selectedId);
+  selectedId = id;
+  if (!id) { closeInfo(); return; }
+  if (reveal) revealFor(PARTS[id].system);
+  fillInfo(id);
+  openInfo();
+  if (focus) focusOn(id);
+}
+
+function fillInfo(id) {
+  const p = PARTS[id], s = SYSTEMS[p.system];
+  info.style.setProperty('--sys', s.color);
+  $('#info-system').textContent = s.label;
+  $('#info-name').textContent = p.name;
+  $('#info-latin').textContent = p.latin;
+  const parent = $('#info-parent');
+  parent.hidden = !p.parent;
+  if (p.parent) { parent.textContent = `Part of the ${PARTS[p.parent].name} →`; parent.onclick = () => select(p.parent, { focus: true }); }
+  const stats = $('#info-stats');
+  stats.replaceChildren(...p.stats.map(([k, val]) => {
+    const d = document.createElement('div'), dt = document.createElement('dt'), dd = document.createElement('dd');
+    dt.textContent = k; dd.textContent = val; d.append(dt, dd); return d;
+  }));
+  stats.hidden = !p.stats.length;
+  $('#info-func').textContent = p.func;
+  $('#info-facts').replaceChildren(...p.facts.map(f => { const li = document.createElement('li'); li.textContent = f; return li; }));
+  updateIsolateLabel();
+  info.scrollTop = 0;
+}
+function openInfo() {
+  info.classList.add('open');
+  document.body.classList.add('info-open', 'sheet-open');
+  if (isPhone()) { panel.classList.remove('open'); layersBtn.setAttribute('aria-expanded', 'false'); }
+  updateInsets();
+}
+function closeInfo() {
+  clearGlow(selectedId); selectedId = null;
+  info.classList.remove('open');
+  document.body.classList.remove('info-open');
+  document.body.classList.toggle('sheet-open', panel.classList.contains('open') && isPhone());
+  updateInsets();
+}
+$('#info-close').addEventListener('click', closeInfo);
+$('#info-focus').addEventListener('click', () => selectedId && focusOn(selectedId));
+
+function updateIsolateLabel() {
+  const btn = $('#info-isolate');
+  if (!selectedId) return;
+  btn.textContent = isolateSnapshot ? 'Show all systems' : `Show only ${SYSTEMS[PARTS[selectedId].system].label}`;
+}
+$('#info-isolate').addEventListener('click', () => {
+  if (!selectedId) return;
+  const target = PARTS[selectedId].system;
+  if (isolateSnapshot) {
+    for (const k in sysState) Object.assign(sysState[k], isolateSnapshot[k]);
+    isolateSnapshot = null;
+  } else {
+    isolateSnapshot = JSON.parse(JSON.stringify(sysState));
+    for (const k in sysState) sysState[k].on = k === target;
+    if (sysState[target].opacity < 0.5) sysState[target].opacity = 1;
+  }
+  Object.keys(SYSTEMS).forEach(k => { applySystem(k); syncUI(k); });
+  updateIsolateLabel();
+});
+
+/* ---------- Search ---------- */
+const searchInput = $('#search'), results = $('#results');
+const INDEX = PARTS_LIST.map(p => ({ id: p.id, name: p.name.toLowerCase(), terms: [p.latin, ...p.aliases].map(t => t.toLowerCase()) }));
+let matches = [], active = -1;
+
+function runSearch(q) {
+  q = q.trim().toLowerCase();
+  if (!q) return [];
+  const scored = [];
+  for (const e of INDEX) {
+    let score = 0, via = null;
+    if (e.name === q) score = 100;
+    else if (e.name.startsWith(q)) score = 80;
+    else if (e.name.split(/[\s-]+/).some(w => w.startsWith(q))) score = 65;
+    else if (e.name.includes(q)) score = 45;
+    else {
+      const t = e.terms.find(t => t === q) || e.terms.find(t => t.startsWith(q)) || e.terms.find(t => t.includes(q));
+      if (t) { score = t === q ? 90 : t.startsWith(q) ? 35 : 20; via = t; }
+    }
+    if (score) scored.push({ id: e.id, score, via });
+  }
+  return scored.sort((a, b) => b.score - a.score || PARTS[a.id].name.localeCompare(PARTS[b.id].name)).slice(0, 8);
+}
+function renderResults() {
+  const q = searchInput.value.trim();
+  if (!q) { results.hidden = true; searchInput.setAttribute('aria-expanded', 'false'); return; }
+  if (!matches.length) {
+    const li = document.createElement('li'); li.className = 'empty';
+    li.textContent = `No structure matches “${q}”. Try a common name such as kneecap, windpipe or collarbone.`;
+    results.replaceChildren(li);
+  } else {
+    results.replaceChildren(...matches.map((m, i) => {
+      const p = PARTS[m.id], s = SYSTEMS[p.system];
+      const li = document.createElement('li');
+      li.id = 'res-' + i; li.setAttribute('role', 'option'); li.setAttribute('aria-selected', String(i === active));
+      li.style.setProperty('--sys', s.color);
+      const sw = document.createElement('span'); sw.className = 'swatch';
+      const nm = document.createElement('span'); nm.className = 'res-name'; nm.textContent = p.name;
+      if (m.via) { const alt = document.createElement('span'); alt.className = 'res-alt'; alt.textContent = `matches “${m.via}”`; nm.appendChild(alt); }
+      const sy = document.createElement('span'); sy.className = 'res-sys'; sy.textContent = s.label;
+      li.append(sw, nm, sy);
+      li.addEventListener('pointerdown', e => { e.preventDefault(); choose(i); });
+      return li;
+    }));
+  }
+  results.hidden = false;
+  searchInput.setAttribute('aria-expanded', 'true');
+  searchInput.setAttribute('aria-activedescendant', active >= 0 ? 'res-' + active : '');
+}
+function choose(i) {
+  const m = matches[i]; if (!m) return;
+  searchInput.value = PARTS[m.id].name;
+  results.hidden = true; searchInput.setAttribute('aria-expanded', 'false');
+  if (isPhone()) searchInput.blur();
+  select(m.id, { focus: true });
+}
+searchInput.addEventListener('input', () => { matches = runSearch(searchInput.value); active = matches.length ? 0 : -1; renderResults(); });
+searchInput.addEventListener('focus', () => { if (searchInput.value) { matches = runSearch(searchInput.value); renderResults(); } });
+searchInput.addEventListener('blur', () => setTimeout(() => { results.hidden = true; searchInput.setAttribute('aria-expanded', 'false'); }, 120));
+searchInput.addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown' && matches.length) { active = (active + 1) % matches.length; renderResults(); e.preventDefault(); }
+  else if (e.key === 'ArrowUp' && matches.length) { active = (active - 1 + matches.length) % matches.length; renderResults(); e.preventDefault(); }
+  else if (e.key === 'Enter') { choose(Math.max(active, 0)); e.preventDefault(); }
+  else if (e.key === 'Escape') { searchInput.value = ''; results.hidden = true; searchInput.blur(); }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && document.activeElement !== searchInput) { e.preventDefault(); searchInput.focus(); }
+  else if (e.key === 'Escape' && document.activeElement !== searchInput) { closeInfo(); if (isPhone()) setLayersOpen(false); }
+});
+
+/* =====================================================================
+   8. CAMERA MOTION
+   ===================================================================== */
+let tween = null;
+const ease = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+function flyTo(target, pos, ms = 950) {
+  tween = { t0: performance.now(), ms: reduceMotion ? 1 : ms, fromT: controls.target.clone(), toT: target, fromP: camera.position.clone(), toP: pos };
+}
+controls.addEventListener('start', () => { tween = null; });   // the user grabbed the model: stop any fly-to
+
+// Frame a structure: fit its bounding box to the view, keeping the current viewing direction.
+function focusOn(id) {
+  scene.updateMatrixWorld();
+  const box = new THREE.Box3();
+  partMeshes[id].forEach(m => box.expandByObject(m));
+  const c = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3()).length();
+  const fit = size / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+  const dist = THREE.MathUtils.clamp(fit * 1.6, 0.4, 3.3);
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  flyTo(c, c.clone().add(dir.multiplyScalar(dist)));
+}
+
+// Keep the model centred in the space the panels leave free, by rendering an off-centre slice of a wider frustum.
+const insets = { target: { x: 0, y: 0 }, cur: { x: 0, y: 0 } };
+function updateInsets() {
+  const W = window.innerWidth;
+  if (isPhone()) {
+    const sheet = info.classList.contains('open') ? info : panel.classList.contains('open') ? panel : null;
+    insets.target.x = 0;
+    insets.target.y = sheet ? -sheet.offsetHeight * 0.85 : 0;   // negative = lift the model above the sheet
+  } else {
+    const left = panel.offsetWidth + 32;
+    const right = info.classList.contains('open') ? info.offsetWidth + 32 : 0;
+    insets.target.x = Math.min(left - right, W * 0.4);
+    insets.target.y = 0;
+  }
+}
+function applyViewOffset() {
+  const w = viewport.clientWidth, h = viewport.clientHeight;
+  const sx = insets.cur.x, sy = insets.cur.y;
+  const fw = w + Math.abs(sx), fh = h + Math.abs(sy);
+  camera.aspect = fw / fh;
+  camera.setViewOffset(fw, fh, sx > 0 ? 0 : -sx, sy > 0 ? 0 : -sy, w, h);
+  camera.updateProjectionMatrix();
+}
+function resize() {
+  renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+  updateInsets();
+  insets.cur.x = insets.target.x; insets.cur.y = insets.target.y;
+  applyViewOffset();
+}
+window.addEventListener('resize', resize);
+
+/* =====================================================================
+   9. POINTER INPUT: distinguish a click from an orbit-drag, then pick
+   ===================================================================== */
+const canvas = renderer.domElement, tip = $('#tip');
+let downAt = null, hoverQueued = false, lastMove = null;
+canvas.addEventListener('pointerdown', e => { downAt = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+canvas.addEventListener('pointerup', e => {
+  if (!downAt) return;
+  const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
+  if (moved < 6 && performance.now() - downAt.t < 500 && e.button === 0) {
+    const id = pickAt(e.clientX, e.clientY);
+    if (id) select(id, { reveal: false }); else closeInfo();
+  }
+  downAt = null;
+});
+canvas.addEventListener('pointermove', e => {
+  if (e.pointerType !== 'mouse' || e.buttons) { tip.hidden = true; return; }
+  lastMove = e;
+  if (!hoverQueued) {
+    hoverQueued = true;
+    requestAnimationFrame(() => {
+      hoverQueued = false;
+      const id = pickAt(lastMove.clientX, lastMove.clientY);
+      if (id !== hoveredId) {
+        if (hoveredId && hoveredId !== selectedId) clearGlow(hoveredId);
+        hoveredId = id;
+      }
+      viewport.classList.toggle('hovering', !!id);
+      if (id) {
+        tip.hidden = false;
+        tip.style.setProperty('--sys', SYSTEMS[PARTS[id].system].color);
+        tip.querySelector('span').textContent = PARTS[id].name;
+        tip.style.transform = `translate(${lastMove.clientX + 14}px, ${lastMove.clientY + 14}px)`;
+      } else tip.hidden = true;
+    });
+  }
+});
+canvas.addEventListener('pointerleave', () => { tip.hidden = true; if (hoveredId && hoveredId !== selectedId) clearGlow(hoveredId); hoveredId = null; });
+
+/* =====================================================================
+   10. RENDER LOOP
+   ===================================================================== */
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (tween) {
+    const k = Math.min(1, (now - tween.t0) / tween.ms), e = ease(k);
+    controls.target.lerpVectors(tween.fromT, tween.toT, e);
+    camera.position.lerpVectors(tween.fromP, tween.toP, e);
+    if (k >= 1) tween = null;
+  }
+  // Ease the panel-aware view offset toward its target
+  const dx = insets.target.x - insets.cur.x, dy = insets.target.y - insets.cur.y;
+  if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+    insets.cur.x += reduceMotion ? dx : dx * 0.14; insets.cur.y += reduceMotion ? dy : dy * 0.14;
+    applyViewOffset();
+  }
+  // Selected structure pulses; hovered structure glows faintly
+  if (selectedId) {
+    const pulse = reduceMotion ? 0.45 : 0.36 + 0.16 * Math.sin(now / 260);
+    partMeshes[selectedId].forEach(m => m.material.emissive.copy(HILITE).multiplyScalar(pulse));
+  }
+  if (hoveredId && hoveredId !== selectedId) partMeshes[hoveredId].forEach(m => m.material.emissive.copy(HILITE).multiplyScalar(0.14));
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+resize();
+// Open in a working state on larger screens: the left ventricle selected, skin ghosted, drawer showing.
+if (!isPhone()) select('left-ventricle', { reveal: false });
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

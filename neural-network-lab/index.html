@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neural Network Lab</title>
+<meta name="description" content="Interactive 3D feedforward neural network: signal propagation, editable weights, and animated backpropagation.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #05070d;
+    --panel: rgba(12, 16, 28, 0.80);
+    --panel-solid: #0c101c;
+    --line: rgba(255, 255, 255, 0.08);
+    --line-strong: rgba(255, 255, 255, 0.16);
+    --text: #e7ebf3;
+    --muted: #8b95a9;
+    --faint: #5b6478;
+    --pos: #ff7a2e;
+    --neg: #2f8cff;
+    --grad: #b26bff;
+    --ok: #3ddc97;
+    --radius: 14px;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 13px/1.45 Inter, system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; cursor: grab; touch-action: none; }
+  #stage canvas:active { cursor: grabbing; }
+
+  .panel {
+    position: fixed;
+    background: var(--panel);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  }
+
+  /* ---------- Left control panel ---------- */
+  #controls {
+    top: 16px; left: 16px; width: 300px;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    padding: 18px 18px 14px;
+    scrollbar-width: thin;
+  }
+  #controls h1 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+  #controls .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  section { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; }
+  section h2 {
+    margin: 0 0 10px; font-size: 10.5px; font-weight: 600;
+    letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row + .row { margin-top: 8px; }
+  .grow { flex: 1; }
+
+  button {
+    font: inherit; color: var(--text); cursor: pointer;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--line-strong);
+    border-radius: 9px; padding: 7px 11px;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+  }
+  button:hover { background: rgba(255, 255, 255, 0.1); }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--grad); outline-offset: 2px; }
+  button.primary { background: rgba(255, 122, 46, 0.16); border-color: rgba(255, 122, 46, 0.5); }
+  button.primary:hover { background: rgba(255, 122, 46, 0.26); }
+  button.train { background: rgba(178, 107, 255, 0.16); border-color: rgba(178, 107, 255, 0.5); }
+  button.train:hover { background: rgba(178, 107, 255, 0.28); }
+  button.on { background: rgba(178, 107, 255, 0.42); border-color: var(--grad); }
+  button.flow-on { background: rgba(255, 122, 46, 0.34); border-color: var(--pos); }
+
+  .seg { display: flex; border: 1px solid var(--line-strong); border-radius: 9px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; padding: 5px 0; flex: 1; background: transparent; }
+  .seg button + button { border-left: 1px solid var(--line-strong); }
+  .seg button.active { background: rgba(255, 255, 255, 0.14); font-weight: 600; }
+
+  label.slider { display: block; }
+  label.slider .lbl { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-bottom: 3px; }
+  label.slider .lbl b { color: var(--text); font: 500 12px var(--mono); }
+  input[type=range] { width: 100%; accent-color: var(--grad); margin: 0; }
+
+  .chips { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; }
+  .chip {
+    padding: 5px 0; font-size: 11.5px; text-align: center; border-radius: 7px;
+    font-family: var(--mono);
+  }
+  .chip.active { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.4); font-weight: 600; }
+  .chip small { display: block; color: var(--muted); font-size: 10px; font-family: Inter, sans-serif; }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin-top: 10px; }
+  .stat .k { color: var(--muted); font-size: 11px; }
+  .stat .v { font: 600 14px var(--mono); }
+  #spark { width: 100%; height: 46px; display: block; margin-top: 10px; border-radius: 8px; background: rgba(255,255,255,0.03); }
+
+  .legend .bar {
+    height: 8px; border-radius: 4px;
+    background: linear-gradient(90deg, var(--neg), #5b6478 50%, var(--pos));
+  }
+  .legend .ticks { display: flex; justify-content: space-between; color: var(--muted); font: 11px var(--mono); margin-top: 3px; }
+  .legend .keys { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+  .kbd { font: 11px var(--mono); padding: 1px 5px; border: 1px solid var(--line-strong); border-radius: 4px; color: var(--muted); }
+  .hint { color: var(--faint); font-size: 11.5px; margin-top: 12px; line-height: 1.6; }
+
+  /* ---------- Right inspector ---------- */
+  #inspector {
+    top: 16px; right: 16px; width: 310px;
+    max-height: calc(100vh - 32px); overflow-y: auto;
+    padding: 16px 16px 14px;
+  }
+  #inspector[hidden] { display: none; }
+  .insp-head { display: flex; justify-content: space-between; align-items: center; }
+  .tag {
+    font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,0.08); color: var(--muted);
+  }
+  .tag.edge { color: #ffd2b8; background: rgba(255,122,46,0.14); }
+  .tag.node { color: #d9c2ff; background: rgba(178,107,255,0.16); }
+  .close { padding: 2px 9px; font-size: 15px; line-height: 1.3; }
+  #inspector h3 { margin: 10px 0 2px; font-size: 15px; font-weight: 600; }
+  .formula { font: 12px var(--mono); color: var(--muted); margin-bottom: 12px; }
+  .big { font: 600 26px var(--mono); letter-spacing: -0.02em; }
+  .kv { display: grid; grid-template-columns: 1fr auto; gap: 5px 10px; margin: 12px 0; font-size: 12.5px; }
+  .kv > :nth-child(odd) { color: var(--muted); }
+  .kv > :nth-child(even) { font-family: var(--mono); text-align: right; }
+  .sub-h { color: var(--muted); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; margin: 14px 0 6px; font-weight: 600; }
+  .drow { display: grid; grid-template-columns: 18px 1fr 50px 58px; gap: 8px; align-items: center; font: 12px var(--mono); padding: 3px 0; }
+  .drow .barw { height: 6px; background: rgba(255,255,255,0.07); border-radius: 3px; overflow: hidden; }
+  .drow .barw i { display: block; height: 100%; background: var(--pos); border-radius: 3px; }
+  .drow .delta { text-align: right; color: var(--faint); }
+  .drow .delta.up { color: var(--ok); }
+  .drow .delta.down { color: #ff6b8a; }
+  .note { color: var(--faint); font-size: 11.5px; margin-top: 8px; }
+
+  /* ---------- Hover tooltip + 3D overlay labels ---------- */
+  #tip {
+    position: fixed; pointer-events: none; z-index: 20;
+    background: var(--panel-solid); border: 1px solid var(--line-strong);
+    border-radius: 9px; padding: 7px 10px; font-size: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5); white-space: nowrap;
+    transform: translate(14px, 14px);
+  }
+  #tip[hidden] { display: none; }
+  #tip .t { font-weight: 600; margin-bottom: 2px; }
+  #tip .m { font-family: var(--mono); color: var(--muted); }
+  #overlay { position: fixed; inset: 0; pointer-events: none; }
+  .lbl3d {
+    position: absolute; transform: translate(-50%, 0);
+    font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--faint); white-space: nowrap;
+  }
+  .out3d {
+    position: absolute; transform: translate(0, -50%);
+    font: 12px var(--mono); padding: 3px 7px; border-radius: 6px;
+    background: rgba(12,16,28,0.7); border: 1px solid var(--line); white-space: nowrap;
+  }
+  .out3d.pred { border-color: var(--pos); color: #ffd2b8; }
+  .out3d .tgt { color: var(--ok); margin-left: 4px; }
+
+  #menuBtn { display: none; position: fixed; top: 12px; left: 12px; z-index: 5; }
+
+  @media (max-width: 760px) {
+    #menuBtn { display: block; background: var(--panel-solid); }
+    #controls { top: 56px; left: 12px; right: 12px; width: auto; max-height: 58vh; display: none; }
+    body.menu-open #controls { display: block; }
+    #inspector { top: auto; bottom: 12px; left: 12px; right: 12px; width: auto; max-height: 48vh; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    button { transition: none; }
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="stage"></div>
+<div id="overlay"></div>
+<div id="tip" hidden></div>
+
+<button id="menuBtn" aria-expanded="false" aria-controls="controls">☰ Controls</button>
+
+<aside id="controls" class="panel" aria-label="Simulator controls">
+  <h1>Neural Network Lab</h1>
+  <div class="sub">Feedforward MLP · tanh hidden · sigmoid output · MSE loss</div>
+
+  <section>
+    <h2>Signal propagation</h2>
+    <div class="row">
+      <button id="flowBtn" class="primary grow flow-on">❚❚ Pause flow</button>
+      <button id="fireBtn">Fire once</button>
+    </div>
+    <div class="row">
+      <label class="slider grow">
+        <span class="lbl">Animation speed <b id="speedVal">1.0×</b></span>
+        <input id="speed" type="range" min="0.25" max="3" step="0.05" value="1">
+      </label>
+    </div>
+  </section>
+
+  <section>
+    <h2>Input sample <span id="sampleNote" style="text-transform:none;letter-spacing:0;font-weight:500"></span></h2>
+    <div class="chips" id="samples"></div>
+    <div class="row" style="margin-top:8px">
+      <button id="randInput" class="grow">Random input</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Training · backpropagation</h2>
+    <div class="row">
+      <span style="color:var(--muted);font-size:12px">Target class</span>
+      <div class="seg grow" id="targets"></div>
+    </div>
+    <div class="row">
+      <button id="stepBtn" class="train grow">Train step</button>
+      <button id="autoBtn" class="train grow">Auto-train</button>
+    </div>
+    <div class="row">
+      <label class="slider grow">
+        <span class="lbl">Learning rate η <b id="lrVal">0.60</b></span>
+        <input id="lr" type="range" min="0.02" max="2" step="0.02" value="0.6">
+      </label>
+    </div>
+    <canvas id="spark" aria-label="Dataset loss history"></canvas>
+    <div class="stats">
+      <div class="stat"><div class="k">Steps</div><div class="v" id="sSteps">0</div></div>
+      <div class="stat"><div class="k">Prediction</div><div class="v" id="sPred">–</div></div>
+      <div class="stat"><div class="k">Sample loss</div><div class="v" id="sLoss">–</div></div>
+      <div class="stat"><div class="k">Dataset loss · acc</div><div class="v" id="sData">–</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Architecture</h2>
+    <div class="row">
+      <span style="color:var(--muted);font-size:12px;width:92px">Hidden layers</span>
+      <div class="seg grow" id="depth">
+        <button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button>
+      </div>
+    </div>
+    <div class="row">
+      <label class="slider grow">
+        <span class="lbl">Neurons per hidden layer <b id="widthVal">6</b></span>
+        <input id="width" type="range" min="3" max="8" step="1" value="6">
+      </label>
+    </div>
+    <div class="row"><button id="reinit" class="grow">Re-initialize weights</button></div>
+  </section>
+
+  <section class="legend">
+    <h2>Legend</h2>
+    <div class="bar"></div>
+    <div class="ticks"><span>−w</span><span>0</span><span>+w</span></div>
+    <div class="keys">
+      <span><i class="dot" style="background:var(--neg)"></i>Negative</span>
+      <span><i class="dot" style="background:var(--pos)"></i>Positive</span>
+      <span><i class="dot" style="background:var(--grad)"></i>Gradient δ</span>
+      <span><i class="dot" style="background:#eaffff"></i>Changed by edit</span>
+    </div>
+    <div class="hint">
+      Drag to orbit · scroll to zoom · right-drag to pan.<br>
+      Hover a neuron for its state. Click a synapse or neuron to edit it.<br>
+      <span class="kbd">Space</span> flow · <span class="kbd">T</span> train step · <span class="kbd">Esc</span> close
+    </div>
+  </section>
+</aside>
+
+<aside id="inspector" class="panel" hidden aria-live="polite"></aside>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+/* =====================================================================
+   1. MODEL: plain-array MLP. No Three.js here, so the math stays readable.
+   Indexing convention: layer l has sizes[l] neurons.
+     W[l][j][i] = weight from neuron i in layer l-1 to neuron j in layer l
+     b[l][j]    = bias of neuron j in layer l   (b[0] unused: inputs have none)
+   ===================================================================== */
+const INPUT_SIZE = 4, OUTPUT_SIZE = 3;
+const CLASS_NAMES = ['A', 'B', 'C'];
+// Three prototype 4-D patterns, two noisy variants each.
+const DATASET = [
+  { x: [ 0.9,  0.8, -0.7, -0.9], y: 0 },
+  { x: [ 0.7,  0.9, -0.9, -0.5], y: 0 },
+  { x: [-0.8,  0.9,  0.8, -0.7], y: 1 },
+  { x: [-0.6,  0.7,  0.9, -0.9], y: 1 },
+  { x: [-0.9, -0.8,  0.7,  0.9], y: 2 },
+  { x: [-0.7, -0.9,  0.6,  0.8], y: 2 },
+];
+
+function mulberry32(a) {
+  return () => {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+let rng = mulberry32(7);
+function randn() {
+  let u = 0, v = 0;
+  while (!u) u = rng();
+  while (!v) v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+const net = { sizes: [], W: [], b: [], z: [], a: [], d: [], gW: [], gb: [] };
+const lastLayer = () => net.sizes.length - 1;
+const sigmoid = (x) => 1 / (1 + Math.exp(-x));
+
+function initModel(sizes) {
+  net.sizes = sizes;
+  net.W = [null]; net.b = [null]; net.gW = [null]; net.gb = [null];
+  for (let l = 1; l < sizes.length; l++) {
+    // Glorot-style scale, slightly inflated so the untrained net has visible contrast.
+    const scale = Math.sqrt(2 / (sizes[l - 1] + sizes[l])) * 1.6;
+    net.W[l] = Array.from({ length: sizes[l] }, () => Array.from({ length: sizes[l - 1] }, () => randn() * scale));
+    net.b[l] = Array.from({ length: sizes[l] }, () => randn() * 0.1);
+    net.gW[l] = net.W[l].map((r) => r.map(() => 0));
+    net.gb[l] = net.b[l].map(() => 0);
+  }
+  net.z = sizes.map((n) => new Array(n).fill(0));
+  net.a = sizes.map((n) => new Array(n).fill(0));
+  net.d = sizes.map((n) => new Array(n).fill(0));
+}
+
+// Forward pass: z = W·a_prev + b, then tanh (hidden) or sigmoid (output).
+function forward(x = state.input) {
+  const L = lastLayer();
+  net.a[0] = x.slice(); net.z[0] = x.slice();
+  for (let l = 1; l <= L; l++) {
+    for (let j = 0; j < net.sizes[l]; j++) {
+      let z = net.b[l][j];
+      const row = net.W[l][j], prev = net.a[l - 1];
+      for (let i = 0; i < row.length; i++) z += row[i] * prev[i];
+      net.z[l][j] = z;
+      net.a[l][j] = l === L ? sigmoid(z) : Math.tanh(z);
+    }
+  }
+  return net.a[L];
+}
+
+// Backward pass for L = ½Σ(a−t)². Fills d (δ = ∂L/∂z), gW and gb; returns the loss.
+function backward(target) {
+  const L = lastLayer();
+  let loss = 0;
+  for (let j = 0; j < net.sizes[L]; j++) {
+    const a = net.a[L][j], err = a - target[j];
+    loss += 0.5 * err * err;
+    net.d[L][j] = err * a * (1 - a);
+  }
+  for (let l = L - 1; l >= 1; l--) {
+    for (let i = 0; i < net.sizes[l]; i++) {
+      let s = 0;
+      for (let j = 0; j < net.sizes[l + 1]; j++) s += net.W[l + 1][j][i] * net.d[l + 1][j];
+      net.d[l][i] = s * (1 - net.a[l][i] ** 2);
+    }
+  }
+  for (let l = 1; l <= L; l++) {
+    for (let j = 0; j < net.sizes[l]; j++) {
+      net.gb[l][j] = net.d[l][j];
+      for (let i = 0; i < net.sizes[l - 1]; i++) net.gW[l][j][i] = net.d[l][j] * net.a[l - 1][i];
+    }
+  }
+  return loss;
+}
+
+function applyGradients(lr) {
+  for (let l = 1; l <= lastLayer(); l++) {
+    for (let j = 0; j < net.sizes[l]; j++) {
+      net.b[l][j] -= lr * net.gb[l][j];
+      for (let i = 0; i < net.sizes[l - 1]; i++) {
+        net.W[l][j][i] = Math.max(-3, Math.min(3, net.W[l][j][i] - lr * net.gW[l][j][i]));
+      }
+    }
+  }
+}
+
+const oneHot = (k) => CLASS_NAMES.map((_, i) => (i === k ? 1 : 0));
+const argmax = (arr) => arr.reduce((best, v, i) => (v > arr[best] ? i : best), 0);
+
+function datasetMetrics() {
+  let loss = 0, correct = 0;
+  for (const s of DATASET) {
+    const out = forward(s.x);
+    out.forEach((v, k) => { loss += 0.5 * (v - (k === s.y ? 1 : 0)) ** 2; });
+    if (argmax(out) === s.y) correct++;
+  }
+  forward(state.input); // restore activations for the displayed input
+  return { loss: loss / DATASET.length, acc: correct / DATASET.length };
+}
+
+/* =====================================================================
+   2. APP STATE
+   ===================================================================== */
+const state = {
+  input: DATASET[0].x.slice(), target: 0, sampleIdx: 0,
+  flowing: true, speed: 1, lr: 0.6, autoTrain: false,
+  steps: 0, lastLoss: null, lossHistory: [],
+  hiddenLayers: 2, hiddenWidth: 6, seed: 7,
+};
+
+/* =====================================================================
+   3. THREE.JS SCENE
+   ===================================================================== */
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#05070d');
+scene.fog = new THREE.FogExp2(0x05070d, 0.016);
+
+const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 300);
+camera.position.set(-9.5, 6, 17.5);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 6;
+controls.maxDistance = 60;
+controls.target.set(0.6, 0, 0);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+const key = new THREE.DirectionalLight(0xffffff, 1.3);
+key.position.set(6, 10, 8);
+scene.add(key);
+const rim = new THREE.PointLight(0x7a5cff, 40, 40);
+rim.position.set(-10, -4, -8);
+scene.add(rim);
+
+const grid = new THREE.GridHelper(80, 80, 0x1b2335, 0x0f1420);
+grid.position.y = -6.5;
+scene.add(grid);
+
+{ // faint starfield for depth cues while orbiting
+  const pts = new Float32Array(900 * 3);
+  for (let k = 0; k < 900; k++) {
+    const r = 45 + Math.random() * 50, th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
+    pts.set([r * Math.sin(ph) * Math.cos(th), r * Math.cos(ph), r * Math.sin(ph) * Math.sin(th)], k * 3);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pts, 3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0x6b7a99, size: 0.18, transparent: true, opacity: 0.55, fog: false })));
+}
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.75, 0.55, 0.32);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+function makeGlowTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grd.addColorStop(0, 'rgba(255,255,255,1)');
+  grd.addColorStop(0.18, 'rgba(255,255,255,0.85)');
+  grd.addColorStop(0.45, 'rgba(255,255,255,0.2)');
+  grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+}
+const glowTex = makeGlowTexture();
+
+const COL = {
+  pos: new THREE.Color('#ff7a2e'),
+  neg: new THREE.Color('#2f8cff'),
+  neu: new THREE.Color('#5b6478'),
+  grad: new THREE.Color('#b26bff'),
+  change: new THREE.Color('#eaffff'),
+  white: new THREE.Color('#ffffff'),
+};
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+function signedColor(v, sat, out) {
+  return out.copy(COL.neu).lerp(v >= 0 ? COL.pos : COL.neg, clamp01(Math.abs(v) / sat));
+}
+
+/* =====================================================================
+   4. NETWORK GEOMETRY
+   Each layer is a ring of spheres in the y–z plane, layers spaced along x.
+   Each synapse is a unit cylinder stretched and rotated between two nodes,
+   plus an invisible, fatter "hit proxy" cylinder for easier clicking.
+   ===================================================================== */
+const netGroup = new THREE.Group();
+scene.add(netGroup);
+const nodeGeo = new THREE.SphereGeometry(1, 32, 20);
+const edgeGeo = new THREE.CylinderGeometry(1, 1, 1, 8, 1, true);
+const hitMat = new THREE.MeshBasicMaterial();
+const UP = new THREE.Vector3(0, 1, 0);
+const SPACING = 4.2;
+
+let nodes = [];        // nodes[l][i] -> { l, i, mesh, halo, r, pulse, grad, dip, change }
+let edges = [];        // flat list of { l, i, j, mesh, hit, from, to, len, flash }
+let edgesInto = [];    // edgesInto[l] -> edges whose destination is layer l
+let nodeTargets = [], edgeTargets = []; // raycast target lists
+let wavefront = null;  // translucent disc that sweeps backward during training
+let wave = null;
+
+const layerX = (l) => (l - lastLayer() / 2) * SPACING;
+const ringRadius = (n) => (n <= 1 ? 0 : Math.max(1.05, n * 0.34));
+const layerName = (l) => (l === 0 ? 'Input' : l === lastLayer() ? 'Output' : `Hidden ${l}`);
+const layerShort = (l) => (l === 0 ? 'In' : l === lastLayer() ? 'Out' : `H${l}`);
+
+function nodePosition(l, i) {
+  const n = net.sizes[l], r = ringRadius(n);
+  const ang = (i / n) * Math.PI * 2 + l * 0.4;
+  return new THREE.Vector3(layerX(l), r * Math.cos(ang), r * Math.sin(ang));
+}
+
+function clearNetwork() {
+  netGroup.traverse((o) => { if (o.material && o.material !== hitMat) o.material.dispose(); });
+  netGroup.clear();
+  for (const p of live) { p.s.visible = false; pool.push(p.s); }
+  live.length = 0;
+  events = [];
+  wave = null;
+}
+
+function buildNetwork() {
+  clearNetwork();
+  const L = lastLayer();
+  nodeTargets = []; edgeTargets = [];
+
+  nodes = net.sizes.map((n, l) => Array.from({ length: n }, (_, i) => {
+    const r = l === 0 || l === L ? 0.4 : 0.33;
+    const mat = new THREE.MeshStandardMaterial({ color: 0x8892a6, roughness: 0.35, metalness: 0.15, transparent: true });
+    const mesh = new THREE.Mesh(nodeGeo, mat);
+    mesh.position.copy(nodePosition(l, i));
+    mesh.scale.setScalar(r);
+    mesh.userData = { type: 'node', l, i };
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: glowTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0,
+    }));
+    halo.position.copy(mesh.position);
+    netGroup.add(mesh, halo);
+    nodeTargets.push(mesh);
+    return { l, i, mesh, halo, r, pulse: 0, grad: 0, dip: 0, change: 0 };
+  }));
+
+  edges = []; edgesInto = [[]];
+  for (let l = 1; l <= L; l++) {
+    edgesInto[l] = [];
+    for (let j = 0; j < net.sizes[l]; j++) {
+      for (let i = 0; i < net.sizes[l - 1]; i++) {
+        const from = nodes[l - 1][i].mesh.position, to = nodes[l][j].mesh.position;
+        const dir = to.clone().sub(from);
+        const len = dir.length();
+        const mid = from.clone().add(to).multiplyScalar(0.5);
+        // CylinderGeometry is built along +Y; rotate +Y onto the synapse direction.
+        const quat = new THREE.Quaternion().setFromUnitVectors(UP, dir.normalize());
+
+        const mesh = new THREE.Mesh(edgeGeo, new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }));
+        mesh.position.copy(mid); mesh.quaternion.copy(quat);
+
+        const hit = new THREE.Mesh(edgeGeo, hitMat);
+        hit.position.copy(mid); hit.quaternion.copy(quat);
+        hit.scale.set(0.14, len, 0.14);
+        // Invisible meshes are skipped by the renderer but NOT by Raycaster,
+        // which only checks layers. That makes them cheap, generous click targets.
+        hit.visible = false;
+
+        const e = { l, i, j, mesh, hit, from, to, len, flash: 0 };
+        hit.userData = { type: 'edge', idx: edges.length };
+        edges.push(e);
+        edgesInto[l].push(e);
+        edgeTargets.push(hit);
+        netGroup.add(mesh, hit);
+      }
+    }
+  }
+
+  const maxR = Math.max(...net.sizes.map(ringRadius));
+  wavefront = new THREE.Mesh(
+    new THREE.CircleGeometry(maxR + 1.3, 64),
+    new THREE.MeshBasicMaterial({ color: COL.grad, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }),
+  );
+  wavefront.rotation.y = Math.PI / 2; // circle faces +z by default; turn it to face the x axis
+  wavefront.visible = false;
+  netGroup.add(wavefront);
+
+  buildOverlayLabels();
+}
+
+/* =====================================================================
+   5. RAYCASTING
+   Screen pixel -> normalized device coords (−1..1) -> ray from the camera.
+   Nodes are tested first so a click near a node never selects one of the
+   many synapses converging on it. Edges use the invisible hit proxies.
+   ===================================================================== */
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+
+function pick(clientX, clientY) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  ndc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(ndc, camera);
+
+  const nodeHits = raycaster.intersectObjects(nodeTargets, false);
+  if (nodeHits.length) return { ...nodeHits[0].object.userData };
+
+  const edgeHits = raycaster.intersectObjects(edgeTargets, false); // sorted nearest-first
+  if (edgeHits.length) return { ...edgeHits[0].object.userData };
+  return null;
+}
+
+/* =====================================================================
+   6. PARTICLES + SCHEDULED EVENTS
+   Packets are pooled additive sprites that interpolate along a synapse
+   between a start time and start + duration. Events fire callbacks (node
+   pulses, gradient flashes) at a scheduled clock time.
+   ===================================================================== */
+const pool = [], live = [];
+let events = [];
+const at = (t, fn) => events.push({ t, fn });
+
+function runEvents(now) {
+  const due = events.filter((e) => e.t <= now);
+  events = events.filter((e) => e.t > now);
+  due.forEach((e) => e.fn());
+}
+
+function spawnPacket(from, to, color, size, start, dur) {
+  let s = pool.pop();
+  if (!s) {
+    s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    scene.add(s);
+  }
+  s.visible = false;
+  s.material.color.copy(color);
+  live.push({ s, from: from.clone(), to: to.clone(), start, dur, size });
+}
+
+function updateParticles(now) {
+  for (let k = live.length - 1; k >= 0; k--) {
+    const p = live[k];
+    const t = (now - p.start) / p.dur;
+    if (t < 0) { p.s.visible = false; continue; }          // scheduled for a later layer
+    if (t >= 1) { p.s.visible = false; pool.push(p.s); live.splice(k, 1); continue; }
+    const e = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2; // ease-in-out
+    p.s.position.lerpVectors(p.from, p.to, e);
+    p.s.material.opacity = 0.15 + 0.85 * Math.sin(Math.PI * t);
+    p.s.scale.setScalar(p.size);
+    p.s.visible = true;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Forward signal propagation loop.
+   Layer by layer: packets for transition (l−1 → l) start at (l−1)·T and
+   arrive at l·T, when layer l's neurons pulse. Packet size is the relative
+   magnitude of the signal w·a_i; its color is the sign of that signal.
+   Weak signals (<8% of the layer's strongest) are skipped to reduce noise.
+   --------------------------------------------------------------------- */
+const fwdStepDur = () => 0.85 / state.speed;
+
+function fireForwardWave(now) {
+  const T = fwdStepDur(), L = lastLayer();
+  nodes[0].forEach((n) => { n.pulse = Math.max(n.pulse, 0.25 + 0.6 * Math.abs(net.a[0][n.i])); });
+
+  for (let l = 1; l <= L; l++) {
+    const signals = edgesInto[l].map((e) => net.W[l][e.j][e.i] * net.a[l - 1][e.i]);
+    const maxS = Math.max(1e-6, ...signals.map(Math.abs));
+    edgesInto[l].forEach((e, k) => {
+      const s = Math.abs(signals[k]) / maxS;
+      if (s < 0.08) return;
+      spawnPacket(e.from, e.to, signals[k] >= 0 ? COL.pos : COL.neg, 0.2 + 0.4 * s, now + (l - 1) * T, T);
+    });
+    const layer = l;
+    at(now + l * T, () => {
+      nodes[layer]?.forEach((n) => {
+        n.pulse = Math.max(n.pulse, 0.3 + 0.7 * clamp01(Math.abs(net.a[layer][n.i])));
+      });
+    });
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Backward (training) wave.
+   A violet wavefront sweeps from the output layer to the input layer.
+   When it reaches layer l, those neurons dip in opacity, then glow in
+   proportion to |δ|, and synapses into l flash in proportion to |∂L/∂w|.
+   Violet packets travel backward along the strongest gradients.
+   --------------------------------------------------------------------- */
+const bwdStepDur = () => 0.6 / state.speed;
+
+function fireBackwardWave(now, snap) {
+  const T = bwdStepDur(), L = lastLayer();
+  wave = { start: now, dur: L * T, x0: layerX(L) + 0.7, x1: layerX(0) - 0.7 };
+
+  for (let l = L; l >= 1; l--) {
+    const t0 = now + (L - l) * T;
+    const maxD = Math.max(1e-9, ...snap.d[l].map(Math.abs));
+    const grads = edgesInto[l].map((e) => Math.abs(snap.gW[l][e.j][e.i]));
+    const maxG = Math.max(1e-9, ...grads);
+    const layer = l;
+
+    at(t0, () => {
+      nodes[layer]?.forEach((n) => { n.dip = 1; n.grad = 0.25 + 0.75 * Math.abs(snap.d[layer][n.i]) / maxD; });
+      edgesInto[layer]?.forEach((e, k) => { e.flash = Math.max(e.flash, grads[k] / maxG); });
+    });
+    edgesInto[l].forEach((e, k) => {
+      const g = grads[k] / maxG;
+      if (g > 0.15) spawnPacket(e.to, e.from, COL.grad, 0.18 + 0.35 * g, t0, T);
+    });
+  }
+  at(now + L * T, () => nodes[0]?.forEach((n) => { n.dip = 1; n.grad = 0.45; }));
+}
+
+function updateWavefront(now) {
+  if (!wave || !wavefront) return;
+  const t = (now - wave.start) / wave.dur;
+  if (t > 1.05) { wavefront.visible = false; wave = null; return; }
+  wavefront.visible = true;
+  wavefront.position.x = THREE.MathUtils.lerp(wave.x0, wave.x1, clamp01(t));
+  wavefront.material.opacity = 0.16 * Math.sin(Math.PI * clamp01(t));
+}
+
+/* =====================================================================
+   7. PER-FRAME VISUAL STATE
+   ===================================================================== */
+let selection = null, hovered = null;
+const tmpC = new THREE.Color();
+const isNodeSel = (sel, n) => sel?.type === 'node' && sel.l === n.l && sel.i === n.i;
+const edgeTouchesNode = (e, s) => (e.l === s.l && e.j === s.i) || (e.l === s.l + 1 && e.i === s.i);
+
+function updateNodes(dt) {
+  const L = lastLayer();
+  const k = (rate) => Math.exp(-dt * rate);
+  for (const layer of nodes) for (const n of layer) {
+    const a = net.a[n.l][n.i];
+    const mag = n.l === L ? a : Math.abs(a);
+    if (n.l === L) tmpC.copy(COL.neu).lerp(COL.pos, clamp01(a));
+    else signedColor(a, 1, tmpC);
+
+    n.pulse *= k(3); n.grad *= k(1.3); n.dip *= k(2.2); n.change *= k(2.4);
+
+    const m = n.mesh.material;
+    m.color.copy(tmpC);
+    m.emissive.copy(tmpC).multiplyScalar(0.12 + 0.7 * mag + 0.9 * n.pulse);
+    if (n.grad > 0.01) { m.emissive.lerp(COL.grad, n.grad); m.color.lerp(COL.grad, n.grad * 0.5); }
+    if (n.change > 0.01) m.emissive.lerp(COL.change, n.change * 0.75);
+    m.opacity = 1 - 0.72 * n.dip;
+
+    const hov = hovered?.type === 'node' && hovered.l === n.l && hovered.i === n.i;
+    const sel = isNodeSel(selection, n);
+    n.mesh.scale.setScalar(n.r * (1 + 0.28 * n.pulse + (hov ? 0.14 : 0) + (sel ? 0.18 : 0)));
+
+    n.halo.material.color.copy(m.emissive);
+    n.halo.material.opacity = clamp01(0.12 + 0.5 * mag + n.pulse + 0.8 * n.grad + n.change + (sel ? 0.4 : 0));
+    n.halo.scale.setScalar(n.r * (3.6 + 3 * n.pulse + (sel ? 1.2 : 0)));
+  }
+}
+
+function updateEdges(dt) {
+  const k = Math.exp(-dt * 1.5);
+  for (let idx = 0; idx < edges.length; idx++) {
+    const e = edges[idx];
+    const w = net.W[e.l][e.j][e.i];
+    const t = clamp01(Math.abs(w) / 2.2);
+    e.flash *= k;
+
+    signedColor(w, 2.2, tmpC);
+    if (e.flash > 0.01) tmpC.lerp(COL.grad, e.flash);
+    let op = 0.1 + 0.6 * t + 0.5 * e.flash;
+    let r = 0.009 + 0.042 * t;
+
+    const isSel = selection?.type === 'edge' && selection.idx === idx;
+    const isHov = hovered?.type === 'edge' && hovered.idx === idx;
+    if (selection) {
+      const related = isSel || (selection.type === 'node' && edgeTouchesNode(e, selection));
+      if (!related) op *= 0.22;
+      else if (!isSel) op = Math.min(1, op + 0.2);
+    }
+    if (isSel) { tmpC.lerp(COL.white, 0.35); op = 1; r += 0.025; }
+    if (isHov) { op = Math.min(1, op + 0.4); r += 0.012; }
+
+    e.mesh.material.color.copy(tmpC);
+    e.mesh.material.opacity = Math.min(1, op);
+    e.mesh.scale.set(r, e.len, r);
+  }
+}
+
+/* =====================================================================
+   8. HTML OVERLAY (layer names + output readouts projected from 3D)
+   ===================================================================== */
+const overlay = document.getElementById('overlay');
+let layerLabels = [], outLabels = [];
+const proj = new THREE.Vector3();
+
+function buildOverlayLabels() {
+  overlay.innerHTML = '';
+  layerLabels = net.sizes.map((_, l) => {
+    const el = document.createElement('div');
+    el.className = 'lbl3d';
+    el.textContent = layerName(l);
+    overlay.appendChild(el);
+    return el;
+  });
+  outLabels = nodes[lastLayer()].map(() => {
+    const el = document.createElement('div');
+    el.className = 'out3d';
+    overlay.appendChild(el);
+    return el;
+  });
+}
+
+function placeAt(el, pos) {
+  proj.copy(pos).project(camera);
+  if (proj.z > 1) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.style.left = `${((proj.x + 1) / 2) * window.innerWidth}px`;
+  el.style.top = `${((1 - proj.y) / 2) * window.innerHeight}px`;
+}
+
+const labelPos = new THREE.Vector3();
+function updateOverlay() {
+  const maxR = Math.max(...net.sizes.map(ringRadius));
+  layerLabels.forEach((el, l) => placeAt(el, labelPos.set(layerX(l), -maxR - 1.1, 0)));
+  const L = lastLayer(), out = net.a[L], pred = argmax(out);
+  outLabels.forEach((el, k) => {
+    placeAt(el, labelPos.copy(nodes[L][k].mesh.position).add(new THREE.Vector3(0.65, 0, 0)));
+    el.className = 'out3d' + (k === pred ? ' pred' : '');
+    el.innerHTML = `${CLASS_NAMES[k]} ${out[k].toFixed(2)}${k === state.target ? '<span class="tgt">◎</span>' : ''}`;
+  });
+}
+
+/* =====================================================================
+   9. TRAINING DRIVER
+   ===================================================================== */
+const clock = new THREE.Clock();
+const nowT = () => clock.elapsedTime;
+
+function trainStep() {
+  forward();
+  const loss = backward(oneHot(state.target));
+  // Snapshot δ and ∂L/∂w before the update so the wave shows the gradients that were applied.
+  const snap = { d: net.d.map((r) => r.slice()), gW: net.gW.map((m) => (m ? m.map((r) => r.slice()) : null)) };
+  applyGradients(state.lr);
+  forward();
+  state.steps++;
+  state.lastLoss = loss;
+  fireBackwardWave(nowT(), snap);
+  recordMetrics();
+  refreshInspectorValues();
+}
+
+function silentStep(sample) {
+  forward(sample.x);
+  backward(oneHot(sample.y));
+  applyGradients(state.lr);
+  state.steps++;
+}
+
+let nextTrainAt = 0;
+function autoTrainTick(now) {
+  // Several unanimated SGD steps across the dataset, then one animated step
+  // on the next sample so the backward wave stays readable.
+  for (let k = 0; k < 6; k++) silentStep(DATASET[Math.floor(Math.random() * DATASET.length)]);
+  setSample((Math.max(0, state.sampleIdx) + 1) % DATASET.length, true);
+  trainStep();
+  nextTrainAt = now + lastLayer() * bwdStepDur() + 0.35;
+}
+
+function recordMetrics() {
+  const m = datasetMetrics();
+  state.lossHistory.push(m.loss);
+  if (state.lossHistory.length > 240) state.lossHistory.shift();
+  renderStats(m);
+  drawSpark();
+}
+
+/* =====================================================================
+   10. UI: control panel
+   ===================================================================== */
+const $ = (s) => document.querySelector(s);
+const f3 = (v) => `${v < 0 ? '−' : ''}${Math.abs(v).toFixed(3)}`;
+
+function renderStats(m = datasetMetrics()) {
+  const out = net.a[lastLayer()];
+  $('#sSteps').textContent = state.steps;
+  $('#sPred').textContent = `${CLASS_NAMES[argmax(out)]} (${out[argmax(out)].toFixed(2)})`;
+  const sampleLoss = out.reduce((s, v, k) => s + 0.5 * (v - (k === state.target ? 1 : 0)) ** 2, 0);
+  $('#sLoss').textContent = sampleLoss.toFixed(4);
+  $('#sData').textContent = `${m.loss.toFixed(3)} · ${Math.round(m.acc * 100)}%`;
+}
+
+function drawSpark() {
+  const c = $('#spark'), dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth, h = c.clientHeight;
+  c.width = w * dpr; c.height = h * dpr;
+  const g = c.getContext('2d');
+  g.scale(dpr, dpr);
+  const hist = state.lossHistory;
+  g.fillStyle = '#5b6478'; g.font = '10px JetBrains Mono, monospace';
+  if (hist.length < 2) { g.fillText('loss curve appears after training', 8, h / 2 + 3); return; }
+  const max = Math.max(...hist, 1e-6);
+  g.beginPath();
+  hist.forEach((v, k) => {
+    const x = 4 + (k / (hist.length - 1)) * (w - 8);
+    const y = h - 6 - (v / max) * (h - 14);
+    k ? g.lineTo(x, y) : g.moveTo(x, y);
+  });
+  g.strokeStyle = '#b26bff'; g.lineWidth = 1.6; g.stroke();
+  g.fillStyle = '#8b95a9';
+  g.fillText(`max ${max.toFixed(3)}`, w - 70, 12);
+}
+
+function renderSamples() {
+  $('#samples').innerHTML = DATASET.map((s, k) =>
+    `<button class="chip${k === state.sampleIdx ? ' active' : ''}" data-k="${k}" aria-pressed="${k === state.sampleIdx}">x${k + 1}<small>${CLASS_NAMES[s.y]}</small></button>`).join('');
+  $('#sampleNote').textContent = state.sampleIdx < 0 ? 'custom' : '';
+}
+
+function renderTargets() {
+  $('#targets').innerHTML = CLASS_NAMES.map((c, k) =>
+    `<button data-k="${k}" class="${k === state.target ? 'active' : ''}" aria-pressed="${k === state.target}">${c}</button>`).join('');
+}
+
+function setSample(k, quiet = false) {
+  state.sampleIdx = k;
+  state.input = DATASET[k].x.slice();
+  state.target = DATASET[k].y;
+  forward();
+  renderSamples(); renderTargets();
+  if (!quiet) { renderStats(); refreshInspectorValues(); }
+}
+
+function rebuild(newSeed = false) {
+  if (newSeed) state.seed = Math.floor(Math.random() * 1e9);
+  rng = mulberry32(state.seed);
+  initModel([INPUT_SIZE, ...Array(state.hiddenLayers).fill(state.hiddenWidth), OUTPUT_SIZE]);
+  forward();
+  buildNetwork();
+  selection = null; hovered = null;
+  renderInspector();
+  state.steps = 0; state.lossHistory = []; state.lastLoss = null;
+  recordMetrics();
+  document.querySelectorAll('#depth button').forEach((b) => b.classList.toggle('active', +b.dataset.v === state.hiddenLayers));
+}
+
+$('#samples').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (b) setSample(+b.dataset.k);
+});
+$('#targets').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  state.target = +b.dataset.k; renderTargets(); renderStats(); refreshInspectorValues();
+});
+$('#randInput').addEventListener('click', () => {
+  applyEdit(() => { state.input = state.input.map(() => +(Math.random() * 2 - 1).toFixed(2)); state.sampleIdx = -1; });
+  renderSamples();
+});
+function setFlow(on) {
+  state.flowing = on;
+  const b = $('#flowBtn');
+  b.textContent = on ? '❚❚ Pause flow' : '▶ Resume flow';
+  b.classList.toggle('flow-on', on);
+}
+$('#flowBtn').addEventListener('click', () => setFlow(!state.flowing));
+$('#fireBtn').addEventListener('click', () => fireForwardWave(nowT()));
+$('#speed').addEventListener('input', (e) => { state.speed = +e.target.value; $('#speedVal').textContent = `${state.speed.toFixed(2)}×`; });
+$('#lr').addEventListener('input', (e) => { state.lr = +e.target.value; $('#lrVal').textContent = state.lr.toFixed(2); });
+$('#stepBtn').addEventListener('click', trainStep);
+$('#autoBtn').addEventListener('click', () => {
+  state.autoTrain = !state.autoTrain;
+  $('#autoBtn').classList.toggle('on', state.autoTrain);
+  $('#autoBtn').textContent = state.autoTrain ? '■ Stop' : 'Auto-train';
+  nextTrainAt = 0;
+});
+$('#depth').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  state.hiddenLayers = +b.dataset.v; rebuild();
+});
+$('#width').addEventListener('input', (e) => { $('#widthVal').textContent = e.target.value; });
+$('#width').addEventListener('change', (e) => { state.hiddenWidth = +e.target.value; rebuild(); });
+$('#reinit').addEventListener('click', () => rebuild(true));
+$('#menuBtn').addEventListener('click', () => {
+  const open = document.body.classList.toggle('menu-open');
+  $('#menuBtn').setAttribute('aria-expanded', open);
+});
+
+/* =====================================================================
+   11. UI: inspector (synapse + neuron) and live-edit propagation
+   ===================================================================== */
+const inspector = $('#inspector');
+let baselineOut = null;
+
+// Mutate the model, re-run the forward pass, and flash every neuron whose
+// activation moved. Only neurons downstream of the edit can change.
+function applyEdit(mutate) {
+  const before = net.a.map((r) => r.slice());
+  mutate();
+  forward();
+  nodes.forEach((layer, l) => layer.forEach((n) => {
+    const da = Math.abs(net.a[l][n.i] - before[l][n.i]);
+    if (da > 1e-4) n.change = Math.max(n.change, Math.min(1, 0.35 + da * 6));
+  }));
+  refreshInspectorValues();
+  renderStats();
+}
+
+function downstreamCount(fromLayer) {
+  return net.sizes.slice(fromLayer + 1).reduce((s, n) => s + n, 0);
+}
+
+function select(sel) {
+  if (sel?.type === 'edge') sel.orig = net.W[edges[sel.idx].l][edges[sel.idx].j][edges[sel.idx].i];
+  if (sel?.type === 'node') sel.orig = sel.l === 0 ? state.input[sel.i] : net.b[sel.l][sel.i];
+  selection = sel;
+  baselineOut = sel ? net.a[lastLayer()].slice() : null;
+  renderInspector();
+}
+
+function renderInspector() {
+  if (!selection) { inspector.hidden = true; inspector.innerHTML = ''; return; }
+  inspector.hidden = false;
+  const L = lastLayer();
+
+  if (selection.type === 'edge') {
+    const e = edges[selection.idx];
+    inspector.innerHTML = `
+      <div class="insp-head"><span class="tag edge">Synapse · weight</span><button class="close" data-act="close" aria-label="Close">×</button></div>
+      <h3>${layerName(e.l - 1)} n${e.i + 1} → ${layerName(e.l)} n${e.j + 1}</h3>
+      <div class="formula">z<sub>${e.j + 1}</sub> = Σ w<sub>${e.j + 1},i</sub>·a<sub>i</sub> + b<sub>${e.j + 1}</sub></div>
+      <div class="big" id="iw"></div>
+      <input id="wSlider" type="range" min="-3" max="3" step="0.01" aria-label="Weight value">
+      <div class="kv">
+        <span>Source activation a<sub>${e.i + 1}</sub></span><span id="iSrc"></span>
+        <span>Signal w·a</span><span id="iSig"></span>
+        <span>Target pre-activation z</span><span id="iZ"></span>
+        <span>Target activation</span><span id="iA"></span>
+        <span>Last gradient ∂L/∂w</span><span id="iG"></span>
+      </div>
+      <div class="sub-h">Output layer · Δ since opened</div>
+      <div id="iDown"></div>
+      <div class="note">Reaches ${1 + downstreamCount(e.l)} downstream neurons. Changed neurons flash white.</div>
+      <div class="row" style="margin-top:12px">
+        <button class="grow" data-act="reset">Reset (${f3(selection.orig)})</button>
+        <button class="grow" data-act="zero">Set to 0</button>
+      </div>`;
+    const s = inspector.querySelector('#wSlider');
+    s.value = net.W[e.l][e.j][e.i];
+    s.addEventListener('input', () => applyEdit(() => { net.W[e.l][e.j][e.i] = +s.value; }));
+  } else {
+    const { l, i } = selection;
+    const isIn = l === 0, isOut = l === L;
+    const fn = isIn ? 'identity (input)' : isOut ? 'sigmoid σ(z)' : 'tanh(z)';
+    const formula = isIn ? `a = x<sub>${i + 1}</sub>` : `a = ${isOut ? 'σ' : 'tanh'}(Σ w·a<sub>prev</sub> + b)`;
+    inspector.innerHTML = `
+      <div class="insp-head"><span class="tag node">Neuron · ${layerName(l)}</span><button class="close" data-act="close" aria-label="Close">×</button></div>
+      <h3>Layer ${l} · neuron ${i + 1}${isOut ? ` · class ${CLASS_NAMES[i]}` : ''}</h3>
+      <div class="formula">${formula}</div>
+      <div class="big" id="nA"></div>
+      <div class="kv">
+        <span>Layer index</span><span>${l} of ${L} (${layerShort(l)})</span>
+        <span>Activation fn</span><span>${fn}</span>
+        ${isIn ? '' : '<span>Pre-activation z</span><span id="nZ"></span>'}
+        ${isIn ? '' : '<span>Bias b</span><span id="nB"></span>'}
+        ${isIn ? '' : '<span>Error signal δ = ∂L/∂z</span><span id="nD"></span>'}
+        ${isOut ? '<span>Target</span><span id="nT"></span>' : ''}
+        <span>Fan-in · fan-out</span><span>${isIn ? 0 : net.sizes[l - 1]} · ${isOut ? 0 : net.sizes[l + 1]}</span>
+        ${isIn ? '' : '<span>Strongest input weight</span><span id="nMax"></span>'}
+      </div>
+      <label class="slider">
+        <span class="lbl">${isIn ? 'Input value x' : 'Bias b'} <b id="nSlideVal"></b></span>
+        <input id="nSlider" type="range" min="${isIn ? -1 : -3}" max="${isIn ? 1 : 3}" step="0.01">
+      </label>
+      ${isOut ? '' : `<div class="sub-h">Output layer · Δ since opened</div><div id="iDown"></div>`}
+      <div class="note">${isIn ? 'Editing an input switches to a custom sample.' : `Bias shifts z directly; ${downstreamCount(l)} neurons sit downstream.`}</div>
+      <div class="row" style="margin-top:12px"><button class="grow" data-act="reset">Reset (${f3(selection.orig)})</button></div>`;
+    const s = inspector.querySelector('#nSlider');
+    s.value = isIn ? state.input[i] : net.b[l][i];
+    s.addEventListener('input', () => applyEdit(() => {
+      if (isIn) { state.input[i] = +s.value; state.sampleIdx = -1; renderSamples(); }
+      else net.b[l][i] = +s.value;
+    }));
+  }
+  refreshInspectorValues();
+}
+
+inspector.addEventListener('click', (ev) => {
+  const act = ev.target.closest('[data-act]')?.dataset.act;
+  if (!act || !selection) return;
+  if (act === 'close') return select(null);
+  const setVal = (v) => {
+    if (selection.type === 'edge') { const e = edges[selection.idx]; net.W[e.l][e.j][e.i] = v; }
+    else if (selection.l === 0) { state.input[selection.i] = v; }
+    else net.b[selection.l][selection.i] = v;
+  };
+  applyEdit(() => setVal(act === 'zero' ? 0 : selection.orig));
+});
+
+function refreshInspectorValues() {
+  if (!selection || inspector.hidden) return;
+  const set = (id, v) => { const el = inspector.querySelector(id); if (el) el.textContent = v; };
+  const syncSlider = (id, v) => { const el = inspector.querySelector(id); if (el && document.activeElement !== el) el.value = v; };
+  const L = lastLayer();
+
+  if (selection.type === 'edge') {
+    const e = edges[selection.idx];
+    const w = net.W[e.l][e.j][e.i];
+    set('#iw', `w = ${f3(w)}`);
+    syncSlider('#wSlider', w);
+    set('#iSrc', f3(net.a[e.l - 1][e.i]));
+    set('#iSig', f3(w * net.a[e.l - 1][e.i]));
+    set('#iZ', f3(net.z[e.l][e.j]));
+    set('#iA', f3(net.a[e.l][e.j]));
+    set('#iG', state.steps ? f3(net.gW[e.l][e.j][e.i]) : 'not trained yet');
+  } else {
+    const { l, i } = selection;
+    set('#nA', `a = ${f3(net.a[l][i])}`);
+    if (l > 0) {
+      set('#nZ', f3(net.z[l][i]));
+      set('#nB', f3(net.b[l][i]));
+      set('#nD', state.steps ? f3(net.d[l][i]) : 'not trained yet');
+      const row = net.W[l][i];
+      const k = row.reduce((best, v, idx) => (Math.abs(v) > Math.abs(row[best]) ? idx : best), 0);
+      set('#nMax', `${f3(row[k])} from n${k + 1}`);
+    }
+    if (l === L) set('#nT', (state.target === i ? 1 : 0).toFixed(1));
+    const v = l === 0 ? state.input[i] : net.b[l][i];
+    set('#nSlideVal', f3(v));
+    syncSlider('#nSlider', v);
+  }
+
+  const down = inspector.querySelector('#iDown');
+  if (down) {
+    down.innerHTML = net.a[L].map((v, k) => {
+      const d = v - baselineOut[k];
+      const cls = d > 5e-4 ? 'up' : d < -5e-4 ? 'down' : '';
+      return `<div class="drow"><span>${CLASS_NAMES[k]}</span><span class="barw"><i style="width:${(v * 100).toFixed(1)}%"></i></span><span>${v.toFixed(3)}</span><span class="delta ${cls}">${d >= 0 ? '+' : '−'}${Math.abs(d).toFixed(3)}</span></div>`;
+    }).join('');
+  }
+}
+
+/* =====================================================================
+   12. POINTER INPUT: hover tooltip + click-to-select (drag = orbit)
+   ===================================================================== */
+const cv = renderer.domElement;
+const tip = $('#tip');
+let downAt = null;
+
+function describe(hit) {
+  if (hit.type === 'node') {
+    const { l, i } = hit;
+    const bias = l === 0 ? 'input, no bias' : `b ${f3(net.b[l][i])}`;
+    return `<div class="t">${layerName(l)} · neuron ${i + 1}</div><div class="m">layer ${l} · a ${f3(net.a[l][i])} · ${bias}</div>`;
+  }
+  const e = edges[hit.idx];
+  return `<div class="t">${layerShort(e.l - 1)} n${e.i + 1} → ${layerShort(e.l)} n${e.j + 1}</div><div class="m">w ${f3(net.W[e.l][e.j][e.i])} · click to edit</div>`;
+}
+
+cv.addEventListener('pointerdown', (e) => { downAt = { x: e.clientX, y: e.clientY }; tip.hidden = true; });
+cv.addEventListener('pointerup', (e) => {
+  if (!downAt) return;
+  // Treat as a click only if the pointer barely moved; otherwise it was an orbit drag.
+  if (Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) < 6) {
+    const hit = pick(e.clientX, e.clientY);
+    select(hit ? (hit.type === 'edge' ? { type: 'edge', idx: hit.idx } : { type: 'node', l: hit.l, i: hit.i }) : null);
+  }
+  downAt = null;
+});
+cv.addEventListener('pointermove', (e) => {
+  if (e.buttons) { tip.hidden = true; return; }
+  hovered = pick(e.clientX, e.clientY);
+  cv.style.cursor = hovered ? 'pointer' : 'grab';
+  if (!hovered || e.pointerType === 'touch') { tip.hidden = true; return; }
+  tip.innerHTML = describe(hovered);
+  tip.style.left = `${Math.min(e.clientX, window.innerWidth - 240)}px`;
+  tip.style.top = `${e.clientY}px`;
+  tip.hidden = false;
+});
+cv.addEventListener('pointerleave', () => { hovered = null; tip.hidden = true; });
+
+window.addEventListener('keydown', (e) => {
+  if (e.target.matches('input, textarea')) return;
+  if (e.code === 'Space' && !e.target.matches('button')) { e.preventDefault(); setFlow(!state.flowing); }
+  else if (e.key === 't' || e.key === 'T') trainStep();
+  else if (e.key === 'Escape') select(null);
+});
+
+// On wide screens, shift the projection center right so the network sits in the
+// open space beside the control panel. Raycasting and overlay projection both
+// read camera.projectionMatrix, so they stay aligned with the offset.
+function fitCamera() {
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w / h;
+  if (w > 760) camera.setViewOffset(w, h, -Math.min(170, w * 0.12), 0, w, h);
+  else camera.clearViewOffset();
+  camera.updateProjectionMatrix();
+  // Portrait screens have a narrow horizontal FOV; back off so every layer fits.
+  if (camera.aspect < 0.9) {
+    camera.position.sub(controls.target).setLength(20.8 * 0.9 / camera.aspect).add(controls.target);
+  }
+}
+fitCamera();
+
+window.addEventListener('resize', () => {
+  fitCamera();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+  drawSpark();
+});
+
+/* =====================================================================
+   13. MAIN LOOP
+   ===================================================================== */
+let nextWaveAt = 0.5;
+function loop() {
+  requestAnimationFrame(loop);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const now = clock.elapsedTime;
+
+  if (state.flowing && now >= nextWaveAt) {
+    fireForwardWave(now);
+    // Next wave starts before this one finishes, so the flow reads as continuous.
+    nextWaveAt = now + lastLayer() * fwdStepDur() * 0.7 + 0.3;
+  }
+  if (state.autoTrain && now >= nextTrainAt) autoTrainTick(now);
+
+  runEvents(now);
+  updateParticles(now);
+  updateNodes(dt);
+  updateEdges(dt);
+  updateWavefront(now);
+  controls.update();
+  composer.render();
+  updateOverlay();
+}
+
+renderSamples();
+renderTargets();
+rebuild();
+loop();
+
+// Exposed for console experiments and automated checks.
+window.nnLab = { net, state, forward, backward, trainStep, datasetMetrics, select, edges: () => edges, nodes: () => nodes, camera };
+</script>
+</body>
+</html>

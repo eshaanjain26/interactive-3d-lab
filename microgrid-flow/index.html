@@ -1,0 +1,1488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Microgrid Flow Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #070b14;
+    --panel: rgba(13, 19, 32, 0.84);
+    --panel-border: rgba(120, 150, 210, 0.16);
+    --text: #e6ecf7;
+    --muted: #8a97b0;
+    --faint: #56627a;
+    --accent: #38d6ff;
+    --accent-2: #7c5cff;
+    --good: #2ee68a;
+    --bad: #ff4d5e;
+    --amber: #ffb547;
+    --solar: #ffd23f;
+    --wind: #38d6ff;
+    --batt: #2ee68a;
+    --grid: #b58cff;
+    --load: #f4f6fb;
+    --btn: rgba(255, 255, 255, 0.06);
+    --btn-hover: rgba(255, 255, 255, 0.11);
+    --radius: 12px;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 13px; }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; outline: none; }
+  .labels { position: absolute; inset: 0; pointer-events: none; }
+
+  .panel { position: fixed; top: 16px; background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: var(--radius); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); padding: 14px; max-height: calc(100vh - 32px); overflow-y: auto;
+    scrollbar-width: thin; scrollbar-color: #2a3550 transparent; z-index: 5; }
+  #controls { left: 16px; width: 272px; }
+  #metrics { right: 16px; width: 318px; }
+
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .brand .logo { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--solar), var(--batt)); color: #061019; }
+  .brand h1 { font-size: 14px; margin: 0; font-weight: 700; letter-spacing: 0.01em; }
+  .brand p { margin: 1px 0 0; color: var(--muted); font-size: 11px; }
+
+  h2 { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted);
+    margin: 16px 0 8px; font-weight: 600; }
+  h2.first { margin-top: 4px; }
+
+  button { font: inherit; color: var(--text); background: var(--btn); border: 1px solid var(--panel-border);
+    border-radius: 8px; padding: 8px 10px; cursor: pointer; transition: background .15s, border-color .15s; white-space: nowrap; }
+  button:hover { background: var(--btn-hover); border-color: rgba(140, 170, 230, 0.32); }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button.surge { width: 100%; margin-top: 8px; font-weight: 600; color: #ffd9b0;
+    background: linear-gradient(135deg, rgba(255, 122, 69, 0.22), rgba(255, 77, 94, 0.22)); border-color: rgba(255, 122, 69, 0.4); }
+  button.surge:hover { background: linear-gradient(135deg, rgba(255, 122, 69, 0.34), rgba(255, 77, 94, 0.34)); }
+
+  .seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 8px; }
+  .seg button { padding: 6px 0; font-size: 11.5px; }
+  .seg button.on { border-color: var(--accent); background: rgba(56, 214, 255, 0.13); }
+
+  .slider { margin: 10px 0 2px; }
+  .slider label { display: flex; justify-content: space-between; color: var(--muted); font-size: 11.5px; margin-bottom: 4px; }
+  .slider label b { color: var(--text); font-family: var(--mono); font-weight: 600; font-size: 11px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); margin: 0; }
+  .slider.cloud input { accent-color: #a9b4c4; }
+  .slider.wind input { accent-color: var(--wind); }
+  .slider.load input { accent-color: #ff9f43; }
+
+  .switch { display: flex; align-items: center; gap: 10px; margin: 8px 0; cursor: pointer; color: var(--muted); font-size: 12px; }
+  .switch input { position: absolute; opacity: 0; pointer-events: none; }
+  .switch .track { width: 30px; height: 17px; border-radius: 99px; background: #26304a; position: relative; flex: none; transition: background .15s; }
+  .switch .track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #c8d2e6; transition: transform .15s; }
+  .switch input:checked + .track { background: var(--accent); }
+  .switch input:checked + .track::after { transform: translateX(13px); background: #fff; }
+  .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .scen { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .scen button { font-size: 11.5px; padding: 7px 6px; text-align: left; white-space: normal; line-height: 1.25; }
+  .scen button small { display: block; color: var(--faint); font-size: 10px; margin-top: 2px; }
+
+  .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 10px; color: var(--muted); font-size: 11px; }
+  .legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px;
+    background: var(--c); box-shadow: 0 0 8px var(--c); vertical-align: 0; }
+  .hint { color: var(--faint); font-size: 11px; line-height: 1.5; margin: 8px 0 0; }
+
+  .status { border-radius: 9px; padding: 9px 11px; font-weight: 600; font-size: 12px; display: flex; gap: 8px; align-items: center;
+    background: rgba(56, 214, 255, 0.1); border: 1px solid rgba(56, 214, 255, 0.28); color: var(--accent); }
+  .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 10px currentColor; flex: none; }
+  .status.good { background: rgba(46, 230, 138, 0.1); border-color: rgba(46, 230, 138, 0.3); color: var(--good); }
+  .status.warn { background: rgba(255, 181, 71, 0.1); border-color: rgba(255, 181, 71, 0.32); color: var(--amber); }
+  .status.bad { background: rgba(255, 77, 94, 0.12); border-color: rgba(255, 77, 94, 0.4); color: #ff7a88; }
+  .status.grid { background: rgba(181, 140, 255, 0.1); border-color: rgba(181, 140, 255, 0.32); color: var(--grid); }
+  .status.bad::before { animation: blink 0.8s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0.2; } }
+
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
+  .tile { background: rgba(255, 255, 255, 0.035); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 9px; padding: 7px 9px;
+    border-top: 2px solid var(--c, transparent); }
+  .tile .k { color: var(--muted); font-size: 10.5px; }
+  .tile .v { font-family: var(--mono); font-size: 15px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .tile .s { color: var(--faint); font-size: 10px; margin-top: 1px; }
+
+  .soc { position: relative; height: 22px; border-radius: 6px; background: rgba(255, 255, 255, 0.05); overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.07); }
+  .soc i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #1a9f62, var(--batt)); transition: width .25s, background .25s; }
+  .soc .lim { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255, 255, 255, 0.35); }
+  .soc span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 8px;
+    font-family: var(--mono); font-size: 11px; font-weight: 600; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); }
+
+  .stack { display: flex; height: 14px; border-radius: 5px; overflow: hidden; background: rgba(255, 255, 255, 0.05); }
+  .stack i { display: block; height: 100%; transition: width .25s; }
+  .stack-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px; margin-top: 7px; font-size: 11px; color: var(--muted); }
+  .stack-legend div { display: flex; justify-content: space-between; }
+  .stack-legend div::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--c); margin: 3px 6px 0 0; flex: none; }
+  .stack-legend span { flex: 1; }
+  .stack-legend b { font-family: var(--mono); color: var(--text); font-weight: 600; }
+
+  .chart-wrap { background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 9px; padding: 8px; }
+  #chart { width: 100%; height: 124px; display: block; }
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; color: var(--muted); font-size: 10.5px; }
+  .chart-legend span::before { content: ""; display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: 2px; background: var(--c); }
+
+  ol.rule { margin: 0; padding-left: 18px; color: var(--muted); font-size: 11.5px; line-height: 1.55; }
+  ol.rule b { color: var(--text); font-weight: 600; }
+
+  #hud { left: 50%; transform: translateX(-50%); display: flex; gap: 18px; padding: 9px 16px; align-items: center; overflow: visible; }
+  .hud-item { display: flex; flex-direction: column; min-width: 64px; }
+  .hud-item .k { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; }
+  .hud-item .v { font-family: var(--mono); font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+  .hud-sun { width: 12px; height: 12px; border-radius: 50%; background: var(--solar); box-shadow: 0 0 10px var(--solar); }
+  .hud-fan { width: 14px; height: 14px; color: var(--wind); animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hud-sep { width: 1px; align-self: stretch; background: var(--panel-border); }
+
+  #card { top: auto; bottom: 16px; left: 50%; transform: translateX(-50%); width: 350px; padding: 14px 16px; }
+  #card[hidden] { display: none; }
+  #card .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  #card .kicker { color: var(--accent); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; }
+  #card h3 { margin: 2px 0 0; font-size: 15px; }
+  #card .close { padding: 3px 9px; font-size: 14px; line-height: 1; }
+  #card .big { display: flex; align-items: baseline; gap: 8px; margin: 10px 0 2px; }
+  #card .big b { font-family: var(--mono); font-size: 24px; font-variant-numeric: tabular-nums; }
+  #card .big span { color: var(--muted); font-size: 12px; }
+  #card .cbar { height: 6px; background: rgba(255, 255, 255, 0.07); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+  #card .cbar i { display: block; height: 100%; background: var(--accent); transition: width .2s; }
+  #card .cbar-label { color: var(--faint); font-size: 10.5px; margin-top: 3px; }
+  #card dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 10px 0 0; font-size: 12px; }
+  #card dt { color: var(--muted); }
+  #card dd { margin: 0; text-align: right; font-family: var(--mono); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  #card .live { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--good); margin-right: 6px;
+    box-shadow: 0 0 8px var(--good); animation: blink 1.2s steps(2) infinite; vertical-align: 1px; }
+
+  .zone-label { font: 600 11px Inter, system-ui, sans-serif; color: var(--text); background: rgba(10, 16, 28, 0.74);
+    border: 1px solid rgba(120, 150, 210, 0.25); padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+  .zone-label b { font-family: var(--mono); font-weight: 600; margin-left: 6px; color: var(--c, var(--accent)); }
+  body.no-labels .zone-label { display: none; }
+
+  #hint { position: fixed; bottom: 16px; right: 16px; color: var(--faint); font-size: 11px; z-index: 4; }
+  #mobilebar { display: none; position: fixed; top: 12px; left: 12px; right: 12px; gap: 8px; z-index: 6; }
+  #mobilebar button { flex: 1; background: var(--panel); backdrop-filter: blur(10px); }
+  #mobilebar button.on { border-color: var(--accent); }
+
+  @media (max-width: 1240px) {
+    #hud { top: auto; bottom: 16px; }
+    #card { bottom: 84px; }
+    #hint { display: none; }
+  }
+  @media (max-width: 860px) {
+    #controls, #metrics { display: none; top: 60px; left: 12px; right: 12px; width: auto; max-height: calc(100vh - 160px); }
+    body.show-controls #controls, body.show-metrics #metrics { display: block; }
+    #mobilebar { display: flex; }
+    #hud { left: 12px; right: 12px; bottom: 12px; transform: none; justify-content: space-between; gap: 6px; padding: 8px 10px; }
+    .hud-sep { display: none; }
+    .hud-item { min-width: 0; }
+    .hud-item .v { font-size: 12.5px; }
+    #card { left: 12px; right: 12px; transform: none; width: auto; bottom: 76px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+
+<div id="mobilebar">
+  <button data-toggle="controls">Controls</button>
+  <button data-toggle="metrics">Grid metrics</button>
+</div>
+
+<!-- ============ CONTROL PANEL ============ -->
+<aside id="controls" class="panel" aria-label="Simulation controls">
+  <div class="brand">
+    <div class="logo"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></div>
+    <div><h1>Microgrid Flow</h1><p>Smart city supply and demand, live in 3D</p></div>
+  </div>
+
+  <h2 class="first">Clock</h2>
+  <div class="slider">
+    <label for="s-hour">Time of day <b id="o-hour">09:30</b></label>
+    <input id="s-hour" type="range" min="0" max="23.99" step="0.01" value="9.5">
+  </div>
+  <div class="seg" id="speed" role="radiogroup" aria-label="Simulation speed">
+    <button data-speed="0" title="Pause the clock (energy keeps flowing at the current state)">Pause</button>
+    <button data-speed="4">Slow</button>
+    <button data-speed="12" class="on">Normal</button>
+    <button data-speed="40">Fast</button>
+  </div>
+
+  <h2>Weather</h2>
+  <div class="slider cloud">
+    <label for="s-cloud">Cloud cover <b id="o-cloud">25%</b></label>
+    <input id="s-cloud" type="range" min="0" max="100" step="1" value="25">
+  </div>
+  <div class="slider wind">
+    <label for="s-wind">Wind speed <b id="o-wind">9.0 m/s</b></label>
+    <input id="s-wind" type="range" min="0" max="30" step="0.5" value="9">
+  </div>
+
+  <h2>City load</h2>
+  <div class="slider load">
+    <label for="s-demand">Demand multiplier <b id="o-demand">100%</b></label>
+    <input id="s-demand" type="range" min="40" max="200" step="1" value="100">
+  </div>
+  <button id="btn-surge" class="surge" title="Adds an 80% city-wide load spike that decays over about 15 seconds">Trigger demand surge</button>
+
+  <h2>Grid configuration</h2>
+  <label class="switch"><input type="checkbox" id="t-grid" checked><span class="track"></span>Utility grid tie (off = islanded)</label>
+  <label class="switch"><input type="checkbox" id="t-batt" checked><span class="track"></span>Battery auto-dispatch</label>
+  <label class="switch"><input type="checkbox" id="t-labels" checked><span class="track"></span>Zone labels</label>
+
+  <h2>Scenarios</h2>
+  <div class="scen">
+    <button data-scenario="noon">Sunny noon<small>Solar surplus charges storage</small></button>
+    <button data-scenario="windnight">Windy night<small>Wind carries the base load</small></button>
+    <button data-scenario="peak">Evening peak<small>Battery shaves the peak</small></button>
+    <button data-scenario="storm">Islanded storm<small>Cut-out, no grid, shedding</small></button>
+  </div>
+
+  <h2>Energy packets</h2>
+  <div class="legend">
+    <span style="--c:var(--solar)">Solar</span>
+    <span style="--c:var(--wind)">Wind</span>
+    <span style="--c:var(--batt)">Battery discharge</span>
+    <span style="--c:var(--grid)">Grid import</span>
+  </div>
+  <p class="hint">Packet colour on a feeder is sampled from the live supply mix, so the colours reaching homes show where their power came from. Click any building, turbine, array, substation or the battery for live telemetry.</p>
+</aside>
+
+<!-- ============ METRICS PANEL ============ -->
+<aside id="metrics" class="panel" aria-label="Grid performance metrics">
+  <div id="status" class="status" role="status" aria-live="polite">Balanced</div>
+
+  <div class="tiles">
+    <div class="tile" style="--c:var(--solar)"><div class="k">Solar</div><div class="v" id="m-solar">0.00</div><div class="s">MW generated</div></div>
+    <div class="tile" style="--c:var(--wind)"><div class="k">Wind</div><div class="v" id="m-wind">0.00</div><div class="s">MW generated</div></div>
+    <div class="tile" style="--c:var(--load)"><div class="k">City load</div><div class="v" id="m-load">0.00</div><div class="s" id="m-load-s">MW served</div></div>
+    <div class="tile" style="--c:var(--batt)"><div class="k">Battery</div><div class="v" id="m-batt">0.00</div><div class="s" id="m-batt-s">idle</div></div>
+    <div class="tile" style="--c:var(--grid)"><div class="k">Utility</div><div class="v" id="m-grid">0.00</div><div class="s" id="m-grid-s">idle</div></div>
+    <div class="tile" style="--c:var(--good)"><div class="k">Renewable</div><div class="v" id="m-renew">0%</div><div class="s">of load now</div></div>
+  </div>
+
+  <h2>Battery bank · 10 MWh / 3 MW</h2>
+  <div class="soc" id="soc"><i></i><div class="lim" style="left:10%"></div><div class="lim" style="left:95%"></div><span><b id="soc-pct">55%</b><b id="soc-mwh">5.5 MWh</b></span></div>
+
+  <h2>How load is met right now</h2>
+  <div class="stack" id="mix">
+    <i style="background:var(--solar)"></i><i style="background:var(--wind)"></i><i style="background:var(--batt)"></i><i style="background:var(--grid)"></i><i style="background:var(--bad)"></i>
+  </div>
+  <div class="stack-legend">
+    <div style="--c:var(--solar)"><span>Solar</span><b id="x-solar">0%</b></div>
+    <div style="--c:var(--wind)"><span>Wind</span><b id="x-wind">0%</b></div>
+    <div style="--c:var(--batt)"><span>Battery</span><b id="x-batt">0%</b></div>
+    <div style="--c:var(--grid)"><span>Grid</span><b id="x-grid">0%</b></div>
+    <div style="--c:var(--bad)"><span>Shed</span><b id="x-shed">0%</b></div>
+    <div style="--c:#6b7690"><span>Curtailed</span><b id="x-curt">0.00</b></div>
+  </div>
+
+  <h2>Last 24 hours</h2>
+  <div class="chart-wrap">
+    <canvas id="chart"></canvas>
+    <div class="chart-legend">
+      <span style="--c:var(--wind)">Wind</span><span style="--c:var(--solar)">Solar</span>
+      <span style="--c:var(--load)">Load served</span><span style="--c:var(--batt)">Battery SOC</span>
+    </div>
+  </div>
+
+  <h2>Dispatch order</h2>
+  <ol class="rule">
+    <li><b>Renewables</b> serve load first.</li>
+    <li>Surplus <b>charges the battery</b> (up to 3 MW, tapering above 87% SOC).</li>
+    <li>Deficit is covered by <b>battery discharge</b> down to the 10% reserve.</li>
+    <li>The <b>utility tie</b> exports up to 2.5 MW or imports up to 3 MW.</li>
+    <li>Anything left is <b>curtailed</b> (surplus) or <b>shed</b> (industrial first, homes last).</li>
+  </ol>
+</aside>
+
+<!-- ============ WEATHER HUD ============ -->
+<div id="hud" class="panel" aria-label="Weather and clock">
+  <div class="hud-item"><span class="k">Time</span><span class="v" id="h-time">09:30</span></div>
+  <div class="hud-sep"></div>
+  <div class="hud-item"><span class="k">Irradiance</span><span class="v"><i class="hud-sun" id="h-sun-dot"></i><span id="h-sun">0 W/m²</span></span></div>
+  <div class="hud-item"><span class="k">Wind</span><span class="v">
+    <svg class="hud-fan" id="h-fan" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="2"/><path d="M12 10c-1-4 0-8 2-8s1 5-2 8zM13.7 13c3.9-1.2 7.9-.4 7.9 1.6S16.6 15 13.7 13zM10.3 13c-2.9 3-6.7 4.3-7.7 2.6S7.3 11.7 10.3 13z"/></svg>
+    <span id="h-wind">0 m/s</span></span></div>
+  <div class="hud-item"><span class="k">Cloud</span><span class="v" id="h-cloud">0%</span></div>
+</div>
+
+<!-- ============ TELEMETRY CARD ============ -->
+<div id="card" class="panel" hidden role="dialog" aria-label="Asset telemetry">
+  <div class="head">
+    <div><div class="kicker" id="c-kicker">Asset</div><h3 id="c-title">Name</h3></div>
+    <button class="close" id="c-close" aria-label="Close telemetry">×</button>
+  </div>
+  <div class="big"><b id="c-big">0</b><span id="c-big-l"></span></div>
+  <div class="cbar"><i id="c-bar"></i></div>
+  <div class="cbar-label" id="c-bar-l"></div>
+  <dl id="c-rows"></dl>
+</div>
+
+<div id="hint">Drag to orbit · scroll to zoom · click any asset</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+/* =====================================================================
+   HOW THE SIMULATION WORKS
+   ---------------------------------------------------------------------
+   Every frame runs one balancing step:
+
+     1. Generation   solar = f(sun angle, cloud cover, passing cloud shadows)
+                     wind  = turbine power curve (cut-in 3, rated 12, cut-out 25 m/s)
+     2. Demand       each building = base kW x time-of-day profile x demand slider x surge
+     3. Dispatch     net = generation - demand, then a fixed merit order:
+                       surplus: battery charge -> grid export -> curtail
+                       deficit: battery discharge -> grid import -> shed load
+     4. Integration  battery SOC += (charge * eta - discharge / eta) * dt / capacity
+     5. Routing      every transmission line (edge) gets a signed MW flow, and the
+                     packet emitter on that edge spawns glowing packets at a rate
+                     proportional to sqrt(|MW|), moving in the direction of the sign.
+
+   Units: power in MW, energy in MWh, sim time in hours.
+   ===================================================================== */
+
+const $ = (id) => document.getElementById(id);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const smooth = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+function mulberry(seed) {
+  return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+const rand = mulberry(20260923);
+
+// ============================ PHYSICAL MODEL ============================
+const CFG = {
+  SOLAR_ARRAY_MW: 2.4,   // peak DC-to-AC output per array at 1000 W/m²
+  SOLAR_DERATE: 0.96,    // inverter + wiring losses
+  TURBINE_MW: 0.85,
+  CUT_IN: 3, RATED_WIND: 12, CUT_OUT: 25,
+  RESTART_WIND: 20,      // cut-out hysteresis: a feathered turbine waits for the storm to ease
+  BATT_MWH: 10, BATT_MW: 3,
+  ETA: 0.95,             // one-way efficiency, so round trip is ~90%
+  SOC_MIN: 0.10,         // reserve kept for black-start / critical loads
+  SOC_MAX: 0.95,
+  IMPORT_MW: 3, EXPORT_MW: 2.5,
+};
+
+/** -1..1: sine of the sun's angle above the horizon. Sunrise 06:00, sunset 18:00. */
+function sunElevation(hour) { return Math.sin(((hour - 6) / 12) * Math.PI); }
+
+/** Plane-of-array irradiance in W/m². Clouds cut up to 82% of clear-sky output. */
+function solarIrradiance(hour, cloud) {
+  const elev = sunElevation(hour);
+  if (elev <= 0) return 0;
+  return 1000 * Math.pow(elev, 1.25) * (1 - 0.82 * Math.pow(cloud, 1.4));
+}
+
+/** Standard turbine power curve: zero below cut-in, cubic ramp, flat at rated, feathered above cut-out. */
+function turbinePower(v) {
+  const { CUT_IN: ci, RATED_WIND: vr, CUT_OUT: co, TURBINE_MW: p } = CFG;
+  if (v < ci || v >= co) return 0;
+  if (v >= vr) return p;
+  return p * (v ** 3 - ci ** 3) / (vr ** 3 - ci ** 3);
+}
+function turbineRpm(v) {
+  if (v < CFG.CUT_IN || v >= CFG.CUT_OUT) return 0;
+  return 6 + 10 * Math.min(1, (v - CFG.CUT_IN) / (CFG.RATED_WIND - CFG.CUT_IN));
+}
+
+/** Normalised daily load shape (peak ~1.0) for each customer class. */
+function loadProfile(type, h) {
+  const dist = (mu) => ((h - mu + 36) % 24) - 12;               // circular hour distance
+  const bump = (mu, s) => Math.exp(-0.5 * (dist(mu) / s) ** 2);
+  const span = (on, off, k) => 1 / (1 + Math.exp(-(h - on) * k)) / (1 + Math.exp((h - off) * k));
+  if (type === 'residential') return 0.32 + 0.3 * bump(7.5, 1.3) + 0.68 * bump(19.8, 2.1);  // morning + evening peaks
+  if (type === 'commercial') return 0.26 + 0.74 * span(8, 18.5, 1.8);                       // business hours
+  return 0.55 + 0.42 * span(6, 22, 2.5);                                                   // two-shift industry
+}
+
+/** Charge/discharge ceilings with a CC/CV-style taper near the SOC limits. */
+function batteryLimits(soc) {
+  return {
+    charge: CFG.BATT_MW * clamp((CFG.SOC_MAX - soc) / 0.08, 0, 1),
+    discharge: CFG.BATT_MW * clamp((soc - CFG.SOC_MIN) / 0.05, 0, 1),
+  };
+}
+
+/**
+ * SUPPLY-DEMAND BALANCING (the heart of the microgrid controller).
+ *
+ * Returns signed setpoints:
+ *   batt > 0  battery discharging into the bus     batt < 0  battery charging
+ *   grid > 0  importing from the utility           grid < 0  exporting to the utility
+ *   curtailed renewable MW that had nowhere to go
+ *   unserved  demand MW that nothing could cover (caller turns this into load shedding)
+ *
+ * The merit order stores surplus before exporting it (cheap local energy is worth more later)
+ * and drains the battery before importing (peak shaving: the utility sees a flatter load).
+ */
+function dispatch(gen, load, soc, { battAuto = true, gridTie = true } = {}) {
+  const out = { batt: 0, grid: 0, curtailed: 0, unserved: 0 };
+  const lim = batteryLimits(soc);
+  const net = gen - load;
+
+  if (net >= 0) {
+    let surplus = net;
+    if (battAuto) { const c = Math.min(surplus, lim.charge); out.batt = -c; surplus -= c; }
+    if (gridTie) { const e = Math.min(surplus, CFG.EXPORT_MW); out.grid = -e; surplus -= e; }
+    out.curtailed = surplus;
+  } else {
+    let deficit = -net;
+    if (battAuto) { const d = Math.min(deficit, lim.discharge); out.batt = d; deficit -= d; }
+    if (gridTie) { const i = Math.min(deficit, CFG.IMPORT_MW); out.grid = i; deficit -= i; }
+    out.unserved = deficit;
+  }
+  return out;
+}
+
+// ============================ STATE ============================
+const state = {
+  hour: 9.5, speed: 12,            // speed = simulated minutes per real second
+  cloud: 0.25, wind: 9, demand: 1,
+  surge: 0, gridTie: true, battAuto: true,
+  soc: 0.55, throughputMWh: 0,
+};
+const sim = { irr: 0, solar: 0, wind: 0, gen: 0, demand: 0, served: 0, shed: 0, batt: 0, grid: 0,
+  curtailed: 0, k: 1, renewToLoad: 0, solarFrac: 0.5 };
+const mix = { toLoad: [0, 0, 0, 0], toStore: [0.5, 0.5, 0, 0] };   // [solar, wind, battery, grid]
+const history = [];
+const HIST_STEP_H = 1 / 6, HIST_LEN = 144;
+let histAcc = 0;
+
+// ============================ RENDERER / SCENE ============================
+const stage = $('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+stage.appendChild(renderer.domElement);
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(innerWidth, innerHeight);
+labelRenderer.domElement.className = 'labels';
+stage.appendChild(labelRenderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x0b1424, 220, 540);
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.5, 1400);
+camera.position.set(-34, 112, 158);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.target.set(4, 0, -2);
+// Portrait screens see a narrow horizontal slice, so start further back to keep the whole city in frame
+if (camera.aspect < 1.2) camera.position.sub(controls.target).multiplyScalar(Math.pow(1.2 / camera.aspect, 0.75)).add(controls.target);
+controls.minDistance = 40;
+controls.maxDistance = 300;
+controls.maxPolarAngle = 1.38;
+controls.update();
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.75, 0.5, 1.1);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+// Sky dome: two-colour gradient re-tinted every frame from sun angle and cloud cover
+const skyU = { top: { value: new THREE.Color() }, bottom: { value: new THREE.Color() } };
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(600, 32, 16), new THREE.ShaderMaterial({
+  uniforms: skyU, side: THREE.BackSide, depthWrite: false, fog: false,
+  vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: 'uniform vec3 top; uniform vec3 bottom; varying vec3 vP; void main(){ float h = clamp(vP.y * 1.7 + 0.12, 0.0, 1.0); gl_FragColor = vec4(mix(bottom, top, pow(h, 0.75)), 1.0); }',
+})));
+
+const hemi = new THREE.HemisphereLight(0xbcd6ff, 0x1c2418, 0.6);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, 2);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -95, right: 95, top: 95, bottom: -95, near: 10, far: 420 });
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.04;
+scene.add(sun, sun.target);
+const moonLight = new THREE.DirectionalLight(0x8fb0ff, 0);
+scene.add(moonLight);
+const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(9, 24, 16), new THREE.MeshBasicMaterial({ color: 0xfff0c0, toneMapped: false, fog: false }));
+const moonDisc = new THREE.Mesh(new THREE.SphereGeometry(5, 20, 14), new THREE.MeshBasicMaterial({ color: 0xcfd8ff, fog: false }));
+scene.add(sunDisc, moonDisc);
+
+// ============================ GEOMETRY HELPERS ============================
+const M = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.8, metalness: 0.05, ...o });
+function mesh(geo, mat, x = 0, y = 0, z = 0, shadow = true) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z);
+  m.castShadow = shadow; m.receiveShadow = true;
+  return m;
+}
+const box = (w, h, d, mat, x, y, z) => mesh(new THREE.BoxGeometry(w, h, d), mat, x, y, z);
+function pad(x, z, w, d, color, y = 0.02) {
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(w, d), M(color, { roughness: 1 }));
+  p.rotation.x = -Math.PI / 2; p.position.set(x, y, z); p.receiveShadow = true;
+  scene.add(p); return p;
+}
+
+// Ground, zoning pads and roads
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), M(0x2a3a2c, { roughness: 1 }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
+scene.add(ground);
+pad(-38, -27, 48, 30, 0x3a3a33);           // solar gravel
+pad(-38, 41, 48, 30, 0x284030);            // residential lawns
+pad(17, 37, 38, 30, 0x2c3139);             // commercial plaza
+pad(52, 22, 36, 52, 0x33312e);             // industrial yard
+pad(0, 14, 180, 3.2, 0x2a2e36, 0.04);      // main avenue
+pad(-8, 10, 3.2, 140, 0x2a2e36, 0.045);    // north-south road
+pad(0, 14, 180, 0.18, 0x6b6446, 0.05);
+
+const hill = mesh(new THREE.CylinderGeometry(16, 27, 2.6, 48), M(0x2b3d2d, { roughness: 1 }), 38, 1.3, -34);
+scene.add(hill);
+
+// ============================ ASSET REGISTRY ============================
+const assets = [], pickables = [];
+function registerAsset(a) {
+  a.mw = 0;
+  a.center = a.center || a.group.position.clone();
+  a.group.traverse((o) => { if (o.isMesh && !o.userData.noPick) { o.userData.asset = a; pickables.push(o); } });
+  scene.add(a.group);
+  assets.push(a);
+  return a;
+}
+
+// ---------- Solar arrays ----------
+const panelGeo = new THREE.BoxGeometry(2.3, 0.08, 1.5);
+const legGeo = new THREE.CylinderGeometry(0.07, 0.07, 1.2, 6);
+const steel = M(0x8a93a1, { metalness: 0.6, roughness: 0.4 });
+function buildSolarArray(id, name, cx, cz) {
+  const g = new THREE.Group(); g.position.set(cx, 0, cz);
+  const panelMat = M(0x1a2c58, { metalness: 0.55, roughness: 0.28, emissive: 0x4a7ae0, emissiveIntensity: 0 });
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 5; c++) {
+    const x = (c - 2) * 2.7, z = (r - 1.5) * 3.1;
+    const p = mesh(panelGeo, panelMat, x, 1.3, z);
+    p.rotation.x = 0.45;                         // tilted toward the southern (+z) sun path
+    g.add(p, mesh(legGeo, steel, x, 0.6, z));
+  }
+  g.add(box(2.4, 1.6, 1.4, M(0xcfd6df), 0, 0.8, 7.4));   // inverter skid
+  return registerAsset({ id, name, type: 'solar', zone: 'Solar farm', group: g, panelMat,
+    port: new THREE.Vector3(cx, 1.7, cz + 7.4), cap: CFG.SOLAR_ARRAY_MW, radius: 9.5, shade: 1, irr: 0 });
+}
+const solarArrays = [buildSolarArray('solarA', 'Solar array A', -48, -30), buildSolarArray('solarB', 'Solar array B', -28, -30)];
+
+// ---------- Wind turbines ----------
+const WIND_YAW = 0.55;                                               // rotor faces the prevailing wind
+const windDir = new THREE.Vector3(Math.sin(WIND_YAW), 0, Math.cos(WIND_YAW));
+const turbineWhite = M(0xd3d9e1, { roughness: 0.5 });
+const bladeGeo = new THREE.BoxGeometry(0.55, 7.2, 0.1); bladeGeo.translate(0, 3.7, 0);
+function buildTurbine(idx, x, z) {
+  const baseY = 2.6;
+  const g = new THREE.Group(); g.position.set(x, baseY, z);
+  g.add(mesh(new THREE.CylinderGeometry(0.22, 0.5, 15, 12), turbineWhite, 0, 7.5, 0));
+  const head = new THREE.Group(); head.position.y = 15; head.rotation.y = WIND_YAW; g.add(head);
+  head.add(box(1.0, 1.0, 2.6, turbineWhite, 0, 0, -0.6));
+  const rotor = new THREE.Group(); rotor.position.z = 0.85; head.add(rotor);
+  rotor.add(mesh(new THREE.SphereGeometry(0.45, 12, 10), turbineWhite));
+  for (let k = 0; k < 3; k++) { const b = mesh(bladeGeo, turbineWhite); b.rotation.z = k * (Math.PI * 2 / 3); rotor.add(b); }
+  g.add(box(1.2, 0.9, 1.0, M(0x9aa4b2), 0.9, 0.45, 0.9));             // pad-mount transformer
+  return registerAsset({ id: `t${idx}`, name: `Wind turbine T${idx}`, type: 'wind', zone: 'Wind farm', group: g, rotor,
+    port: new THREE.Vector3(x + 0.9, baseY + 0.9, z + 0.9), cap: CFG.TURBINE_MW, radius: 4,
+    wake: idx === 1 ? 1 : 0.88 + 0.1 * rand(), phase: rand() * 6.28, omega: 0, v: 0, rpm: 0, feathered: false });
+}
+const turbines = [[28, -40], [40, -45], [50, -35], [32, -28], [45, -25]].map(([x, z], i) => buildTurbine(i + 1, x, z));
+
+// ---------- Substations ----------
+const transformerMat = M(0x7d8796, { metalness: 0.3, roughness: 0.6 });
+function buildSubstation(id, name, x, z, size, zone, rating) {
+  const g = new THREE.Group(); g.position.set(x, 0, z);
+  g.add(box(size * 2, 0.3, size * 1.6, M(0x3a414d), 0, 0.15, 0));
+  for (const sx of [-0.45, 0.45]) {
+    g.add(box(size * 0.6, 2, size * 0.55, transformerMat, sx * size, 1.3, 0));
+    for (let f = -1; f <= 1; f++) g.add(box(0.08, 1.6, size * 0.5, transformerMat, sx * size + (sx > 0 ? 1 : -1) * size * 0.34, 1.2, f * 0.01));
+  }
+  for (const [px, pz] of [[-0.8, -0.6], [0.8, -0.6], [-0.8, 0.6], [0.8, 0.6]]) g.add(mesh(new THREE.CylinderGeometry(0.1, 0.1, 3.4, 6), steel, px * size, 1.7, pz * size));
+  g.add(box(size * 1.7, 0.12, 0.12, steel, 0, 3.4, -0.6 * size), box(size * 1.7, 0.12, 0.12, steel, 0, 3.4, 0.6 * size));
+  const fence = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(size * 2.1, 1.6, size * 1.8)),
+    new THREE.LineBasicMaterial({ color: 0x8a97b0, transparent: true, opacity: 0.45 }));
+  fence.position.y = 0.8; g.add(fence);
+  return registerAsset({ id, name, type: 'substation', zone, group: g, port: new THREE.Vector3(x, 3.5, z), radius: size * 1.4, rating });
+}
+const hub = buildSubstation('hub', 'Main substation', 0, -4, 5, 'Central bus', 12);
+const collector = buildSubstation('collector', 'Wind collector', 22, -12, 2.6, 'Wind farm', 5);
+
+// ---------- Battery storage bank ----------
+function buildBattery(cx, cz) {
+  const g = new THREE.Group(); g.position.set(cx, 0, cz);
+  const shell = M(0xd4d9e0, { roughness: 0.55 }), stripe = M(0x1c9f6a);
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) {
+    const x = (c - 1) * 5.2, z = r * 3.1 - 1.55;
+    g.add(box(4.6, 2.6, 2.2, shell, x, 1.3, z), box(4.62, 0.25, 2.22, stripe, x, 2.15, z));
+  }
+  // 10-segment state-of-charge tower
+  const segs = [];
+  for (let i = 0; i < 10; i++) {
+    const m = M(0x111620, { emissive: 0x2ee68a, emissiveIntensity: 0 });
+    const s = box(1.1, 0.42, 0.9, m, 9.4, 0.4 + i * 0.5, 0);
+    segs.push(m); g.add(s);
+  }
+  const ring = new THREE.Mesh(new THREE.RingGeometry(10.5, 11.1, 72),
+    new THREE.MeshBasicMaterial({ color: 0x2ee68a, transparent: true, opacity: 0, side: THREE.DoubleSide, toneMapped: false, depthWrite: false }));
+  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.08; ring.userData.noPick = true; g.add(ring);
+  return registerAsset({ id: 'battery', name: 'Battery storage bank', type: 'battery', zone: 'Storage', group: g, segs, ring,
+    port: new THREE.Vector3(cx, 2.8, cz - 1.6), radius: 11.5 });
+}
+const battery = buildBattery(-20, 4);
+
+// ---------- Utility grid tie ----------
+const latticeMat = new THREE.MeshStandardMaterial({ color: 0x9aa6b8, wireframe: true });
+function pylon(x, z, h = 16) {
+  const g = new THREE.Group(); g.position.set(x, 0, z);
+  const t = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 1.9, h, 4, 7, true), latticeMat);
+  t.position.y = h / 2; t.rotation.y = Math.PI / 4; g.add(t);
+  g.add(box(7, 0.25, 0.3, steel, 0, h - 1.5, 0), box(5, 0.25, 0.3, steel, 0, h - 4, 0));
+  return g;
+}
+const gridTieGroup = pylon(-4, -46);
+gridTieGroup.add(box(3.2, 2.4, 2.4, transformerMat, 4.5, 1.2, 3));
+const gridTie = registerAsset({ id: 'grid', name: 'Utility grid tie', type: 'grid', zone: 'Point of common coupling', group: gridTieGroup,
+  port: new THREE.Vector3(-4, 14.5, -46), radius: 6 });
+const farPylon = pylon(-4, -92);
+scene.add(farPylon);
+
+// ---------- Buildings ----------
+function windowTexture(lit) {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 128;
+  const x = c.getContext('2d'), r = mulberry(lit ? 7 : 3);
+  x.fillStyle = lit ? '#000' : '#4a5566'; x.fillRect(0, 0, 64, 128);
+  for (let row = 0; row < 16; row++) for (let col = 0; col < 6; col++) {
+    const on = r() < 0.62;
+    x.fillStyle = lit ? (on ? `hsl(${34 + r() * 16},90%,${58 + r() * 22}%)` : '#000') : '#8fb4d9';
+    x.fillRect(col * 10 + 3, row * 8 + 2, 7, 5);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4;
+  return t;
+}
+const facadeTex = windowTexture(false), litTex = windowTexture(true);
+const beaconGeo = new THREE.SphereGeometry(0.35, 10, 8);
+function beacon(y) {
+  const b = new THREE.Mesh(beaconGeo, new THREE.MeshBasicMaterial({ color: 0xff3344, toneMapped: false }));
+  b.position.y = y; b.visible = false; b.userData.noPick = true; return b;
+}
+
+const buildings = [];
+const PRIORITY = { industrial: 1, commercial: 2, residential: 3 };   // lower tier is shed first
+function addBuilding(a) { a.priority = PRIORITY[a.type]; a.phase = rand() * 6.28; a.shed = false; a.demand = 0; buildings.push(a); return registerAsset(a); }
+
+const housePalette = [0xc9b79c, 0xb8c4c9, 0xd7c6b3, 0x9fb0a3, 0xc2a38f, 0xa9a0b8];
+function buildHouse(x, z, idx) {
+  const g = new THREE.Group(); g.position.set(x, 0, z);
+  g.add(box(3.4, 2.4, 3.0, M(housePalette[idx % housePalette.length]), 0, 1.2, 0));
+  const roof = mesh(new THREE.ConeGeometry(2.75, 1.6, 4), M(idx % 2 ? 0x5a3d35 : 0x44474f), 0, 3.2, 0);
+  roof.rotation.y = Math.PI / 4; g.add(roof);
+  const win = M(0x1c2129, { emissive: 0xffc977, emissiveIntensity: 0 });
+  g.add(box(0.75, 0.6, 0.06, win, -0.8, 1.3, 1.52), box(0.75, 0.6, 0.06, win, 0.8, 1.3, 1.52));
+  const bc = beacon(4.4); g.add(bc);
+  return addBuilding({ id: `h${idx}`, name: `Home ${String(idx + 1).padStart(2, '0')}`, type: 'residential', zone: 'Residential',
+    group: g, lightMats: [win], beacon: bc, base: 0.045 + rand() * 0.032, port: new THREE.Vector3(x, 2.2, z), radius: 2.8 });
+}
+function buildTower(x, z, idx) {
+  const w = 5 + rand() * 1.4, d = 5 + rand() * 1.4, h = 9 + rand() * 15;
+  const g = new THREE.Group(); g.position.set(x, 0, z);
+  const map = facadeTex.clone(), em = litTex.clone();
+  map.repeat.set(1, h / 12); em.repeat.set(1, h / 12); map.needsUpdate = em.needsUpdate = true;
+  const mat = new THREE.MeshStandardMaterial({ map, emissiveMap: em, emissive: 0xffd49a, emissiveIntensity: 0, roughness: 0.45, metalness: 0.25 });
+  g.add(box(w, h, d, mat, 0, h / 2, 0), box(w + 0.4, 0.5, d + 0.4, M(0x3b4250), 0, h + 0.25, 0));
+  g.add(box(1.4, 1, 1.4, M(0x6b7482), w * 0.2, h + 1, 0));
+  const bc = beacon(h + 1.8); g.add(bc);
+  const names = ['Harbor Tower', 'Civic Center', 'Market Plaza', 'Data Hub', 'Medical Offices', 'Arcadia Mall'];
+  return addBuilding({ id: `c${idx}`, name: names[idx], type: 'commercial', zone: 'Commercial', group: g, lightMats: [mat], beacon: bc,
+    base: 0.12 + h * 0.01, height: h, port: new THREE.Vector3(x, 2.2, z), radius: 4.4 });
+}
+function buildFactory(x, z, idx, w, d) {
+  const g = new THREE.Group(); g.position.set(x, 0, z);
+  const wall = M(0x6f7a86), roofM = M(0x535b66);
+  g.add(box(w, 4.5, d, wall, 0, 2.25, 0));
+  const teeth = Math.floor(w / 3);
+  for (let i = 0; i < teeth; i++) {
+    const t = mesh(new THREE.CylinderGeometry(1.5, 1.5, d, 3), roofM, -w / 2 + 1.5 + i * 3, 4.9, 0);
+    t.rotation.x = Math.PI / 2; t.rotation.y = Math.PI / 2; g.add(t);
+  }
+  const win = M(0x1c2129, { emissive: 0xffe0a8, emissiveIntensity: 0 });
+  g.add(box(w * 0.8, 0.7, 0.06, win, 0, 3, d / 2 + 0.03));
+  const stackLights = [];
+  for (const sx of [w / 2 - 1.5, w / 2 - 3.6]) {
+    g.add(mesh(new THREE.CylinderGeometry(0.5, 0.65, 10, 12), M(0x8b8580), sx, 5, -d / 2 + 1.4));
+    const l = new THREE.Mesh(beaconGeo, new THREE.MeshBasicMaterial({ color: 0xff5040, toneMapped: false }));
+    l.position.set(sx, 10.2, -d / 2 + 1.4); l.userData.noPick = true; g.add(l); stackLights.push(l);
+  }
+  const bc = beacon(7.5); g.add(bc);
+  const names = ['Foundry', 'Cold Storage', 'Assembly Plant'];
+  return addBuilding({ id: `i${idx}`, name: names[idx], type: 'industrial', zone: 'Industrial', group: g, lightMats: [win], beacon: bc,
+    stackLights, base: [0.5, 0.6, 0.7][idx], port: new THREE.Vector3(x, 2.4, z), radius: Math.max(w, d) * 0.62 });
+}
+
+let hi = 0;
+for (const z of [32, 41, 50]) for (const x of [-54, -46, -38, -30, -22]) buildHouse(x + (rand() - 0.5), z + (rand() - 0.5), hi++);
+[[4, 30], [14, 29], [24, 32], [5, 42], [16, 43], [27, 47]].forEach(([x, z], i) => buildTower(x, z, i));
+buildFactory(58, 6, 0, 12, 8);
+buildFactory(58, 26, 1, 10, 9);
+buildFactory(47, 42, 2, 12, 8);
+
+const zones = {
+  residential: { sub: buildSubstation('subR', 'Residential substation', -30, 22, 3, 'Residential', 4), served: 0, shedCount: 0 },
+  commercial: { sub: buildSubstation('subC', 'Commercial substation', 10, 20, 3, 'Commercial', 4), served: 0, shedCount: 0 },
+  industrial: { sub: buildSubstation('subI', 'Industrial substation', 40, 22, 3.4, 'Industrial', 4), served: 0, shedCount: 0 },
+};
+// Shedding order: tier 1 first, and within a tier the biggest load first so fewer customers go dark
+const shedOrder = [...buildings];
+
+// ---------- Trees ----------
+{
+  const N = 120;
+  const foliage = new THREE.InstancedMesh(new THREE.ConeGeometry(1.4, 3.8, 7), M(0x2f5a3a), N);
+  const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.18, 0.24, 1.2, 5), M(0x4a3a2c), N);
+  foliage.castShadow = trunks.castShadow = true;
+  const blocked = (x, z) => (x > -64 && x < -12 && z > -46 && z < -12) || Math.hypot(x - 38, z + 34) < 29 ||
+    (x > -12 && x < 30 && z > -58 && z < 6) || (x > -32 && x < -6 && z > -6 && z < 14) || (x > -62 && x < 34 && z > 12 && z < 56) ||
+    (x > 32 && x < 72 && z > -4 && z < 52) || Math.abs(x + 8) < 4 || (x > -12 && x < 4 && z < -40);
+  const o = new THREE.Object3D(); let n = 0;
+  for (let tries = 0; n < N && tries < 4000; tries++) {
+    const x = (rand() - 0.5) * 190, z = (rand() - 0.5) * 170;
+    if (blocked(x, z)) continue;
+    const s = 0.7 + rand() * 0.7;
+    o.position.set(x, 2.3 * s, z); o.scale.setScalar(s); o.updateMatrix(); foliage.setMatrixAt(n, o.matrix);
+    o.position.y = 0.6 * s; o.updateMatrix(); trunks.setMatrixAt(n, o.matrix);
+    n++;
+  }
+  foliage.count = trunks.count = n;
+  scene.add(foliage, trunks);
+}
+
+// ============================ TRANSMISSION NETWORK ============================
+/*
+   The grid is a directed graph. Each edge is a sagging overhead line (quadratic Bezier)
+   with a signed MW flow: positive means energy moves from `a` to `b`, negative means b to a.
+   Edge kinds decide packet colour: solar / wind lines are single-source, battery and grid
+   lines change colour with direction, and distribution ('dist') lines carry the blended mix.
+*/
+const edges = [];
+const KIND_GLOW = { solar: new THREE.Color('#ffd23f'), wind: new THREE.Color('#38d6ff'), batt: new THREE.Color('#2ee68a'),
+  grid: new THREE.Color('#b58cff'), dist: new THREE.Color('#8ab4ff') };
+function addEdge(from, to, kind, { r = 0.09, ref = 2, lift } = {}) {
+  const a = (from.isVector3 ? from : from.port).clone(), b = (to.isVector3 ? to : to.port).clone();
+  const dist = a.distanceTo(b);
+  const mid = a.clone().add(b).multiplyScalar(0.5);
+  mid.y = Math.max(a.y, b.y) + (lift ?? 1.5 + dist * 0.1);
+  const curve = new THREE.QuadraticBezierCurve3(a, mid, b);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x3a4252, emissive: 0x000000, roughness: 0.6, metalness: 0.4 });
+  const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, Math.max(12, Math.round(dist)), r, 6), mat);
+  tube.castShadow = true;
+  scene.add(tube);
+  const e = { curve, len: curve.getLength(), kind, flow: 0, acc: rand(), mat, ref };
+  edges.push(e);
+  return e;
+}
+for (const s of solarArrays) s.edge = addEdge(s, hub, 'solar', { r: 0.12, ref: CFG.SOLAR_ARRAY_MW });
+for (const t of turbines) t.edge = addEdge(t, collector, 'wind', { r: 0.08, ref: CFG.TURBINE_MW, lift: 2 });
+const collectorEdge = addEdge(collector, hub, 'wind', { r: 0.15, ref: 4.25 });
+const battEdge = addEdge(hub, battery, 'batt', { r: 0.15, ref: CFG.BATT_MW });
+const gridEdge = addEdge(hub, gridTie, 'grid', { r: 0.15, ref: CFG.IMPORT_MW, lift: 3 });
+const gridFarEdge = addEdge(gridTie.port, new THREE.Vector3(-4, 14.5, -92), 'grid', { r: 0.13, ref: CFG.IMPORT_MW, lift: -3 });
+addEdge(new THREE.Vector3(-4, 14.5, -92), new THREE.Vector3(-4, 14.5, -170), 'grid', { r: 0.13, lift: -4 }).decor = true;
+for (const z of Object.values(zones)) z.edge = addEdge(hub, z.sub, 'dist', { r: 0.13, ref: 3 });
+for (const b of buildings) b.edge = addEdge(zones[b.type].sub, b, 'dist', { r: 0.05, ref: 0.5, lift: 1.4 + b.port.distanceTo(zones[b.type].sub.port) * 0.06 });
+
+// ============================ ENERGY PACKETS ============================
+/*
+   One InstancedMesh draws every packet (a single draw call). Each edge owns an emitter:
+     spawn rate  = 1.2 + 4.4 * sqrt(|MW|) packets per second
+     speed       = 8 + 5 * sqrt(|MW|) world units per second
+     size        grows with the flow relative to the line's rating
+   sqrt keeps a 50 kW house feeder visible next to a 4 MW trunk line without flooding the trunk.
+   Packets remember the direction they were born with, so a reversal (battery switching from
+   charge to discharge) shows old packets draining out while new ones flow the other way.
+*/
+const MAX_PACKETS = 3000;
+const packetMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.3, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), MAX_PACKETS);
+packetMesh.frustumCulled = false;
+packetMesh.userData.noPick = true;
+const white = new THREE.Color(1, 1, 1);
+for (let i = 0; i < MAX_PACKETS; i++) packetMesh.setColorAt(i, white);
+packetMesh.count = 0;
+scene.add(packetMesh);
+const packets = [];
+const MIX_COLORS = [KIND_GLOW.solar, KIND_GLOW.wind, KIND_GLOW.batt, KIND_GLOW.grid];
+
+function sampleMix(weights, out) {
+  const total = weights[0] + weights[1] + weights[2] + weights[3];
+  if (total <= 0) return out.copy(KIND_GLOW.dist);
+  let r = Math.random() * total;
+  for (let i = 0; i < 4; i++) { r -= weights[i]; if (r <= 0) return out.copy(MIX_COLORS[i]); }
+  return out.copy(MIX_COLORS[3]);
+}
+function packetColor(e, out) {
+  switch (e.kind) {
+    case 'solar': return out.copy(KIND_GLOW.solar);
+    case 'wind': return out.copy(KIND_GLOW.wind);
+    case 'batt': return e.flow > 0 ? sampleMix(mix.toStore, out) : out.copy(KIND_GLOW.batt);   // charging carries renewables in
+    case 'grid': return e.flow > 0 ? sampleMix(mix.toStore, out) : out.copy(KIND_GLOW.grid);   // exports are renewable surplus
+    default: return sampleMix(mix.toLoad, out);
+  }
+}
+
+const tmpObj = new THREE.Object3D(), tmpV = new THREE.Vector3();
+function updatePackets(dt) {
+  for (const e of edges) {
+    if (e.decor) continue;
+    const f = Math.abs(e.flow);
+    if (f < 0.004) { e.acc = Math.min(e.acc, 1); continue; }
+    e.acc = Math.min(e.acc + (1.2 + 4.4 * Math.sqrt(f)) * dt, 4);
+    while (e.acc >= 1 && packets.length < MAX_PACKETS) {
+      e.acc -= 1;
+      const p = { e, t: 0, dir: Math.sign(e.flow), speed: 8 + 5 * Math.sqrt(f),
+        size: 0.55 + 0.7 * Math.min(1, Math.sqrt(f / e.ref)), color: new THREE.Color() };
+      packetColor(e, p.color).multiplyScalar(2.6);          // HDR so bloom picks it up
+      packets.push(p);
+    }
+  }
+  let n = 0;
+  for (const p of packets) {
+    p.t += (p.speed * dt) / p.e.len;
+    if (p.t >= 1) continue;
+    p.e.curve.getPoint(p.dir > 0 ? p.t : 1 - p.t, tmpV);
+    const fade = Math.min(1, p.t * 10, (1 - p.t) * 10);
+    tmpObj.position.copy(tmpV);
+    tmpObj.scale.setScalar(p.size * (0.35 + 0.65 * fade));
+    tmpObj.updateMatrix();
+    packetMesh.setMatrixAt(n, tmpObj.matrix);
+    packetMesh.setColorAt(n, p.color);
+    packets[n++] = p;
+  }
+  packets.length = n;
+  packetMesh.count = n;
+  packetMesh.instanceMatrix.needsUpdate = true;
+  packetMesh.instanceColor.needsUpdate = true;
+}
+
+// ============================ WEATHER VISUALS ============================
+const clouds = [];
+{
+  const puffGeo = new THREE.SphereGeometry(1, 14, 10);
+  for (let i = 0; i < 18; i++) {
+    const mat = new THREE.MeshStandardMaterial({ color: 0xf2f5f8, roughness: 1, transparent: true, opacity: 0, depthWrite: false });
+    const g = new THREE.Group();
+    const n = 4 + Math.floor(rand() * 4);
+    for (let k = 0; k < n; k++) {
+      const s = 3.2 + rand() * 3.2;
+      const p = new THREE.Mesh(puffGeo, mat);
+      p.scale.set(s, s * 0.6, s);
+      p.position.set((k - n / 2) * 3.4 + rand() * 2, rand() * 1.5, (rand() - 0.5) * 4);
+      g.add(p);
+    }
+    g.position.set((rand() - 0.5) * 220, 36 + rand() * 10, (rand() - 0.5) * 190);
+    g.userData = { mat, threshold: (i + 0.5) / 18 };
+    clouds.push(g); scene.add(g);
+  }
+}
+/** Solar output dip when a visible cloud drifts over an array (the sun sits high, so a vertical projection is close enough). */
+function cloudShadeAt(pos) {
+  let shade = 1;
+  for (const c of clouds) {
+    const o = c.userData.mat.opacity;
+    if (o < 0.3) continue;
+    const d = Math.hypot(c.position.x - pos.x, c.position.z - pos.z);
+    if (d < 14) shade = Math.min(shade, 1 - o * 0.5 * (1 - d / 14));
+  }
+  return shade;
+}
+
+// Wind streaks: short line segments drifting downwind, length and opacity scale with wind speed
+const STREAKS = 90;
+const streakPos = new Float32Array(STREAKS * 6);
+const streakSeeds = Array.from({ length: STREAKS }, () => new THREE.Vector3((rand() - 0.5) * 200, 4 + rand() * 26, (rand() - 0.5) * 180));
+const streakGeo = new THREE.BufferGeometry();
+streakGeo.setAttribute('position', new THREE.BufferAttribute(streakPos, 3));
+const streakMat = new THREE.LineBasicMaterial({ color: 0xcfe8ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+const streaks = new THREE.LineSegments(streakGeo, streakMat);
+streaks.frustumCulled = false;
+scene.add(streaks);
+
+// ============================ LABELS ============================
+function zoneLabel(text, color, x, y, z) {
+  const el = document.createElement('div');
+  el.className = 'zone-label';
+  el.style.setProperty('--c', color);
+  el.innerHTML = `${text}<b></b>`;
+  const o = new CSS2DObject(el); o.position.set(x, y, z); scene.add(o);
+  return el.querySelector('b');
+}
+const labels = {
+  solar: zoneLabel('Solar farm', 'var(--solar)', -38, 7, -30),
+  wind: zoneLabel('Wind farm', 'var(--wind)', 40, 24, -36),
+  batt: zoneLabel('Battery bank', 'var(--batt)', -20, 7.5, 4),
+  grid: zoneLabel('Utility tie', 'var(--grid)', -4, 20, -46),
+  residential: zoneLabel('Residential', 'var(--load)', -38, 8, 42),
+  commercial: zoneLabel('Commercial', 'var(--load)', 16, 28, 38),
+  industrial: zoneLabel('Industrial', 'var(--load)', 54, 14, 24),
+};
+zoneLabel('Main substation', 'var(--accent)', 0, 8, -4);
+
+// ============================ SIMULATION STEP ============================
+let clockT = 0;
+function stepSimulation(dtReal) {
+  const dtH = (state.speed * dtReal) / 60;
+  state.hour = (state.hour + dtH) % 24;
+  state.surge *= Math.exp(-dtReal / 5);
+
+  // 1. Generation ---------------------------------------------------------
+  sim.irr = solarIrradiance(state.hour, state.cloud);
+  let solar = 0;
+  for (const s of solarArrays) {
+    s.shade = cloudShadeAt(s.group.position);
+    s.irr = sim.irr * s.shade;
+    s.raw = s.cap * (s.irr / 1000) * CFG.SOLAR_DERATE;
+    solar += s.raw;
+  }
+  let wind = 0;
+  for (const t of turbines) {
+    // Gusts: two slow sine waves per turbine, plus a fixed wake loss for downstream rows
+    t.v = state.wind * t.wake * (1 + 0.07 * Math.sin(clockT * 0.8 + t.phase) + 0.04 * Math.sin(clockT * 2.3 + t.phase * 2));
+    if (t.v >= CFG.CUT_OUT) t.feathered = true;
+    else if (t.v < CFG.RESTART_WIND) t.feathered = false;
+    t.raw = t.feathered ? 0 : turbinePower(t.v);
+    t.rpm = t.feathered ? 0 : turbineRpm(t.v);
+    wind += t.raw;
+  }
+  const gen = solar + wind;
+
+  // 2. Demand -------------------------------------------------------------
+  let demand = 0;
+  for (const b of buildings) {
+    b.demand = b.base * loadProfile(b.type, state.hour) * state.demand * (1 + state.surge) * (1 + 0.04 * Math.sin(clockT * 0.35 + b.phase));
+    b.shed = false;
+    demand += b.demand;
+  }
+
+  // 3. Dispatch, then shed load if the battery and utility together still fall short -------
+  const opts = { battAuto: state.battAuto, gridTie: state.gridTie };
+  let d = dispatch(gen, demand, state.soc, opts);
+  let shed = 0;
+  if (d.unserved > 1e-4) {
+    shedOrder.sort((a, b) => a.priority - b.priority || b.demand - a.demand);
+    for (const b of shedOrder) { if (shed >= d.unserved) break; b.shed = true; shed += b.demand; }
+    // Whole buildings trip, so we usually overshoot: re-dispatch so storage/grid only cover what's left
+    d = dispatch(gen, demand - shed, state.soc, opts);
+  }
+  const served = demand - shed;
+
+  // 4. Battery state of charge --------------------------------------------
+  const charge = Math.max(0, -d.batt), discharge = Math.max(0, d.batt);
+  // Limits are power ceilings, so a long step could overshoot; never cross the reserve floor or ceiling
+  const nextSoc = state.soc + ((charge * CFG.ETA - discharge / CFG.ETA) * dtH) / CFG.BATT_MWH;
+  state.soc = clamp(nextSoc, Math.min(state.soc, CFG.SOC_MIN), Math.max(state.soc, CFG.SOC_MAX));
+  state.throughputMWh += discharge * dtH;
+
+  // 5. Curtailment scales every renewable source down by the same factor k --------
+  const k = gen > 0 ? (gen - d.curtailed) / gen : 0;
+  for (const s of solarArrays) s.mw = s.raw * k;
+  for (const t of turbines) t.mw = t.raw * k;
+  const exportMW = Math.max(0, -d.grid), importMW = Math.max(0, d.grid);
+  const renewToLoad = Math.max(0, gen * k - charge - exportMW);
+  const solarFrac = gen > 0 ? solar / gen : 0.5;
+  mix.toLoad = [renewToLoad * solarFrac, renewToLoad * (1 - solarFrac), discharge, importMW];
+  mix.toStore = [solarFrac, 1 - solarFrac, 0, 0];
+
+  // 6. Edge flows: this is what the packet emitters read -------------------
+  for (const s of solarArrays) s.edge.flow = s.mw;
+  for (const t of turbines) t.edge.flow = t.mw;
+  collectorEdge.flow = wind * k;
+  collector.mw = wind * k;
+  battEdge.flow = charge - discharge;                  // + = hub -> battery (charging)
+  gridEdge.flow = gridFarEdge.flow = exportMW - importMW;  // + = toward the utility (export)
+  for (const z of Object.values(zones)) { z.served = 0; z.shedCount = 0; z.count = 0; }
+  for (const b of buildings) {
+    b.mw = b.shed ? 0 : b.demand;
+    b.edge.flow = b.mw;
+    const z = zones[b.type];
+    z.served += b.mw; z.count++; if (b.shed) z.shedCount++;
+  }
+  for (const z of Object.values(zones)) { z.edge.flow = z.served; z.sub.mw = z.served; }
+  hub.mw = served + charge + exportMW;
+  battery.mw = d.batt;
+  gridTie.mw = d.grid;
+
+  Object.assign(sim, { solar: solar * k, wind: wind * k, rawGen: gen, gen: gen * k, demand, served, shed, batt: d.batt, grid: d.grid,
+    curtailed: d.curtailed, k, renewToLoad, solarFrac, charge, discharge });
+
+  // 7. History (one sample every 10 simulated minutes) -------------------
+  histAcc += dtH;
+  if (histAcc >= HIST_STEP_H) {
+    histAcc %= HIST_STEP_H;
+    history.push({ solar: sim.solar, wind: sim.wind, served, demand, soc: state.soc });
+    if (history.length > HIST_LEN) history.shift();
+    drawChart();
+  }
+}
+
+// ============================ VISUAL SYNC ============================
+const C = (hex) => new THREE.Color(hex);
+const SKY = {
+  dayTop: C('#3f79b4'), dayBot: C('#a9cbe3'), duskTop: C('#2b3a6b'), duskBot: C('#e38b5c'),
+  nightTop: C('#03060d'), nightBot: C('#0c1628'), overTop: C('#5d6874'), overBot: C('#9aa3ad'),
+};
+const sunDir = new THREE.Vector3(), tmpCol = new THREE.Color(), tmpCol2 = new THREE.Color();
+const warmSun = C('#ffb070'), whiteSun = C('#fff6e8');
+let nightF = 0;
+
+function updateEnvironment(dt) {
+  const elev = sunElevation(state.hour);
+  const ang = ((state.hour - 6) / 12) * Math.PI;
+  sunDir.set(Math.cos(ang), Math.sin(ang), 0.55).normalize();
+  const dayF = smooth(-0.1, 0.3, elev);
+  const duskF = Math.exp(-((elev / 0.2) ** 2));
+  nightF = 1 - dayF;
+  const cl = state.cloud;
+
+  sun.position.copy(sunDir).multiplyScalar(180);
+  sun.intensity = 2.2 * smooth(-0.02, 0.25, elev) * (1 - 0.7 * cl);
+  sun.color.copy(warmSun).lerp(whiteSun, smooth(0, 0.5, elev));
+  moonLight.position.copy(sunDir).multiplyScalar(-180).setY(Math.abs(sunDir.y) * 180 + 40);
+  moonLight.intensity = 0.4 * nightF * (1 - 0.6 * cl);
+  hemi.intensity = 0.28 + 0.55 * dayF * (1 - 0.25 * cl);
+
+  sunDisc.position.copy(sunDir).multiplyScalar(420);
+  sunDisc.visible = elev > -0.08;
+  sunDisc.material.color.setRGB(1, 0.94, 0.75).multiplyScalar(0.4 + 2.2 * (1 - cl * 0.85));
+  moonDisc.position.copy(sunDir).multiplyScalar(-420);
+  moonDisc.visible = elev < 0.1;
+
+  const top = skyU.top.value, bot = skyU.bottom.value;
+  top.copy(SKY.nightTop).lerp(SKY.dayTop, dayF).lerp(SKY.duskTop, duskF * 0.7 * (1 - cl));
+  bot.copy(SKY.nightBot).lerp(SKY.dayBot, dayF).lerp(SKY.duskBot, duskF * 0.8 * (1 - cl));
+  top.lerp(tmpCol.copy(SKY.overTop).multiplyScalar(0.25 + 0.75 * dayF), cl * 0.8);
+  bot.lerp(tmpCol.copy(SKY.overBot).multiplyScalar(0.2 + 0.8 * dayF), cl * 0.8);
+  scene.fog.color.copy(bot);
+
+  // Clouds: a cloud is visible once cover passes its threshold; they drift downwind
+  const cloudTint = tmpCol2.setRGB(1, 1, 1).lerp(C('#6b7380'), cl * 0.8).multiplyScalar(0.25 + 0.75 * dayF);
+  const drift = (0.6 + state.wind * 0.35) * dt;
+  for (const c of clouds) {
+    const u = c.userData;
+    const target = cl > u.threshold ? 0.55 + 0.35 * cl : 0;
+    u.mat.opacity += (target - u.mat.opacity) * Math.min(1, dt * 1.5);
+    u.mat.color.copy(cloudTint);
+    c.visible = u.mat.opacity > 0.01;
+    c.children.forEach((p) => { p.castShadow = u.mat.opacity > 0.35; });
+    c.position.addScaledVector(windDir, drift);
+    if (c.position.x > 120) c.position.x -= 240;
+    if (c.position.z > 110) c.position.z -= 220;
+  }
+
+  // Wind streaks
+  const len = 1 + state.wind * 0.35, sp = state.wind * 1.4;
+  streakMat.opacity = smooth(1, 14, state.wind) * 0.35;
+  for (let i = 0; i < STREAKS; i++) {
+    const s = streakSeeds[i];
+    s.addScaledVector(windDir, sp * dt * (0.8 + (i % 5) * 0.1));
+    if (s.x > 100) s.x -= 200;
+    if (s.z > 90) s.z -= 180;
+    streakPos.set([s.x, s.y, s.z, s.x - windDir.x * len, s.y, s.z - windDir.z * len], i * 6);
+  }
+  streakGeo.attributes.position.needsUpdate = true;
+}
+
+let blinkT = 0;
+function updateAssetsVisual(dt) {
+  blinkT += dt;
+  const blink = (Math.sin(blinkT * 7) > 0);
+
+  for (const s of solarArrays) s.panelMat.emissiveIntensity = 0.45 * (s.mw / s.cap);
+
+  // Rotor speed eases toward the target rpm so cut-out spin-down looks mechanical
+  for (const t of turbines) {
+    const target = (t.rpm / 60) * Math.PI * 2 * 1.4;
+    t.omega += (target - t.omega) * Math.min(1, dt * 0.8);
+    t.rotor.rotation.z -= t.omega * dt;
+  }
+
+  // Battery: SOC segments, and a ring that contracts while charging / expands while discharging
+  const lit = Math.round(state.soc * 10);
+  const segColor = state.soc > 0.5 ? 0x2ee68a : state.soc > 0.25 ? 0xffb547 : 0xff4d5e;
+  battery.segs.forEach((m, i) => {
+    m.emissive.setHex(segColor);
+    const active = i === lit - 1 && Math.abs(sim.batt) > 0.05;
+    m.emissiveIntensity = i < lit ? (active && blink ? 0.4 : 1.6) : 0.02;
+  });
+  const bmw = Math.abs(sim.batt);
+  const ringM = battery.ring.material;
+  if (bmw > 0.05) {
+    const ph = (blinkT * 0.8) % 1;
+    const charging = sim.batt < 0;
+    ringM.color.set(charging ? '#38d6ff' : '#2ee68a').multiplyScalar(2);
+    battery.ring.scale.setScalar(charging ? 1.25 - ph * 0.35 : 0.9 + ph * 0.35);
+    ringM.opacity = (0.25 + 0.55 * Math.min(1, bmw / CFG.BATT_MW)) * Math.sin(ph * Math.PI);
+  } else ringM.opacity = 0;
+
+  // Buildings: window glow tracks load and darkness; shed buildings go dark and flash a beacon
+  for (const b of buildings) {
+    const ratio = b.demand / (b.base || 1);
+    const glow = b.shed ? 0 : (0.08 + 1.9 * nightF) * (0.45 + 0.55 * clamp(ratio, 0, 1.5));
+    for (const m of b.lightMats) m.emissiveIntensity = glow;
+    b.beacon.visible = b.shed && blink;
+    if (b.stackLights) b.stackLights.forEach((l) => { l.visible = !b.shed && Math.sin(blinkT * 3 + b.phase) > 0; });
+  }
+
+  // Line glow tints each conductor by what it's carrying
+  for (const e of edges) {
+    if (e.decor) continue;
+    if (Math.abs(e.flow) < 0.002) { e.mat.emissive.setRGB(0, 0, 0); continue; }
+    const col = e.kind === 'batt' && e.flow > 0 ? KIND_GLOW.wind : KIND_GLOW[e.kind];
+    e.mat.emissive.copy(col).multiplyScalar(0.15 + 0.6 * Math.min(1, Math.abs(e.flow) / e.ref));
+  }
+}
+
+// ============================ UI ============================
+const fmtMW = (v) => (Math.abs(v) >= 1 ? `${v.toFixed(2)} MW` : `${(v * 1000).toFixed(0)} kW`);
+const pct = (v) => `${Math.round(v * 100)}%`;
+const hhmm = (h) => { const m = Math.floor(h * 60) % 1440; return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; };
+const ui = {
+  hour: $('s-hour'), cloud: $('s-cloud'), wind: $('s-wind'), demand: $('s-demand'),
+  status: $('status'), mix: [...$('mix').children], socFill: $('soc').querySelector('i'),
+};
+
+function setStatus(cls, text) {
+  if (ui.status.dataset.text === text) return;
+  ui.status.dataset.text = text;
+  ui.status.className = `status ${cls}`;
+  ui.status.textContent = text;
+}
+
+function updateUI() {
+  const { solar, wind, served, demand, shed, batt, grid, curtailed, renewToLoad, solarFrac } = sim;
+  $('m-solar').textContent = solar.toFixed(2);
+  $('m-wind').textContent = wind.toFixed(2);
+  $('m-load').textContent = served.toFixed(2);
+  $('m-load-s').textContent = shed > 0.001 ? `${shed.toFixed(2)} MW shed` : state.surge > 0.05 ? `surge +${pct(state.surge)}` : 'MW served';
+  $('m-batt').textContent = Math.abs(batt).toFixed(2);
+  $('m-batt-s').textContent = batt > 0.01 ? 'MW discharging' : batt < -0.01 ? 'MW charging' : 'idle';
+  $('m-grid').textContent = Math.abs(grid).toFixed(2);
+  $('m-grid-s').textContent = !state.gridTie ? 'islanded' : grid > 0.01 ? 'MW import' : grid < -0.01 ? 'MW export' : 'idle';
+  $('m-renew').textContent = served > 0 ? pct(Math.min(1, renewToLoad / served)) : '0%';
+
+  ui.socFill.style.width = `${state.soc * 100}%`;
+  ui.socFill.style.background = state.soc > 0.5 ? 'linear-gradient(90deg,#1a9f62,#2ee68a)' : state.soc > 0.25 ? 'linear-gradient(90deg,#b7791f,#ffb547)' : 'linear-gradient(90deg,#a3212f,#ff4d5e)';
+  $('soc-pct').textContent = `${(state.soc * 100).toFixed(1)}%`;
+  $('soc-mwh').textContent = `${(state.soc * CFG.BATT_MWH).toFixed(2)} MWh`;
+
+  // Stacked bar: shares of total demand
+  const total = Math.max(demand, 1e-6);
+  const parts = [renewToLoad * solarFrac, renewToLoad * (1 - solarFrac), Math.max(0, batt), Math.max(0, grid), shed].map((v) => v / total);
+  parts.forEach((p, i) => { ui.mix[i].style.width = `${p * 100}%`; });
+  ['x-solar', 'x-wind', 'x-batt', 'x-grid', 'x-shed'].forEach((id, i) => { $(id).textContent = pct(parts[i]); });
+  $('x-curt').textContent = `${curtailed.toFixed(2)} MW`;
+
+  if (shed > 0.001) setStatus('bad', `Load shedding: ${fmtMW(shed)} dropped`);
+  else if (batt > 0.05 && grid > 0.05) setStatus('warn', 'Peak: battery and grid import both running');
+  else if (batt > 0.05) setStatus('good', `Deficit covered by battery (${fmtMW(batt)})`);
+  else if (grid > 0.05) setStatus('grid', state.battAuto ? `Battery at reserve: importing ${fmtMW(grid)}` : `Importing ${fmtMW(grid)} from utility`);
+  else if (curtailed > 0.05) setStatus('warn', `Curtailing ${fmtMW(curtailed)} of renewables`);
+  else if (batt < -0.05 && grid < -0.05) setStatus('', 'Surplus: charging battery and exporting');
+  else if (batt < -0.05) setStatus('', `Surplus charging battery (${fmtMW(-batt)})`);
+  else if (grid < -0.05) setStatus('grid', `Battery full: exporting ${fmtMW(-grid)}`);
+  else setStatus('good', 'Balanced');
+
+  // HUD
+  $('h-time').textContent = hhmm(state.hour);
+  $('h-sun').textContent = `${Math.round(sim.irr)} W/m²`;
+  $('h-sun-dot').style.opacity = 0.15 + 0.85 * (sim.irr / 1000);
+  $('h-wind').textContent = `${state.wind.toFixed(1)} m/s`;
+  const fan = $('h-fan');
+  fan.style.animationPlayState = state.wind < 1 ? 'paused' : 'running';
+  fan.style.animationDuration = `${Math.max(0.15, 8 / Math.max(state.wind, 1))}s`;
+  $('h-cloud').textContent = pct(state.cloud);
+  if (document.activeElement !== ui.hour) ui.hour.value = state.hour;
+  $('o-hour').textContent = hhmm(state.hour);
+
+  // Zone labels
+  labels.solar.textContent = fmtMW(sim.solar);
+  labels.wind.textContent = fmtMW(sim.wind);
+  labels.batt.textContent = `${pct(state.soc)} · ${batt > 0.01 ? '▲' : batt < -0.01 ? '▼' : ''}${fmtMW(Math.abs(batt))}`;
+  labels.grid.textContent = !state.gridTie ? 'open' : `${grid > 0.01 ? 'in ' : grid < -0.01 ? 'out ' : ''}${fmtMW(Math.abs(grid))}`;
+  for (const key of ['residential', 'commercial', 'industrial']) {
+    const z = zones[key];
+    labels[key].textContent = z.shedCount ? `${fmtMW(z.served)} · ${z.shedCount} shed` : fmtMW(z.served);
+    labels[key].style.color = z.shedCount ? '#ff7a88' : '';
+  }
+
+  if (selected) renderCard();
+}
+
+// ---------- Chart ----------
+function drawChart() {
+  const c = $('chart'), ctx = c.getContext('2d'), dpr = devicePixelRatio || 1;
+  const W = c.clientWidth, H = c.clientHeight;
+  if (!W) return;
+  if (c.width !== Math.round(W * dpr)) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  const L = 24, R = 28, T = 6, B = 14, pw = W - L - R, ph = H - T - B;
+  const maxY = Math.max(6, ...history.map((h) => Math.max(h.solar + h.wind, h.demand))) * 1.08;
+  const X = (i) => L + (i / (HIST_LEN - 1)) * pw;
+  const Y = (v) => T + ph - (v / maxY) * ph;
+  const off = HIST_LEN - history.length;
+
+  ctx.font = '9px JetBrains Mono, monospace';
+  ctx.fillStyle = '#56627a';
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  for (let v = 0; v <= maxY; v += maxY > 12 ? 4 : 2) {
+    ctx.beginPath(); ctx.moveTo(L, Y(v)); ctx.lineTo(L + pw, Y(v)); ctx.stroke();
+    ctx.fillText(`${v}`, 4, Y(v) + 3);
+  }
+  ctx.fillText('MW', 2, T + ph + 11);
+  ctx.textAlign = 'right';
+  ctx.fillText('100%', W - 1, T + 7); ctx.fillText('SOC', W - 1, T + ph + 11);
+  ctx.fillText('-24h', L + 22, T + ph + 11); ctx.fillText('now', L + pw, T + ph + 11);
+  ctx.textAlign = 'left';
+  if (history.length < 2) return;
+
+  const area = (fnTop, fnBot, fill) => {
+    ctx.beginPath();
+    history.forEach((h, i) => ctx.lineTo(X(off + i), Y(fnTop(h))));
+    for (let i = history.length - 1; i >= 0; i--) ctx.lineTo(X(off + i), Y(fnBot(history[i])));
+    ctx.closePath(); ctx.fillStyle = fill; ctx.fill();
+  };
+  area((h) => h.wind, () => 0, 'rgba(56,214,255,0.45)');
+  area((h) => h.wind + h.solar, (h) => h.wind, 'rgba(255,210,63,0.55)');
+
+  const line = (fn, color, dash = [], width = 1.5) => {
+    ctx.beginPath(); ctx.setLineDash(dash); ctx.strokeStyle = color; ctx.lineWidth = width;
+    history.forEach((h, i) => (i ? ctx.lineTo(X(off + i), fn(h)) : ctx.moveTo(X(off + i), fn(h))));
+    ctx.stroke(); ctx.setLineDash([]);
+  };
+  line((h) => Y(h.served), '#f4f6fb', [], 1.6);
+  if (history.some((h) => h.demand - h.served > 0.01)) line((h) => Y(h.demand), 'rgba(255,77,94,0.9)', [2, 2], 1.2);
+  line((h) => T + ph - h.soc * ph, '#2ee68a', [4, 3], 1.4);
+}
+
+// ---------- Telemetry card ----------
+let selected = null;
+const selRing = new THREE.Mesh(new THREE.RingGeometry(1, 1.1, 64),
+  new THREE.MeshBasicMaterial({ color: new THREE.Color('#38d6ff').multiplyScalar(2.5), transparent: true, opacity: 0.9, side: THREE.DoubleSide, toneMapped: false, depthWrite: false }));
+selRing.rotation.x = -Math.PI / 2;
+selRing.visible = false;
+scene.add(selRing);
+
+const TIER = { 1: 'Tier 1 (shed first)', 2: 'Tier 2', 3: 'Tier 3 (protected)' };
+function telemetry(a) {
+  const renewPct = sim.served > 0 ? pct(Math.min(1, sim.renewToLoad / sim.served)) : '0%';
+  switch (a.type) {
+    case 'solar': {
+      let status = 'Generating';
+      if (a.irr <= 0) status = 'Offline: sun below horizon';
+      else if (sim.k < 0.999) status = `Curtailed to ${pct(sim.k)}`;
+      else if (a.shade < 0.95) status = 'Cloud shadow passing';
+      else if (state.cloud > 0.6) status = 'Dimmed by overcast';
+      return { kicker: 'Solar PV array', big: fmtMW(a.mw), bigL: 'generating', bar: a.mw / a.cap, barL: `Output vs ${a.cap} MW peak`,
+        rows: [['Irradiance', `${Math.round(a.irr)} W/m²`], ['Capacity factor', pct(a.mw / a.cap)], ['Cloud cover', pct(state.cloud)],
+          ['Modules', '20 racks, fixed tilt'], ['Status', status]] };
+    }
+    case 'wind': {
+      let status = 'Partial load (cubic region)';
+      if (a.v < CFG.CUT_IN) status = 'Idle: below 3 m/s cut-in';
+      else if (a.feathered) status = `Feathered: storm cut-out (restarts < ${CFG.RESTART_WIND} m/s)`;
+      else if (a.v >= CFG.RATED_WIND) status = 'Rated output';
+      if (sim.k < 0.999 && a.raw > 0) status = `Curtailed to ${pct(sim.k)}`;
+      return { kicker: 'Wind turbine', big: fmtMW(a.mw), bigL: 'generating', bar: a.mw / a.cap, barL: `Output vs ${a.cap} MW rating`,
+        rows: [['Hub wind', `${a.v.toFixed(1)} m/s`], ['Rotor speed', `${a.rpm.toFixed(1)} rpm`], ['Wake loss', pct(1 - a.wake)],
+          ['Cut-in / rated / cut-out', '3 / 12 / 25 m/s'], ['Status', status]] };
+    }
+    case 'battery': {
+      const b = sim.batt;
+      const mode = !state.battAuto ? 'Dispatch disabled' : b > 0.01 ? 'Discharging' : b < -0.01 ? 'Charging' : state.soc >= CFG.SOC_MAX - 0.005 ? 'Full, standby' : state.soc <= CFG.SOC_MIN + 0.005 ? 'At reserve floor' : 'Standby';
+      let eta = '·';
+      if (b > 0.01) eta = `${((state.soc - CFG.SOC_MIN) * CFG.BATT_MWH * CFG.ETA / b).toFixed(1)} h to reserve`;
+      if (b < -0.01) eta = `${((CFG.SOC_MAX - state.soc) * CFG.BATT_MWH / (-b * CFG.ETA)).toFixed(1)} h to full`;
+      return { kicker: 'Energy storage', big: fmtMW(Math.abs(b)), bigL: mode.toLowerCase(), bar: state.soc, barL: 'State of charge (10% reserve, 95% ceiling)',
+        rows: [['State of charge', `${(state.soc * 100).toFixed(1)}%`], ['Stored energy', `${(state.soc * CFG.BATT_MWH).toFixed(2)} MWh`],
+          ['Power limit', `±${CFG.BATT_MW} MW`], ['Time estimate', eta], ['Equivalent cycles', (state.throughputMWh / CFG.BATT_MWH).toFixed(2)],
+          ['Round-trip efficiency', pct(CFG.ETA ** 2)]] };
+    }
+    case 'grid': {
+      const g = sim.grid;
+      const mode = !state.gridTie ? 'Islanded (breaker open)' : g > 0.01 ? 'Importing' : g < -0.01 ? 'Exporting' : 'Connected, no flow';
+      return { kicker: 'Point of common coupling', big: fmtMW(Math.abs(g)), bigL: mode.toLowerCase(),
+        bar: g >= 0 ? g / CFG.IMPORT_MW : -g / CFG.EXPORT_MW, barL: g >= 0 ? 'Import vs 3 MW limit' : 'Export vs 2.5 MW limit',
+        rows: [['Mode', mode], ['Import limit', `${CFG.IMPORT_MW} MW`], ['Export limit', `${CFG.EXPORT_MW} MW`], ['Curtailed renewables', fmtMW(sim.curtailed)]] };
+    }
+    case 'substation': {
+      const z = Object.values(zones).find((q) => q.sub === a);
+      const rows = [['Rating', `${a.rating} MW`], ['Loading', pct(a.mw / a.rating)]];
+      if (z) rows.push(['Feeders', `${z.count}`], ['Buildings shed', `${z.shedCount}`]);
+      if (a === hub) rows.push(['Generation in', fmtMW(sim.gen)], ['Battery', fmtMW(sim.batt)], ['Utility', fmtMW(sim.grid)]);
+      if (a === collector) rows.push(['Turbines online', `${turbines.filter((t) => t.raw > 0).length} / ${turbines.length}`]);
+      return { kicker: 'Substation', big: fmtMW(a.mw), bigL: 'throughput', bar: a.mw / a.rating, barL: 'Transformer loading', rows };
+    }
+    default: {
+      const peak = a.base * state.demand * (1 + state.surge);
+      return { kicker: `${a.type} customer`, big: fmtMW(a.mw), bigL: a.shed ? 'shed' : 'consuming', bar: a.demand / Math.max(peak, 1e-6),
+        barL: 'Load vs class peak at current demand setting',
+        rows: [['Demand', fmtMW(a.demand)], ['Feeder', zones[a.type].sub.name], ['Profile', { residential: 'Morning + evening peak', commercial: 'Business hours', industrial: 'Two shifts, 06 to 22' }[a.type]],
+          ['Renewable share', a.shed ? '·' : renewPct], ['Shed priority', TIER[a.priority]], ['Status', a.shed ? 'Shed (breaker open)' : 'Served']] };
+    }
+  }
+}
+function renderCard() {
+  const t = telemetry(selected);
+  $('c-kicker').textContent = t.kicker;
+  $('c-title').innerHTML = `<span class="live"></span>${selected.name}`;
+  $('c-big').textContent = t.big;
+  $('c-big').style.color = selected.shed ? '#ff7a88' : '';
+  $('c-big-l').textContent = t.bigL;
+  $('c-bar').style.width = `${clamp(t.bar, 0, 1) * 100}%`;
+  $('c-bar').style.background = selected.shed ? 'var(--bad)' : { solar: 'var(--solar)', wind: 'var(--wind)', battery: 'var(--batt)', grid: 'var(--grid)' }[selected.type] || 'var(--accent)';
+  $('c-bar-l').textContent = t.barL;
+  $('c-rows').innerHTML = t.rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+}
+function select(a) {
+  selected = a;
+  $('card').hidden = !a;
+  selRing.visible = !!a;
+  if (!a) return;
+  selRing.scale.setScalar(a.radius);
+  selRing.position.set(a.center.x, a.center.y + 0.12, a.center.z);
+  renderCard();
+}
+$('c-close').addEventListener('click', () => select(null));
+addEventListener('keydown', (e) => { if (e.key === 'Escape') select(null); });
+
+// ---------- Picking ----------
+const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2();
+function pick(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const hit = raycaster.intersectObjects(pickables, false)[0];
+  return hit ? hit.object.userData.asset : null;
+}
+let down = null, lastHover = 0;
+renderer.domElement.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; });
+renderer.domElement.addEventListener('pointerup', (e) => {
+  if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 6) select(pick(e));
+  down = null;
+});
+renderer.domElement.addEventListener('pointermove', (e) => {
+  const now = performance.now();
+  if (e.buttons || now - lastHover < 70) return;
+  lastHover = now;
+  renderer.domElement.style.cursor = pick(e) ? 'pointer' : 'grab';
+});
+
+// ---------- Controls wiring ----------
+function bindSlider(input, out, apply, fmt) {
+  const sync = () => { apply(+input.value); out.textContent = fmt(+input.value); };
+  input.addEventListener('input', sync);
+  sync();
+}
+bindSlider(ui.hour, $('o-hour'), (v) => { state.hour = v; }, hhmm);
+bindSlider(ui.cloud, $('o-cloud'), (v) => { state.cloud = v / 100; }, (v) => `${v}%`);
+bindSlider(ui.wind, $('o-wind'), (v) => { state.wind = v; }, (v) => `${v.toFixed(1)} m/s`);
+bindSlider(ui.demand, $('o-demand'), (v) => { state.demand = v / 100; }, (v) => `${v}%`);
+
+$('speed').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  state.speed = +b.dataset.speed;
+  [...$('speed').children].forEach((x) => x.classList.toggle('on', x === b));
+});
+$('btn-surge').addEventListener('click', () => { state.surge = 0.8; });
+$('t-grid').addEventListener('change', (e) => { state.gridTie = e.target.checked; });
+$('t-batt').addEventListener('change', (e) => { state.battAuto = e.target.checked; });
+$('t-labels').addEventListener('change', (e) => document.body.classList.toggle('no-labels', !e.target.checked));
+
+const SCENARIOS = {
+  noon: { hour: 12.5, cloud: 5, wind: 6, demand: 100, grid: true, soc: 0.35 },
+  windnight: { hour: 23, cloud: 55, wind: 17, demand: 90, grid: true, soc: 0.4 },
+  peak: { hour: 18.8, cloud: 35, wind: 4, demand: 145, grid: true, soc: 0.8 },
+  storm: { hour: 16.5, cloud: 95, wind: 29, demand: 130, grid: false, soc: 0.6 },
+};
+document.querySelectorAll('[data-scenario]').forEach((btn) => btn.addEventListener('click', () => {
+  const s = SCENARIOS[btn.dataset.scenario];
+  const set = (input, v) => { input.value = v; input.dispatchEvent(new Event('input')); };
+  set(ui.hour, s.hour); set(ui.cloud, s.cloud); set(ui.wind, s.wind); set(ui.demand, s.demand);
+  $('t-grid').checked = s.grid; state.gridTie = s.grid;
+  $('t-batt').checked = true; state.battAuto = true;
+  state.surge = 0;
+  state.soc = s.soc;
+}));
+
+document.querySelectorAll('#mobilebar [data-toggle]').forEach((b) => b.addEventListener('click', () => {
+  const cls = `show-${b.dataset.toggle}`;
+  const on = !document.body.classList.contains(cls);
+  document.body.classList.remove('show-controls', 'show-metrics');
+  document.querySelectorAll('#mobilebar button').forEach((x) => x.classList.remove('on'));
+  if (on) { document.body.classList.add(cls); b.classList.add('on'); }
+}));
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+  labelRenderer.setSize(innerWidth, innerHeight);
+  drawChart();
+});
+
+// Replay the previous 24 h in 10-minute steps so the chart and battery start from a realistic state
+{
+  const speed = state.speed;
+  state.speed = 60;                                   // 1 real second = 1 sim hour, so dtReal = HIST_STEP_H
+  for (let i = 0; i < HIST_LEN; i++) { histAcc = HIST_STEP_H; stepSimulation(HIST_STEP_H); clockT += 1; }
+  state.speed = speed;
+  state.throughputMWh = 0;
+  histAcc = 0;
+}
+
+// For console experiments and automated checks
+window.microgrid = { CFG, state, sim, dispatch, turbinePower, solarIrradiance, loadProfile, batteryLimits };
+
+// ============================ MAIN LOOP ============================
+const clock = new THREE.Clock();
+let uiAcc = 1;
+function frame() {
+  const dt = Math.min(clock.getDelta(), 0.1);
+  clockT += dt;
+  stepSimulation(dt);
+  updateEnvironment(dt);
+  updateAssetsVisual(dt);
+  updatePackets(dt);
+  if (selRing.visible) selRing.material.opacity = 0.55 + 0.4 * Math.sin(clockT * 4);
+  uiAcc += dt;
+  if (uiAcc > 0.12) { uiAcc = 0; updateUI(); }
+  controls.update();
+  composer.render();
+  labelRenderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

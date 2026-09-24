@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Attention Lens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600&display=swap">
+<style>
+  /* ---------- Design tokens: light is the base, dark redefines tokens only ---------- */
+  :root {
+    --ground: #E8EBF1;
+    --panel: rgba(250, 251, 253, 0.92);
+    --panel-solid: #FAFBFD;
+    --ink: #161B2E;
+    --ink-2: #4B5470;
+    --ink-3: #7C849C;
+    --line: rgba(22, 27, 46, 0.12);
+    --line-strong: rgba(22, 27, 46, 0.26);
+    --accent: #C4531B;
+    --accent-ink: #FFFFFF;
+    --accent-soft: rgba(196, 83, 27, 0.12);
+    --neg: #3C6FB0;
+    --h1: #C98410;
+    --h2: #178A83;
+    --h3: #C23B6B;
+    --h4: #4A5FD0;
+    --slab: #98A3C2;
+    --edge: #5A6687;
+    --shadow: 0 16px 36px -12px rgba(22, 27, 46, 0.3), 0 2px 6px rgba(22, 27, 46, 0.08);
+    --f-display: "Instrument Serif", Georgia, "Times New Roman", serif;
+    --f-ui: "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --gutter: 16px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0E1220;
+      --panel: rgba(21, 26, 44, 0.9);
+      --panel-solid: #151A2C;
+      --ink: #E6E9F2;
+      --ink-2: #A5ADC4;
+      --ink-3: #737C96;
+      --line: rgba(230, 233, 242, 0.1);
+      --line-strong: rgba(230, 233, 242, 0.24);
+      --accent: #FF8A4C;
+      --accent-ink: #1A0E06;
+      --accent-soft: rgba(255, 138, 76, 0.14);
+      --neg: #6FA3E8;
+      --h1: #F2B23D;
+      --h2: #3CCBBF;
+      --h3: #F06A98;
+      --h4: #8C9CFF;
+      --slab: #3A4568;
+      --edge: #7E8BB5;
+      --shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.3);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0E1220;
+    --panel: rgba(21, 26, 44, 0.9);
+    --panel-solid: #151A2C;
+    --ink: #E6E9F2;
+    --ink-2: #A5ADC4;
+    --ink-3: #737C96;
+    --line: rgba(230, 233, 242, 0.1);
+    --line-strong: rgba(230, 233, 242, 0.24);
+    --accent: #FF8A4C;
+    --accent-ink: #1A0E06;
+    --accent-soft: rgba(255, 138, 76, 0.14);
+    --neg: #6FA3E8;
+    --h1: #F2B23D;
+    --h2: #3CCBBF;
+    --h3: #F06A98;
+    --h4: #8C9CFF;
+    --slab: #3A4568;
+    --edge: #7E8BB5;
+    --shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.3);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font: 14px/1.5 var(--f-ui);
+    overflow: hidden;
+  }
+  button, input { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- 3D stage fills the window; panels float above it ---------- */
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  #labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .tok-label, .layer-label {
+    position: absolute; left: 0; top: 0; white-space: nowrap; will-change: transform;
+  }
+  .tok-label {
+    pointer-events: auto; cursor: pointer;
+    font: 500 12px/1 var(--f-mono);
+    padding: 4px 6px; border-radius: 4px;
+    background: var(--panel); border: 1px solid var(--line);
+    color: var(--ink);
+  }
+  .tok-label[data-focus="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .tok-label .tid { color: var(--ink-3); font-size: 10px; margin-left: 5px; }
+  .tok-label[data-focus="true"] .tid { color: inherit; opacity: 0.7; }
+  .layer-label {
+    font: 500 11px/1 var(--f-ui); letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-2);
+  }
+  .layer-label .dim { font-family: var(--f-mono); letter-spacing: 0; text-transform: none; color: var(--ink-3); margin-left: 6px; }
+
+  /* ---------- Top bar ---------- */
+  .bar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 5;
+    padding: calc(env(safe-area-inset-top, 0px) + 12px) var(--gutter) 12px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px;
+    pointer-events: none;
+  }
+  .bar > * { pointer-events: auto; }
+  .brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+  .brand h1 { margin: 0; font: 400 30px/1 var(--f-display); letter-spacing: -0.01em; }
+  .brand h1 em { color: var(--accent); }
+  .brand span { color: var(--ink-3); font-size: 12px; }
+  #sentence-form {
+    display: flex; align-items: center; gap: 8px;
+    flex: 1 1 380px; max-width: 620px;
+    background: var(--panel); border: 1px solid var(--line-strong);
+    border-radius: 8px; padding: 4px 4px 4px 12px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  #sentence-form label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+  #sentence {
+    flex: 1; min-width: 0; border: 0; background: transparent; outline: none;
+    font: 500 15px/1.2 var(--f-mono); padding: 8px 4px;
+  }
+  .btn {
+    border: 1px solid var(--line-strong); background: var(--panel-solid);
+    border-radius: 6px; padding: 7px 12px; cursor: pointer; white-space: nowrap;
+    font-weight: 500; font-size: 13px;
+  }
+  .btn:hover { border-color: var(--ink-2); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .btn[aria-pressed="true"] { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+  .head-toggle { display: inline-flex; align-items: center; gap: 8px; box-shadow: var(--shadow); }
+  .head-toggle .swatches { display: inline-flex; gap: 2px; }
+  .head-toggle .swatches i { width: 6px; height: 14px; border-radius: 1px; display: block; }
+
+  /* ---------- Heatmap panel ---------- */
+  #matrix {
+    position: fixed; z-index: 4; left: var(--gutter);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 112px);
+    width: 300px; max-width: calc(100% - 2 * var(--gutter));
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  #matrix summary {
+    list-style: none; cursor: pointer; padding: 10px 12px;
+    display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  }
+  #matrix summary::-webkit-details-marker { display: none; }
+  #matrix summary b { font-weight: 600; font-size: 13px; }
+  #matrix summary span { font: 11px var(--f-mono); color: var(--ink-3); }
+  .matrix-body { padding: 0 12px 12px; display: grid; gap: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip {
+    border: 1px solid var(--line-strong); background: transparent; border-radius: 999px;
+    padding: 2px 9px; font-size: 11.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+  }
+  .chip i { width: 8px; height: 8px; border-radius: 50%; display: block; }
+  .chip[aria-pressed="true"] { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+  #heat { width: 100%; display: block; cursor: crosshair; }
+  #heat-read { font: 11px/1.4 var(--f-mono); color: var(--ink-2); min-height: 1.4em; }
+
+  /* ---------- Pipeline scrubber ---------- */
+  .scrubber {
+    position: fixed; z-index: 5; left: 0; right: 0; bottom: 0;
+    padding: 0 var(--gutter) calc(env(safe-area-inset-bottom, 0px) + 14px);
+    pointer-events: none;
+  }
+  .scrub-inner {
+    pointer-events: auto;
+    max-width: 880px; margin: 0 auto;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: var(--shadow); padding: 10px 14px 12px;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; align-items: center;
+  }
+  #play { width: 40px; height: 40px; border-radius: 50%; padding: 0; display: grid; place-items: center; grid-row: span 2; }
+  #play svg { width: 14px; height: 14px; fill: currentColor; }
+  .track { position: relative; }
+  #phase { width: 100%; margin: 0; accent-color: var(--accent); cursor: pointer; }
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 2px; }
+  .step {
+    background: none; border: 0; padding: 2px 0; cursor: pointer; text-align: left;
+    font-size: 12px; color: var(--ink-3); display: flex; gap: 6px; align-items: baseline;
+  }
+  .step:nth-child(2) { text-align: center; justify-content: center; }
+  .step:nth-child(3) { justify-content: center; }
+  .step:nth-child(4) { justify-content: flex-end; }
+  .step b { font: 500 10px var(--f-mono); }
+  .step[aria-current="step"] { color: var(--ink); font-weight: 600; }
+  .step[aria-current="step"] b { color: var(--accent); }
+  #phase-caption { grid-column: 1 / -1; margin: 4px 0 0; color: var(--ink-2); font-size: 13px; line-height: 1.45; }
+  #phase-caption .math { font-family: var(--f-mono); font-size: 12px; color: var(--ink); }
+
+  /* ---------- Inspection drawer ---------- */
+  #drawer {
+    position: fixed; z-index: 6; right: var(--gutter);
+    top: calc(env(safe-area-inset-top, 0px) + 72px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 112px);
+    width: 380px; max-width: calc(100% - 2 * var(--gutter));
+    background: var(--panel-solid); border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: var(--shadow); overflow: auto;
+    padding: 18px 20px 22px;
+  }
+  #drawer-close { position: absolute; top: 10px; right: 10px; padding: 4px 9px; }
+  .eyebrow { font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-3); display: flex; align-items: center; gap: 6px; }
+  .eyebrow i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  #drawer h2 { font: 400 28px/1.1 var(--f-display); margin: 6px 36px 12px 0; text-wrap: balance; }
+  #drawer p { margin: 0 0 12px; color: var(--ink-2); max-width: 65ch; }
+  #drawer h3 { font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-3); margin: 18px 0 8px; font-weight: 600; }
+  .formula {
+    font: 13px/1.6 var(--f-mono); background: var(--accent-soft); color: var(--ink);
+    border-radius: 6px; padding: 10px 12px; margin: 0 0 12px; overflow-x: auto; white-space: nowrap;
+  }
+  .formula sub, .formula sup { font-size: 0.75em; }
+  .big { font: 500 34px/1 var(--f-mono); color: var(--accent); font-variant-numeric: tabular-nums; }
+  .big small { font-size: 13px; color: var(--ink-3); margin-left: 6px; }
+  table.nums { width: 100%; border-collapse: collapse; font: 12px var(--f-mono); font-variant-numeric: tabular-nums; }
+  table.nums th { text-align: right; font-weight: 500; color: var(--ink-3); padding: 4px 4px; border-bottom: 1px solid var(--line); }
+  table.nums th:first-child, table.nums td:first-child { text-align: left; }
+  table.nums td { text-align: right; padding: 5px 4px; border-bottom: 1px solid var(--line); }
+  table.nums tr.sum td { font-weight: 600; border-bottom: 0; }
+  .dist { display: grid; gap: 3px; }
+  .dist-row { display: grid; grid-template-columns: 76px 1fr 44px; gap: 8px; align-items: center; font: 11.5px var(--f-mono); }
+  .dist-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dist-row .bg { height: 8px; background: var(--line); border-radius: 2px; overflow: hidden; }
+  .dist-row .fg { height: 100%; background: var(--accent); border-radius: 2px; }
+  .dist-row .v { text-align: right; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .dist-row.hit .nm { color: var(--accent); font-weight: 500; }
+  .vec { display: flex; align-items: center; gap: 2px; height: 48px; }
+  .vec span { flex: 1; background: var(--accent); border-radius: 1px; }
+  .vec span.neg { background: var(--neg); align-self: flex-start; margin-top: 24px; }
+  .vec span.pos { align-self: flex-end; margin-bottom: 24px; }
+  .note { font-size: 12px; color: var(--ink-3); border-top: 1px solid var(--line); padding-top: 10px; margin-top: 16px; }
+  dl.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; font-size: 13px; }
+  dl.kv dt { color: var(--ink-3); }
+  dl.kv dd { margin: 0; font-family: var(--f-mono); font-size: 12.5px; }
+
+  .hint {
+    position: fixed; z-index: 3; right: var(--gutter);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 118px);
+    font-size: 12px; color: var(--ink-3);
+  }
+  #fatal { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--ink-2); }
+
+  @media (max-width: 760px) {
+    .brand span { display: none; }
+    .brand h1 { font-size: 26px; }
+    #sentence-form { order: 3; flex-basis: 100%; }
+    #sentence-form label { display: none; }
+    #matrix { bottom: calc(env(safe-area-inset-bottom, 0px) + 138px); width: 260px; }
+    #drawer { top: auto; left: var(--gutter); right: var(--gutter); width: auto; max-width: none; height: 58%; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); }
+    .step span { display: none; }
+    .hint { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="stage" aria-label="3D view of a transformer encoder block"></div>
+<div id="labels" aria-hidden="false"></div>
+
+<header class="bar">
+  <div class="brand">
+    <h1>Attention <em>Lens</em></h1>
+    <span>one encoder block · d<sub>model</sub> 16 · 4 heads · mock weights</span>
+  </div>
+  <form id="sentence-form" autocomplete="off">
+    <label for="sentence">Sentence</label>
+    <input id="sentence" name="sentence" maxlength="120" value="The bank of the river flooded after the storm" spellcheck="false">
+    <button class="btn primary" type="submit">Run</button>
+  </form>
+  <button id="heads-toggle" class="btn head-toggle" type="button" aria-pressed="false">
+    <span class="swatches"><i style="background:var(--h1)"></i><i style="background:var(--h2)"></i><i style="background:var(--h3)"></i><i style="background:var(--h4)"></i></span>
+    <span id="heads-toggle-text">Split into 4 heads</span>
+  </button>
+</header>
+
+<details id="matrix" open>
+  <summary><b>Attention matrix</b><span id="matrix-sub">softmax · mean of heads</span></summary>
+  <div class="matrix-body">
+    <div class="chips" id="heat-chips" role="group" aria-label="Matrix head"></div>
+    <canvas id="heat" width="276" height="276" aria-label="Attention weight heatmap, rows are queries, columns are keys"></canvas>
+    <div id="heat-read">Rows attend (query) · columns are attended to (key)</div>
+  </div>
+</details>
+
+<div class="hint">Drag to orbit · scroll to zoom · click an arc, token or layer</div>
+
+<aside id="drawer" hidden aria-live="polite">
+  <button id="drawer-close" class="btn" type="button" aria-label="Close panel">✕</button>
+  <div id="drawer-body"></div>
+</aside>
+
+<footer class="scrubber">
+  <div class="scrub-inner">
+    <button id="play" class="btn" type="button" aria-label="Play pipeline from the start">
+      <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M2 1l11 6-11 6z"/></svg>
+    </button>
+    <div class="track">
+      <input id="phase" type="range" min="0" max="3" step="1" value="3" aria-label="Pipeline step">
+      <div class="steps">
+        <button class="step" type="button" data-p="0"><b>1</b><span>Tokenize</span></button>
+        <button class="step" type="button" data-p="1"><b>2</b><span>Embed</span></button>
+        <button class="step" type="button" data-p="2"><b>3</b><span>Score QKᵀ</span></button>
+        <button class="step" type="button" data-p="3"><b>4</b><span>Softmax</span></button>
+      </div>
+    </div>
+    <p id="phase-caption"></p>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(() => {
+'use strict';
+
+if (!window.THREE || !THREE.OrbitControls) {
+  document.getElementById('stage').innerHTML = '<div id="fatal">Three.js did not load. Check your connection and reload the page.</div>';
+  return;
+}
+
+/* =====================================================================
+   1. MODEL CONSTANTS AND SEEDED MATH
+   Everything is deterministic: the same sentence always produces the
+   same embeddings, projections and attention weights.
+   ===================================================================== */
+const D_MODEL = 16;          // embedding width
+const N_HEADS = 4;
+const D_K = 4;               // per-head query/key width (D_MODEL / N_HEADS)
+const MAX_TOKENS = 14;
+const VOCAB = 30522;         // BERT-sized mock vocabulary for token ids
+
+const HEADS = [
+  { key: 'h1', name: 'Previous token', short: 'H1',
+    about: 'Looks one position back. Trained models grow heads like this early; they give every token a sense of local word order.' },
+  { key: 'h2', name: 'Syntax', short: 'H2',
+    about: 'Links determiners and prepositions to the noun they govern ("the → bank", "of → river"), and subword pieces to their stem.' },
+  { key: 'h3', name: 'Semantic', short: 'H3',
+    about: 'Connects content words whose meanings overlap. This is the head that lets "bank" read "river" and settle on the water sense.' },
+  { key: 'h4', name: 'Anchor', short: 'H4',
+    about: 'Parks attention on the first token and punctuation. Real models do this when a head has nothing useful to add (an "attention sink").' },
+];
+
+// FNV-1a string hash -> 32-bit seed
+function hashStr(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+// mulberry32 PRNG, seeded
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function gauss(r) {
+  const u = Math.max(r(), 1e-9), v = r();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+const dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };
+const len = a => Math.sqrt(dot(a, a));
+const cosine = (a, b) => dot(a, b) / (len(a) * len(b) + 1e-9);
+function softmax(row) {
+  const m = Math.max(...row);
+  const e = row.map(v => Math.exp(v - m));
+  const s = e.reduce((x, y) => x + y, 0);
+  return e.map(v => v / s);
+}
+function randMat(seed, rows, cols) {
+  const r = rng(seed);
+  return Array.from({ length: rows }, () => Array.from({ length: cols }, () => gauss(r) / Math.sqrt(rows)));
+}
+function project(x, W) {           // x (1 x rows) · W (rows x cols)
+  const out = new Array(W[0].length).fill(0);
+  for (let a = 0; a < x.length; a++) for (let b = 0; b < out.length; b++) out[b] += x[a] * W[a][b];
+  return out;
+}
+
+// One W_Q and W_K per head, fixed seeds so the "model" never changes.
+const W_Q = HEADS.map((_, h) => randMat(9001 + h * 17, D_MODEL, D_K));
+const W_K = HEADS.map((_, h) => randMat(7331 + h * 29, D_MODEL, D_K));
+
+/* =====================================================================
+   2. TOKENIZER AND EMBEDDINGS
+   A mock WordPiece: words split on whitespace/punctuation, long words
+   lose a common suffix into a "##" piece. Embeddings are a hashed
+   random vector per token, nudged toward shared "meaning clusters" so
+   related words (bank / river / money) have measurable similarity.
+   ===================================================================== */
+const SUFFIXES = ['ation', 'tion', 'ness', 'ment', 'able', 'ing', 'ly', 'ed', 'er'];
+const DET = new Set('the a an this that these those my your his her its our their some every each no'.split(' '));
+const PREP = new Set('of in on at by for with to from after before over under into about across through near along during'.split(' '));
+const FUNC = new Set('is am are was were be been being has have had do does did will would can could should and or but so not it'.split(' '));
+const CLUSTERS = {
+  water:  'river water lake sea ocean shore stream flood flooded rain storm boat fish swim waves bank beach current'.split(' '),
+  money:  'bank money loan cash account deposit pay paid credit interest price cost fund funds teller rate invest'.split(' '),
+  animal: 'cat dog dogs cats bird horse animal pet mouse fox'.split(' '),
+  motion: 'ran run walk walked jumped jump chased moved flew fell crossed'.split(' '),
+  people: 'she he they woman man people teacher student child doctor we you i'.split(' '),
+  time:   'after before today yesterday morning night year day when then'.split(' '),
+  food:   'apple bread ate eat food dinner cake coffee'.split(' '),
+  ml:     'model token tokens attention neural network data computer transformer layer vector'.split(' '),
+};
+const CLUSTER_VEC = {};
+for (const name of Object.keys(CLUSTERS)) {
+  const r = rng(hashStr('cluster:' + name));
+  const v = Array.from({ length: D_MODEL }, () => gauss(r));
+  const l = len(v);
+  CLUSTER_VEC[name] = v.map(x => (x / l) * 1.6);
+}
+const WORD_CLUSTERS = {};
+for (const [name, words] of Object.entries(CLUSTERS)) for (const w of words) (WORD_CLUSTERS[w] ||= []).push(name);
+
+function tokenize(text) {
+  const words = text.match(/[A-Za-z0-9']+|[^\sA-Za-z0-9']/g) || [];
+  const out = [];
+  for (const w of words) {
+    const low = w.toLowerCase();
+    if (w.length >= 8 && /^[A-Za-z]+$/.test(w)) {
+      const suf = SUFFIXES.find(s => low.endsWith(s) && low.length - s.length >= 4);
+      if (suf) {
+        out.push({ text: w.slice(0, w.length - suf.length), word: low, sub: false });
+        out.push({ text: '##' + suf, word: low, sub: true });
+        continue;
+      }
+    }
+    out.push({ text: w, word: low, sub: false });
+  }
+  return out.slice(0, MAX_TOKENS);
+}
+
+function classOf(t) {
+  if (t.sub) return 'piece';
+  if (!/[a-z0-9]/i.test(t.word)) return 'punct';
+  if (DET.has(t.word)) return 'det';
+  if (PREP.has(t.word)) return 'prep';
+  if (FUNC.has(t.word)) return 'func';
+  return 'content';
+}
+
+function embed(tok, pos) {
+  const key = tok.sub ? tok.text : tok.word;
+  const r = rng(hashStr('emb:' + key));
+  const e = Array.from({ length: D_MODEL }, () => gauss(r) * 0.55);
+  if (!tok.sub) for (const c of (WORD_CLUSTERS[tok.word] || [])) CLUSTER_VEC[c].forEach((v, i) => { e[i] += v; });
+  // Sinusoidal position encoding (Vaswani et al. 2017), scaled by 0.3 so meaning dominates in this toy.
+  const pe = Array.from({ length: D_MODEL }, (_, i) => {
+    const k = Math.floor(i / 2);
+    const ang = pos / Math.pow(10000, (2 * k) / D_MODEL);
+    return (i % 2 === 0 ? Math.sin(ang) : Math.cos(ang)) * 0.3;
+  });
+  return { id: 1000 + (hashStr('id:' + key) % (VOCAB - 1000)), tokEmb: e, pe, x: e.map((v, i) => v + pe[i]) };
+}
+
+/* =====================================================================
+   3. ATTENTION SCORES
+   logit[h][i][j] = (q_i · k_j) / sqrt(d_k) + prior[h][i][j]
+   q and k come from real projections of the embeddings. The prior term
+   stands in for what training would have taught each head, so every
+   head tracks a readable relationship.
+   ===================================================================== */
+function priors(toks, E) {
+  const n = toks.length, cls = toks.map(classOf);
+  const P = HEADS.map(() => Array.from({ length: n }, () => new Array(n).fill(0)));
+  const nextContent = i => { for (let k = i + 1; k < n; k++) if (cls[k] === 'content') return k; return -1; };
+  const prevContent = i => { for (let k = i - 1; k >= 0; k--) if (cls[k] === 'content') return k; return -1; };
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      P[0][i][j] = (j === i - 1 ? 4 : 0) + (i === 0 && j === 0 ? 3 : 0) + (j === i ? 0.8 : 0) - 0.3 * Math.abs(i - j);
+      P[2][i][j] = 4.5 * cosine(E[i], E[j]) - (i === j ? 7 : 0) - (cls[j] === 'content' ? 0 : 2) - 0.25 * Math.abs(i - j);
+      P[3][i][j] = (j === 0 ? 2.6 : 0) + (cls[j] === 'punct' ? 2 : 0) + (j === n - 1 ? 0.6 : 0);
+    }
+    const syn = P[1][i];
+    if (cls[i] === 'det' || cls[i] === 'prep') {
+      const k = nextContent(i); if (k >= 0) syn[k] += 4;
+      if (cls[i] === 'prep') { const b = prevContent(i); if (b >= 0) syn[b] += 2; }
+    } else if (cls[i] === 'content') {
+      for (let k = i - 1; k >= Math.max(0, i - 3); k--) if (cls[k] === 'det') { syn[k] += 3.5; break; }
+      if (i + 1 < n && cls[i + 1] === 'piece') syn[i + 1] += 2;
+    } else if (cls[i] === 'piece') {
+      syn[i - 1] += 4;
+    } else if (cls[i] === 'func') {
+      const k = nextContent(i); if (k >= 0) syn[k] += 2;
+      const b = prevContent(i); if (b >= 0) syn[b] += 1.2;
+    }
+    if (cls[i] === 'punct') syn[i] += 1;
+  }
+  return P;
+}
+
+function computeModel(text) {
+  const toks = tokenize(text);
+  if (!toks.length) return null;
+  const n = toks.length;
+  const emb = toks.map((t, p) => embed(t, p));
+  const X = emb.map(e => e.x);
+  const P = priors(toks, emb.map(e => e.tokEmb));
+  const heads = HEADS.map((meta, h) => {
+    const Q = X.map(x => project(x, W_Q[h]));
+    const K = X.map(x => project(x, W_K[h]));
+    const qk = Q.map(q => K.map(k => dot(q, k) / Math.sqrt(D_K)));
+    const logits = qk.map((row, i) => row.map((v, j) => v + P[h][i][j]));
+    return { ...meta, Q, K, qk, prior: P[h], logits, weights: logits.map(softmax) };
+  });
+  // Combined view: mean of the four heads' weights (and logits, for the raw-score step).
+  const mean = sel => Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) =>
+    heads.reduce((s, hd) => s + hd[sel][i][j], 0) / N_HEADS));
+  return { toks, emb, heads, meanW: mean('weights'), meanL: mean('logits'), n };
+}
+
+/* =====================================================================
+   4. THEME
+   The 3D scene reads its colors from the same CSS tokens as the panels
+   and rebuilds when the viewer's theme changes.
+   ===================================================================== */
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+let C = {};
+function readTheme() {
+  const g = new THREE.Color(css('--ground'));
+  C = {
+    ground: g, dark: (g.r + g.g + g.b) / 3 < 0.4,
+    ink: new THREE.Color(css('--ink')), ink3: new THREE.Color(css('--ink-3')),
+    accent: new THREE.Color(css('--accent')), neg: new THREE.Color(css('--neg')),
+    slab: new THREE.Color(css('--slab')), edge: new THREE.Color(css('--edge')),
+    heads: ['--h1', '--h2', '--h3', '--h4'].map(v => new THREE.Color(css(v))),
+    headsCss: ['--h1', '--h2', '--h3', '--h4'].map(css),
+    accentCss: css('--accent'), inkCss: css('--ink'), ink3Css: css('--ink-3'), lineCss: css('--line'),
+  };
+}
+
+/* =====================================================================
+   5. SCENE SETUP
+   Vertical stack (bottom to top): token chips → embedding plate →
+   multi-head self-attention → Add & Norm → feed-forward → Add & Norm.
+   ===================================================================== */
+const Y = { tok: 0, emb: 1.25, attn: 3.7, norm1: 5.5, ffn: 7.1, norm2: 8.7 };
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+stage.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 6;
+controls.maxDistance = 48;
+controls.target.set(0, 4.3, 0);
+
+function frameCamera() {
+  const w = innerWidth, narrow = w < 760;
+  camera.position.set(narrow ? -7 : -9.5, narrow ? 8.5 : 8.8, narrow ? 26 : 18.5);
+  controls.target.set(0, narrow ? 3.4 : 3.2, 0);
+}
+frameCamera();
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+const sun = new THREE.DirectionalLight(0xffffff, 0.6);
+sun.position.set(-6, 14, 10);
+scene.add(sun);
+
+// Groups rebuilt per sentence / theme
+const G = {
+  static: new THREE.Group(), tokens: new THREE.Group(), emb: new THREE.Group(),
+  attn: new THREE.Group(), post: new THREE.Group(), arcs: new THREE.Group(), flow: new THREE.Group(),
+};
+Object.values(G).forEach(g => scene.add(g));
+
+// Fade system: each material registers under a visibility key; the
+// pipeline step sets per-key targets and the render loop eases toward them.
+let faders = [];
+const vis = { tok: 1, emb: 1, attn: 1, post: 1, arc: 1 };
+const visTarget = { ...vis };
+function fade(mat, key, base) { mat.transparent = true; mat.depthWrite = false; faders.push({ mat, key, base }); return mat; }
+
+let pickables = [];   // meshes that open the drawer on click
+const labelsEl = document.getElementById('labels');
+let labels = [];      // { el, pos: Vector3, key }
+
+function disposeGroup(g) {
+  g.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+  g.clear();
+}
+
+/* ---------- state ---------- */
+const state = {
+  model: null, phase: 3, split: false, splitT: 0, focus: -1,
+  selected: null,       // { i, j, h } for an arc, h = -1 means mean
+  heatHead: -1, width: 10, spacing: 1.5,
+};
+const xOf = i => (i - (state.model.n - 1) / 2) * state.spacing;
+const headZ = h => (h - 1.5) * 1.05;
+
+/* =====================================================================
+   6. PROCEDURAL GEOMETRY
+   ===================================================================== */
+function slab(width, height, depth, y, color, key, base, kind, extra) {
+  const geo = new THREE.BoxGeometry(width, height, depth);
+  const mat = fade(new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }), key, base);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.y = y;
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo),
+    fade(new THREE.LineBasicMaterial({ color: C.edge }), key, 0.7));
+  mesh.add(edges);
+  mesh.userData = { kind, ...extra };
+  pickables.push(mesh);
+  return mesh;
+}
+
+function addLabel(html, pos, cls, key, onClick) {
+  const el = document.createElement(onClick ? 'button' : 'div');
+  el.className = cls;
+  el.innerHTML = html;
+  if (onClick) { el.type = 'button'; el.addEventListener('click', onClick); }
+  labelsEl.appendChild(el);
+  labels.push({ el, pos, key });
+  return el;
+}
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function buildScene() {
+  Object.values(G).forEach(disposeGroup);
+  faders = []; pickables = []; labels = []; labelsEl.innerHTML = '';
+  arcs = []; particles = [];
+  scene.background = C.ground;
+  scene.fog = new THREE.Fog(C.ground, 34, 70);
+
+  const m = state.model, n = m.n;
+  state.spacing = Math.min(1.5, 13 / Math.max(n, 1));
+  state.width = Math.max(8, (n - 1) * state.spacing + 2.4);
+  const W = state.width;
+
+  // Floor grid for spatial reference
+  const grid = new THREE.GridHelper(40, 40, C.edge, C.edge);
+  grid.position.y = -0.9;
+  fade(grid.material, 'tok', C.dark ? 0.12 : 0.16);
+  G.static.add(grid);
+
+  // --- Token chips (one cube per token) and their vertical residual stream lines ---
+  const chipGeo = new THREE.BoxGeometry(0.42, 0.42, 0.42);
+  m.toks.forEach((t, i) => {
+    const x = xOf(i);
+    const chip = new THREE.Mesh(chipGeo.clone(), fade(new THREE.MeshLambertMaterial({ color: C.accent }), 'tok', 1));
+    chip.position.set(x, Y.tok, 0);
+    chip.userData = { kind: 'token', i };
+    pickables.push(chip);
+    G.tokens.add(chip);
+    addLabel(`${esc(t.text)}<span class="tid">${m.emb[i].id}</span>`, new THREE.Vector3(x, Y.tok - 0.62, 0), 'tok-label', 'tok',
+      () => focusToken(i));
+
+    // Each position's "residual stream": a faint line running up through every layer.
+    const pts = [new THREE.Vector3(x, Y.tok + 0.21, 0), new THREE.Vector3(x, Y.norm2, 0)];
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+      fade(new THREE.LineDashedMaterial({ color: C.edge, dashSize: 0.12, gapSize: 0.1 }), 'emb', 0.55));
+    line.computeLineDistances();
+    G.flow.add(line);
+  });
+
+  // --- Embedding plate + a 16-bar vector per token (bar height = component value) ---
+  G.emb.add(slab(W, 0.06, 2.8, Y.emb, C.slab, 'emb', 0.35, 'layer', { layer: 'embedding' }));
+  const barGeo = new THREE.BoxGeometry(0.07, 1, 0.1);
+  m.emb.forEach((e, i) => {
+    const x = xOf(i);
+    e.x.forEach((v, d) => {
+      const h = Math.max(0.02, Math.min(1.1, Math.abs(v) * 0.45));
+      const bar = new THREE.Mesh(barGeo, fade(new THREE.MeshLambertMaterial({ color: v >= 0 ? C.accent : C.neg }), 'emb', 0.9));
+      bar.scale.y = h;
+      bar.position.set(x, Y.emb + (v >= 0 ? h / 2 + 0.03 : -h / 2 - 0.03), -1.2 + d * (2.4 / (D_MODEL - 1)));
+      bar.userData = { kind: 'embedding', i };
+      pickables.push(bar);
+      G.emb.add(bar);
+    });
+  });
+
+  // --- Multi-head attention: four slabs that overlap (combined) or fan out along z (split) ---
+  headSlabs = HEADS.map((hd, h) => {
+    const s = slab(W, 0.42, 1, Y.attn, C.slab.clone(), 'attn', 0.3, 'head', { h });
+    G.attn.add(s);
+    return s;
+  });
+
+  // --- Add & Norm, FFN, Add & Norm ---
+  G.post.add(slab(W, 0.14, 2.6, Y.norm1, C.slab, 'post', 0.35, 'layer', { layer: 'norm1' }));
+  G.post.add(slab(W, 1.1, 2.6, Y.ffn, C.slab, 'post', 0.16, 'layer', { layer: 'ffn' }));
+  G.post.add(slab(W, 0.14, 2.6, Y.norm2, C.slab, 'post', 0.35, 'layer', { layer: 'norm2' }));
+
+  // Per-token FFN "diamond": d_model (narrow) → 4·d_model (wide) → d_model (narrow).
+  const up = new THREE.CylinderGeometry(0.42, 0.13, 0.5, 20, 1, true);
+  const down = new THREE.CylinderGeometry(0.13, 0.42, 0.5, 20, 1, true);
+  const ring = new THREE.TorusGeometry(0.24, 0.035, 8, 28);
+  m.toks.forEach((_, i) => {
+    const x = xOf(i);
+    const mat = fade(new THREE.MeshLambertMaterial({ color: C.accent, side: THREE.DoubleSide }), 'post', 0.55);
+    const a = new THREE.Mesh(up, mat); a.position.set(x, Y.ffn - 0.25, 0);
+    const b = new THREE.Mesh(down, mat); b.position.set(x, Y.ffn + 0.25, 0);
+    [a, b].forEach(o => { o.userData = { kind: 'layer', layer: 'ffn' }; pickables.push(o); G.post.add(o); });
+    [Y.norm1, Y.norm2].forEach((yy, k) => {
+      const r = new THREE.Mesh(ring, fade(new THREE.MeshLambertMaterial({ color: C.ink3 }), 'post', 0.8));
+      r.rotation.x = Math.PI / 2; r.position.set(x, yy + 0.1, 0);
+      r.userData = { kind: 'layer', layer: k ? 'norm2' : 'norm1' };
+      pickables.push(r); G.post.add(r);
+    });
+  });
+
+  // --- Residual (skip) connections drawn around the left end of the stack ---
+  const L = -W / 2 - 0.55;
+  [[Y.emb + 0.4, Y.norm1], [Y.norm1 + 0.3, Y.norm2]].forEach(([y0, y1]) => {
+    const path = new THREE.CurvePath();
+    const p0 = new THREE.Vector3(-W / 2 + 0.2, y0, 0), p1 = new THREE.Vector3(L, y0, 0);
+    const p2 = new THREE.Vector3(L, y1, 0), p3 = new THREE.Vector3(-W / 2 + 0.2, y1, 0);
+    path.add(new THREE.LineCurve3(p0, p1)); path.add(new THREE.LineCurve3(p1, p2)); path.add(new THREE.LineCurve3(p2, p3));
+    const tube = new THREE.Mesh(new THREE.TubeGeometry(path, 60, 0.035, 6, false),
+      fade(new THREE.MeshBasicMaterial({ color: C.accent }), 'post', 0.75));
+    tube.userData = { kind: 'layer', layer: 'residual' };
+    pickables.push(tube);
+    G.post.add(tube);
+    const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.22, 12), fade(new THREE.MeshBasicMaterial({ color: C.accent }), 'post', 0.75));
+    arrow.rotation.z = -Math.PI / 2; arrow.position.copy(p3);
+    G.post.add(arrow);
+  });
+
+  // --- Layer labels on the right end of each slab ---
+  const R = W / 2 + 0.35;
+  const n16 = `${n}×${D_MODEL}`;
+  addLabel(`Tokens<span class="dim">${n} ids</span>`, new THREE.Vector3(R, Y.tok, 0), 'layer-label', 'tok');
+  addLabel(`Embedding + position<span class="dim">${n16}</span>`, new THREE.Vector3(R, Y.emb, 0), 'layer-label', 'emb');
+  addLabel(`Multi-head self-attention<span class="dim">4 × ${n}×${n}</span>`, new THREE.Vector3(R, Y.attn, 0), 'layer-label', 'attn');
+  addLabel(`Add &amp; Norm<span class="dim">${n16}</span>`, new THREE.Vector3(R, Y.norm1, 0), 'layer-label', 'post');
+  addLabel(`Feed-forward<span class="dim">16 → 64 → 16</span>`, new THREE.Vector3(R, Y.ffn, 0), 'layer-label', 'post');
+  addLabel(`Add &amp; Norm<span class="dim">${n16}</span>`, new THREE.Vector3(R, Y.norm2, 0), 'layer-label', 'post');
+  addLabel(`Residual`, new THREE.Vector3(L - 0.2, (Y.emb + Y.norm1) / 2, 0), 'layer-label end', 'post');
+
+  buildArcs();
+}
+let headSlabs = [];
+
+/* =====================================================================
+   7. ATTENTION ARCS
+   For every (query i, key j) pair worth drawing we build a cubic Bezier:
+     start  = top of the attention slab above token i
+     end    = top of the attention slab above token j
+     bulge  = two control points lifted in y by an amount that grows with
+              |i − j|, so long-range links arc higher and never overlap
+              short ones.
+   A self-link (i == j) becomes a small loop. The curve is swept into a
+   TubeGeometry whose radius and opacity scale with the softmax weight;
+   a wider, fainter tube around it gives the glow and a bigger click
+   target. Tubes "grow" in by animating the index draw range, and small
+   particles ride each strong curve from key j toward query i, which is
+   the direction value information flows.
+   ===================================================================== */
+let arcs = [], particles = [];
+const particleGeo = new THREE.SphereGeometry(0.06, 10, 8);
+
+function arcCurve(i, j, z) {
+  const y = Y.attn + 0.22;
+  const xi = xOf(i), xj = xOf(j);
+  if (i === j) {
+    return new THREE.CubicBezierCurve3(
+      new THREE.Vector3(xi - 0.1, y, z), new THREE.Vector3(xi - 0.55, y + 0.95, z),
+      new THREE.Vector3(xi + 0.55, y + 0.95, z), new THREE.Vector3(xi + 0.1, y, z));
+  }
+  const lift = Math.min(3.2, 0.55 + 0.32 * Math.abs(xi - xj));
+  return new THREE.CubicBezierCurve3(
+    new THREE.Vector3(xi, y, z), new THREE.Vector3(xi, y + lift, z),
+    new THREE.Vector3(xj, y + lift, z), new THREE.Vector3(xj, y, z));
+}
+
+function pickPairs() {
+  // Returns [{ i, j, h, w, raw }] to draw for the current step / view / focus.
+  const m = state.model, n = m.n, out = [];
+  const views = state.split ? [0, 1, 2, 3] : [-1];
+  for (const h of views) {
+    const W = h < 0 ? m.meanW : m.heads[h].weights;
+    const L = h < 0 ? m.meanL : m.heads[h].logits;
+    for (let i = 0; i < n; i++) {
+      if (state.focus >= 0 && i !== state.focus) continue;
+      if (state.phase === 2) {
+        // Raw scores: show top-3 keys per query, strength = row-normalized logit.
+        const row = L[i], lo = Math.min(...row), hi = Math.max(...row);
+        const order = row.map((v, j) => j).sort((a, b) => row[b] - row[a]);
+        const keep = state.focus >= 0 ? order : order.slice(0, 3);
+        keep.forEach(j => out.push({ i, j, h, w: (row[j] - lo) / (hi - lo + 1e-9), raw: true }));
+      } else {
+        const min = state.focus >= 0 ? 0.03 : (state.split ? 0.16 : 0.1);
+        for (let j = 0; j < n; j++) if (W[i][j] >= min) out.push({ i, j, h, w: W[i][j], raw: false });
+      }
+    }
+  }
+  return out;
+}
+
+function buildArcs() {
+  disposeGroup(G.arcs);
+  arcs = []; particles = [];
+  pickables = pickables.filter(p => p.userData.kind !== 'arc');
+  if (!state.model || state.phase < 2) return;
+  const blend = C.dark ? THREE.AdditiveBlending : THREE.NormalBlending;
+  for (const p of pickPairs()) {
+    const z = state.split ? headZ(p.h) : 0;
+    const curve = arcCurve(p.i, p.j, z);
+    const color = p.raw ? C.ink3.clone().lerp(C.accent, 0.35) : (p.h < 0 ? C.accent : C.heads[p.h]);
+    const r = p.raw ? 0.018 + 0.02 * p.w : 0.012 + 0.07 * p.w;
+    const coreMat = new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false, blending: blend });
+    const core = new THREE.Mesh(new THREE.TubeGeometry(curve, 48, r, 6, false), coreMat);
+    const glowMat = new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false, blending: blend });
+    const glow = new THREE.Mesh(new THREE.TubeGeometry(curve, 48, r * 2.6 + 0.05, 8, false), glowMat);
+    const a = { ...p, curve, core, glow, grow: reduceMotion ? 1 : 0, base: p.raw ? 0.25 + 0.55 * p.w : 0.3 + 0.7 * Math.sqrt(p.w) };
+    glow.userData = { kind: 'arc', arc: a };
+    core.userData = { kind: 'arc', arc: a };
+    pickables.push(glow);
+    G.arcs.add(core, glow);
+    arcs.push(a);
+    if (!p.raw && p.w >= 0.18 && p.i !== p.j) {
+      const dotMesh = new THREE.Mesh(particleGeo, new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false }));
+      G.arcs.add(dotMesh);
+      particles.push({ mesh: dotMesh, arc: a, off: Math.random(), speed: 0.35 + 0.4 * p.w });
+    }
+  }
+}
+
+/* =====================================================================
+   8. PIPELINE STEPS
+   ===================================================================== */
+const CAPTIONS = [
+  'The sentence is split into tokens and each one gets a vocabulary id. Long words lose a common suffix into a <span class="math">##</span> piece, the way WordPiece does.',
+  'Each id looks up a 16-number vector. A sinusoidal position signal is added so word order survives: <span class="math">x = W<sub>E</sub>[id] + PE(pos)</span>. Orange bars are positive components, blue are negative.',
+  'Every query is dotted with every key and scaled: <span class="math">QKᵀ / √d<sub>k</sub></span>. These are raw logits, not yet comparable across rows, so only the top 3 keys per token are drawn.',
+  'Softmax turns each row into weights that sum to 1. Arc thickness is the weight; dots travel from the key toward the query, the direction value vectors flow.',
+];
+const TARGETS = [
+  { tok: 1, emb: 0, attn: 0.25, post: 0.18, arc: 0 },
+  { tok: 1, emb: 1, attn: 0.35, post: 0.18, arc: 0 },
+  { tok: 1, emb: 0.55, attn: 1, post: 0.25, arc: 1 },
+  { tok: 1, emb: 0.55, attn: 1, post: 1, arc: 1 },
+];
+const phaseInput = document.getElementById('phase');
+function setPhase(p) {
+  const prev = state.phase;
+  state.phase = p;
+  phaseInput.value = p;
+  Object.assign(visTarget, TARGETS[p]);
+  document.querySelectorAll('.step').forEach(b => b.setAttribute('aria-current', +b.dataset.p === p ? 'step' : 'false'));
+  document.getElementById('phase-caption').innerHTML = CAPTIONS[p];
+  if (prev !== p || !arcs.length) buildArcs();
+  drawHeat();
+}
+phaseInput.addEventListener('input', () => { stopPlay(); setPhase(+phaseInput.value); });
+document.querySelectorAll('.step').forEach(b => b.addEventListener('click', () => { stopPlay(); setPhase(+b.dataset.p); }));
+
+let playTimer = null;
+function stopPlay() { clearInterval(playTimer); playTimer = null; }
+document.getElementById('play').addEventListener('click', () => {
+  stopPlay();
+  setPhase(0);
+  playTimer = setInterval(() => {
+    if (state.phase >= 3) return stopPlay();
+    setPhase(state.phase + 1);
+  }, 1900);
+});
+
+/* ---------- head split toggle ---------- */
+const headsBtn = document.getElementById('heads-toggle');
+function setSplit(on) {
+  state.split = on;
+  headsBtn.setAttribute('aria-pressed', on);
+  document.getElementById('heads-toggle-text').textContent = on ? 'Merge heads' : 'Split into 4 heads';
+  state.selected = null;
+  buildArcs();
+}
+headsBtn.addEventListener('click', () => setSplit(!state.split));
+
+function focusToken(i) {
+  state.focus = state.focus === i ? -1 : i;
+  labels.forEach(l => { if (l.el.classList.contains('tok-label')) l.el.dataset.focus = 'false'; });
+  if (state.focus >= 0) {
+    labels.filter(l => l.el.classList.contains('tok-label'))[i].el.dataset.focus = 'true';
+    openDrawer({ kind: 'token', i });
+  }
+  state.selected = null;
+  buildArcs();
+  drawHeat();
+}
+
+/* =====================================================================
+   9. HEATMAP (2D canvas mirror of the attention matrix)
+   ===================================================================== */
+const heat = document.getElementById('heat');
+const heatRead = document.getElementById('heat-read');
+const chipsEl = document.getElementById('heat-chips');
+function buildChips() {
+  const opts = [{ h: -1, label: 'Mean', color: 'var(--accent)' }, ...HEADS.map((hd, h) => ({ h, label: `${hd.short} ${hd.name}`, color: `var(--${hd.key})` }))];
+  chipsEl.innerHTML = opts.map(o => `<button type="button" class="chip" data-h="${o.h}" aria-pressed="${o.h === state.heatHead}"><i style="background:${o.color}"></i>${o.label}</button>`).join('');
+  chipsEl.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => {
+    state.heatHead = +c.dataset.h;
+    chipsEl.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', x === c));
+    drawHeat();
+  }));
+}
+let heatLayout = null;
+function drawHeat() {
+  const m = state.model; if (!m) return;
+  const cssW = heat.clientWidth || 276;
+  const dpr = Math.min(devicePixelRatio, 2);
+  const n = m.n, padL = 62, padT = 54;
+  const cell = Math.floor((cssW - padL - 4) / n);
+  const cssH = padT + cell * n + 2;
+  heat.width = cssW * dpr; heat.height = cssH * dpr; heat.style.height = cssH + 'px';
+  const ctx = heat.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cssW, cssH);
+  heatLayout = { padL, padT, cell, n };
+
+  const h = state.heatHead;
+  const raw = state.phase === 2;
+  const M = raw ? (h < 0 ? m.meanL : m.heads[h].logits) : (h < 0 ? m.meanW : m.heads[h].weights);
+  const col = new THREE.Color(h < 0 ? C.accentCss : C.headsCss[h]);
+  const rgb = `${Math.round(col.r * 255)},${Math.round(col.g * 255)},${Math.round(col.b * 255)}`;
+  const ready = state.phase >= 2;
+  document.getElementById('matrix-sub').textContent = !ready ? 'appears at step 3' : `${raw ? 'raw logits' : 'softmax'} · ${h < 0 ? 'mean of heads' : HEADS[h].name}`;
+
+  ctx.font = '500 10.5px "JetBrains Mono", ui-monospace, monospace';
+  ctx.fillStyle = C.inkCss;
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let i = 0; i < n; i++) {
+    const lbl = m.toks[i].text.slice(0, 8);
+    ctx.globalAlpha = state.focus < 0 || state.focus === i ? 1 : 0.4;
+    ctx.fillText(lbl, padL - 6, padT + i * cell + cell / 2);
+    ctx.save();
+    ctx.translate(padL + i * cell + cell / 2, padT - 6);
+    ctx.rotate(-Math.PI / 3);
+    ctx.textAlign = 'left';
+    ctx.fillText(lbl, 0, 0);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  for (let i = 0; i < n; i++) {
+    const row = M[i], lo = Math.min(...row), hi = Math.max(...row);
+    for (let j = 0; j < n; j++) {
+      const v = raw ? (row[j] - lo) / (hi - lo + 1e-9) : Math.pow(row[j], 0.6);
+      ctx.fillStyle = ready ? `rgba(${rgb},${0.05 + 0.95 * v})` : C.lineCss;
+      ctx.fillRect(padL + j * cell + 0.5, padT + i * cell + 0.5, cell - 1, cell - 1);
+    }
+  }
+  const s = state.selected;
+  if (s && ready && s.h === h) {
+    ctx.strokeStyle = C.inkCss; ctx.lineWidth = 1.5;
+    ctx.strokeRect(padL + s.j * cell, padT + s.i * cell, cell, cell);
+  }
+}
+function heatCell(ev) {
+  if (!heatLayout) return null;
+  const r = heat.getBoundingClientRect();
+  const x = ev.clientX - r.left - heatLayout.padL, y = ev.clientY - r.top - heatLayout.padT;
+  const j = Math.floor(x / heatLayout.cell), i = Math.floor(y / heatLayout.cell);
+  if (i < 0 || j < 0 || i >= heatLayout.n || j >= heatLayout.n) return null;
+  return { i, j };
+}
+heat.addEventListener('pointermove', ev => {
+  const c = heatCell(ev), m = state.model;
+  if (!c || state.phase < 2) { heatRead.textContent = 'Rows attend (query) · columns are attended to (key)'; return; }
+  const h = state.heatHead;
+  const w = (h < 0 ? m.meanW : m.heads[h].weights)[c.i][c.j];
+  const l = (h < 0 ? m.meanL : m.heads[h].logits)[c.i][c.j];
+  heatRead.textContent = `"${m.toks[c.i].text}" → "${m.toks[c.j].text}"  α=${w.toFixed(3)}  logit=${l.toFixed(2)}`;
+});
+heat.addEventListener('click', ev => {
+  const c = heatCell(ev);
+  if (!c || state.phase < 2) return;
+  selectArc({ i: c.i, j: c.j, h: state.heatHead });
+});
+
+/* =====================================================================
+   10. INSPECTION DRAWER
+   ===================================================================== */
+const drawer = document.getElementById('drawer');
+const drawerBody = document.getElementById('drawer-body');
+document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+function closeDrawer() { drawer.hidden = true; state.selected = null; drawHeat(); }
+
+const f3 = v => (v >= 0 ? ' ' : '') + v.toFixed(3);
+const f2 = v => (v >= 0 ? '+' : '') + v.toFixed(2);
+
+function distRows(row, hit, tokens) {
+  return `<div class="dist">${row.map((w, j) => `<div class="dist-row${j === hit ? ' hit' : ''}">
+    <span class="nm">${esc(tokens[j].text)}</span><span class="bg"><span class="fg" style="width:${(w * 100).toFixed(1)}%"></span></span><span class="v">${w.toFixed(3)}</span></div>`).join('')}</div>`;
+}
+
+const LAYER_INFO = {
+  embedding: () => ({
+    eyebrow: 'Layer · input', title: 'Embedding + position',
+    body: `<p>Each token id selects one row of the embedding table. Position is added as fixed sine and cosine waves at different frequencies, so the model can tell "bank of the river" from "river of the bank".</p>
+      <div class="formula">x<sub>i</sub> = W<sub>E</sub>[id<sub>i</sub>] + PE(i)</div>
+      <div class="formula">PE(i, 2k) = sin(i / 10000<sup>2k/d</sup>)<br>PE(i, 2k+1) = cos(i / 10000<sup>2k/d</sup>)</div>
+      <dl class="kv"><dt>Shape</dt><dd>X ∈ ℝ<sup>${state.model.n}×${D_MODEL}</sup></dd><dt>Table</dt><dd>W<sub>E</sub> ∈ ℝ<sup>${VOCAB}×${D_MODEL}</sup></dd></dl>
+      <p class="note">Here W<sub>E</sub> rows are seeded random vectors pulled toward shared meaning clusters, and PE is scaled by 0.3.</p>`,
+  }),
+  mhsa: () => ({
+    eyebrow: 'Layer · attention', title: 'Multi-head self-attention',
+    body: `<p>Every token asks a question (query), advertises what it contains (key), and offers content (value). Dot products between queries and keys decide how much of each value flows into each position.</p>
+      <div class="formula">Attention(Q, K, V) = softmax(QKᵀ / √d<sub>k</sub>) V</div>
+      <div class="formula">head<sub>h</sub> = Attention(XW<sub>Q</sub><sup>h</sup>, XW<sub>K</sub><sup>h</sup>, XW<sub>V</sub><sup>h</sup>)<br>MultiHead(X) = [head<sub>1</sub>; …; head<sub>4</sub>] W<sub>O</sub></div>
+      <dl class="kv"><dt>Heads</dt><dd>4 × d<sub>k</sub> = ${D_K}</dd><dt>Scores</dt><dd>4 × ${state.model.n}×${state.model.n}</dd><dt>Why √d<sub>k</sub></dt><dd>keeps logits from growing with width</dd></dl>
+      <p>Split the layer to see each head on its own sub-layer. Each learns a different relationship because each has its own W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub>.</p>`,
+  }),
+  norm1: () => normInfo('after attention', 'MultiHead(x)'),
+  norm2: () => normInfo('after feed-forward', 'FFN(x)'),
+  ffn: () => ({
+    eyebrow: 'Layer · position-wise', title: 'Feed-forward network',
+    body: `<p>The same two-layer MLP runs on every token independently. It widens each vector 4×, applies a nonlinearity, then projects back. Attention mixes information across tokens; this layer processes it within each token.</p>
+      <div class="formula">FFN(x) = max(0, xW<sub>1</sub> + b<sub>1</sub>) W<sub>2</sub> + b<sub>2</sub></div>
+      <dl class="kv"><dt>W<sub>1</sub></dt><dd>ℝ<sup>${D_MODEL}×${D_MODEL * 4}</sup></dd><dt>W<sub>2</sub></dt><dd>ℝ<sup>${D_MODEL * 4}×${D_MODEL}</sup></dd><dt>Params</dt><dd>${(D_MODEL * D_MODEL * 4 * 2 + D_MODEL * 5).toLocaleString()}</dd></dl>
+      <p class="note">The diamond on each token column is this shape: 16 wide, then 64, then 16.</p>`,
+  }),
+  residual: () => ({
+    eyebrow: 'Connection', title: 'Residual path',
+    body: `<p>The input to each sublayer skips around it and is added back to its output. Gradients get a direct route to earlier layers, and a sublayer only has to learn a correction to what is already there.</p>
+      <div class="formula">y = x + Sublayer(x)</div>`,
+  }),
+};
+function normInfo(where, sub) {
+  return {
+    eyebrow: 'Layer · ' + where, title: 'Add & Norm',
+    body: `<p>Adds the residual input back, then rescales each token vector to zero mean and unit variance across its ${D_MODEL} features before a learned per-feature scale and shift.</p>
+      <div class="formula">y = LayerNorm(x + ${sub})</div>
+      <div class="formula">LayerNorm(z) = γ ⊙ (z − μ) / √(σ² + ε) + β</div>
+      <dl class="kv"><dt>μ, σ²</dt><dd>per token, over ${D_MODEL} features</dd><dt>γ, β</dt><dd>ℝ<sup>${D_MODEL}</sup> learned</dd></dl>`,
+  };
+}
+
+function openDrawer(target) {
+  const m = state.model;
+  let html = '';
+  if (target.kind === 'arc') {
+    const { i, j, h } = target;
+    const qi = m.toks[i].text, kj = m.toks[j].text;
+    const W = h < 0 ? m.meanW : m.heads[h].weights;
+    const hdLabel = h < 0 ? 'Mean of 4 heads' : `${HEADS[h].short} · ${HEADS[h].name}`;
+    const dotColor = h < 0 ? 'var(--accent)' : `var(--${HEADS[h].key})`;
+    html = `<div class="eyebrow"><i style="background:${dotColor}"></i>Attention arc · ${hdLabel}</div>
+      <h2>“${esc(qi)}” attends to “${esc(kj)}”</h2>
+      <div class="big">${W[i][j].toFixed(3)}<small>α<sub>${i}${j}</sub></small></div>
+      <p style="margin-top:10px">Query <b>q<sub>${i}</sub></b> from “${esc(qi)}” is dotted with key <b>k<sub>${j}</sub></b> from “${esc(kj)}”. After softmax over row ${i}, ${(W[i][j] * 100).toFixed(1)}% of the new “${esc(qi)}” vector is drawn from the value vector of “${esc(kj)}”.</p>
+      <div class="formula">α<sub>ij</sub> = exp(s<sub>ij</sub>) / Σ<sub>j'</sub> exp(s<sub>ij'</sub>)<br>s<sub>ij</sub> = q<sub>i</sub>·k<sub>j</sub> / √${D_K}</div>
+      <h3>Per head</h3>
+      <table class="nums"><thead><tr><th>Head</th><th>q·k/√d</th><th>prior</th><th>logit</th><th>α</th></tr></thead><tbody>
+      ${m.heads.map((hd, k) => `<tr${k === h ? ' style="color:var(--accent)"' : ''}><td>${hd.short} ${hd.name}</td><td>${f2(hd.qk[i][j])}</td><td>${f2(hd.prior[i][j])}</td><td>${f2(hd.logits[i][j])}</td><td>${hd.weights[i][j].toFixed(3)}</td></tr>`).join('')}
+      <tr class="sum"><td>Mean</td><td></td><td></td><td>${f2(m.meanL[i][j])}</td><td>${m.meanW[i][j].toFixed(3)}</td></tr></tbody></table>
+      <h3>Row ${i}: where “${esc(qi)}” looks (${h < 0 ? 'mean' : HEADS[h].short})</h3>
+      ${distRows(W[i], j, m.toks)}
+      ${h >= 0 ? `<p class="note" style="border:0;padding:0">${HEADS[h].about}</p>` : ''}
+      <p class="note">Mock weights. W<sub>Q</sub> and W<sub>K</sub> are seeded random 16×4 matrices, so the q·k column is real arithmetic on these embeddings. The prior column stands in for what training would teach each head.</p>`;
+  } else if (target.kind === 'token' || target.kind === 'embedding') {
+    const i = target.i, t = m.toks[i], e = m.emb[i];
+    const maxAbs = Math.max(...e.x.map(Math.abs));
+    const top = m.meanW[i].map((w, j) => ({ w, j })).sort((a, b) => b.w - a.w).slice(0, 3);
+    html = `<div class="eyebrow">${target.kind === 'token' ? 'Token' : 'Embedding vector'} · position ${i}</div>
+      <h2>“${esc(t.text)}”</h2>
+      <dl class="kv"><dt>Mock id</dt><dd>${e.id}</dd><dt>Word</dt><dd>${esc(t.word)}${t.sub ? ' (suffix piece)' : ''}</dd><dt>Class</dt><dd>${classOf(t)}</dd><dt>‖x‖</dt><dd>${len(e.x).toFixed(3)}</dd></dl>
+      <h3>x<sub>${i}</sub> = embedding + position (16 dims)</h3>
+      <div class="vec">${e.x.map(v => `<span class="${v < 0 ? 'neg' : 'pos'}" style="height:${(Math.abs(v) / maxAbs * 24).toFixed(1)}px" title="${v.toFixed(3)}"></span>`).join('')}</div>
+      <div class="formula" style="margin-top:10px">[${e.x.slice(0, 6).map(v => v.toFixed(2)).join(', ')}, …]</div>
+      <h3>Attends most to (mean of heads)</h3>
+      ${distRows(m.meanW[i], top[0].j, m.toks)}
+      <p class="note">${state.focus === i ? 'Arcs now show only this token\'s queries. Click the token again to show all.' : 'Click the token label to isolate its arcs.'}</p>`;
+  } else if (target.kind === 'head') {
+    const h = target.h;
+    if (!state.split) return openDrawer({ kind: 'layer', layer: 'mhsa' });
+    const hd = m.heads[h];
+    let best = { w: -1 };
+    for (let i = 0; i < m.n; i++) for (let j = 0; j < m.n; j++) if (i !== j && hd.weights[i][j] > best.w) best = { w: hd.weights[i][j], i, j };
+    html = `<div class="eyebrow"><i style="background:var(--${hd.key})"></i>Attention head ${h + 1} of 4</div>
+      <h2>${hd.name}</h2>
+      <p>${hd.about}</p>
+      <div class="formula">head<sub>${h + 1}</sub> = softmax(XW<sub>Q</sub><sup>${h + 1}</sup>(XW<sub>K</sub><sup>${h + 1}</sup>)ᵀ / √${D_K}) XW<sub>V</sub><sup>${h + 1}</sup></div>
+      <dl class="kv"><dt>W<sub>Q</sub>, W<sub>K</sub></dt><dd>ℝ<sup>${D_MODEL}×${D_K}</sup> each</dd><dt>Strongest link</dt><dd>${best.w > 0 ? `${esc(m.toks[best.i].text)} → ${esc(m.toks[best.j].text)} (${best.w.toFixed(3)})` : 'n/a'}</dd></dl>`;
+  } else {
+    const info = LAYER_INFO[target.layer]();
+    html = `<div class="eyebrow">${info.eyebrow}</div><h2>${info.title}</h2>${info.body}`;
+  }
+  drawerBody.innerHTML = html;
+  drawer.hidden = false;
+  drawer.scrollTop = 0;
+}
+
+function selectArc(sel) {
+  state.selected = sel;
+  openDrawer({ kind: 'arc', ...sel });
+  drawHeat();
+}
+
+/* =====================================================================
+   11. PICKING (click vs. drag, priority: arc > token > bars > slabs)
+   ===================================================================== */
+const ray = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+let down = null, hovered = null;
+const PRIORITY = { arc: 0, token: 1, embedding: 2, head: 3, layer: 4 };
+function pick(ev) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hits = ray.intersectObjects(pickables, false).filter(h => {
+    const k = h.object.userData.kind;
+    if (k === 'arc') return state.phase >= 2;
+    if (k === 'embedding') return state.phase >= 1;
+    return true;
+  });
+  if (!hits.length) return null;
+  hits.sort((a, b) => (PRIORITY[a.object.userData.kind] - PRIORITY[b.object.userData.kind]) || (a.distance - b.distance));
+  return hits[0].object.userData;
+}
+renderer.domElement.addEventListener('pointerdown', ev => { down = { x: ev.clientX, y: ev.clientY }; });
+renderer.domElement.addEventListener('pointerup', ev => {
+  if (!down || Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 5) return;
+  const u = pick(ev);
+  if (!u) { if (state.selected) { state.selected = null; drawHeat(); } return; }
+  if (u.kind === 'arc') selectArc({ i: u.arc.i, j: u.arc.j, h: u.arc.h });
+  else if (u.kind === 'token') focusToken(u.i);
+  else if (u.kind === 'embedding') openDrawer({ kind: 'embedding', i: u.i });
+  else if (u.kind === 'head') openDrawer({ kind: 'head', h: u.h });
+  else if (u.kind === 'layer') openDrawer({ kind: 'layer', layer: u.layer });
+});
+renderer.domElement.addEventListener('pointermove', ev => {
+  if (ev.buttons) return;
+  const u = pick(ev);
+  hovered = u && u.kind === 'arc' ? u.arc : null;
+  renderer.domElement.style.cursor = u ? 'pointer' : 'grab';
+});
+
+/* =====================================================================
+   12. RENDER LOOP
+   ===================================================================== */
+const tmp = new THREE.Vector3();
+let last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const k = reduceMotion ? 1 : 1 - Math.exp(-dt * 5);
+  for (const key in vis) vis[key] += (visTarget[key] - vis[key]) * k;
+  state.splitT += ((state.split ? 1 : 0) - state.splitT) * k;
+
+  for (const f of faders) f.mat.opacity = f.base * vis[f.key];
+
+  // Head slabs: overlap at z=0 (depth 3) when merged, fan out to 4 thin colored slabs when split.
+  headSlabs.forEach((s, h) => {
+    const t = state.splitT;
+    s.position.z = headZ(h) * t;
+    s.scale.z = 3 + (0.82 - 3) * t;
+    s.material.color.copy(C.slab).lerp(C.heads[h], t * 0.85);
+    s.material.opacity = (0.3 * (0.35 + 0.65 * t)) * vis.attn;
+  });
+
+  // Arcs grow along their length, dim when another arc is selected.
+  const sel = state.selected;
+  for (const a of arcs) {
+    a.grow = Math.min(1, a.grow + dt * 1.4);
+    const count = Math.floor(a.core.geometry.index.count * a.grow / 3) * 3;
+    a.core.geometry.setDrawRange(0, count);
+    a.glow.geometry.setDrawRange(0, Math.floor(a.glow.geometry.index.count * a.grow / 3) * 3);
+    const isSel = sel && sel.i === a.i && sel.j === a.j && sel.h === a.h;
+    const dim = sel && !isSel ? 0.22 : 1;
+    const boost = isSel || hovered === a ? 1.6 : 1;
+    a.core.material.opacity = Math.min(1, a.base * dim * boost) * vis.arc;
+    a.glow.material.opacity = Math.min(0.5, a.base * 0.16 * dim * boost * (C.dark ? 1.4 : 1)) * vis.arc;
+  }
+  if (!reduceMotion) for (const p of particles) {
+    const t = 1 - ((now / 1000) * p.speed + p.off) % 1;   // key j → query i
+    p.arc.curve.getPoint(t, p.mesh.position);
+    const dim = sel && !(sel.i === p.arc.i && sel.j === p.arc.j && sel.h === p.arc.h) ? 0.2 : 1;
+    p.mesh.material.opacity = 0.9 * vis.arc * p.arc.grow * dim;
+  } else particles.forEach(p => { p.mesh.visible = false; });
+
+  controls.update();
+  renderer.render(scene, camera);
+
+  // Project HTML labels onto the canvas.
+  const w = innerWidth, h = innerHeight;
+  for (const l of labels) {
+    tmp.copy(l.pos).project(camera);
+    const behind = tmp.z > 1;
+    const x = (tmp.x * 0.5 + 0.5) * w, y = (-tmp.y * 0.5 + 0.5) * h;
+    const o = vis[l.key];
+    l.el.style.opacity = behind ? 0 : Math.min(1, o * 1.2).toFixed(2);
+    l.el.style.visibility = behind || o < 0.05 ? 'hidden' : 'visible';
+    const ax = l.el.classList.contains('tok-label') ? '-50%' : l.el.classList.contains('end') ? '-100%' : '0';
+    l.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(${ax}, -50%)`;
+  }
+}
+
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  drawHeat();
+}
+addEventListener('resize', resize);
+
+/* =====================================================================
+   13. WIRING
+   ===================================================================== */
+const input = document.getElementById('sentence');
+function run(text) {
+  const m = computeModel(text);
+  if (!m) return;
+  state.model = m;
+  state.focus = -1;
+  state.selected = null;
+  buildScene();
+  setPhase(state.phase);
+  if (!drawer.hidden) drawer.hidden = true;
+}
+let debounce;
+input.addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(() => run(input.value), 260); });
+document.getElementById('sentence-form').addEventListener('submit', e => { e.preventDefault(); clearTimeout(debounce); run(input.value); });
+
+function retheme() { readTheme(); if (state.model) { buildScene(); setPhase(state.phase); } }
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', retheme);
+new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+if (innerWidth < 760) document.getElementById('matrix').open = false;
+readTheme();
+buildChips();
+run(input.value);
+resize();
+Object.assign(vis, TARGETS[state.phase]);
+requestAnimationFrame(frame);
+
+// Open on the ambiguity the default sentence is built around: "bank" reading "river".
+const bank = state.model.toks.findIndex(t => t.word === 'bank');
+const river = state.model.toks.findIndex(t => t.word === 'river');
+if (bank >= 0 && river >= 0) {
+  setSplit(true);
+  state.heatHead = 2;
+  chipsEl.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', +x.dataset.h === 2));
+  if (innerWidth >= 760) selectArc({ i: bank, j: river, h: 2 }); else drawHeat();
+}
+})();
+</script>
+</body>
+</html>

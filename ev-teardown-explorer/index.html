@@ -1,0 +1,1699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EV Teardown Explorer</title>
+<meta name="description" content="Interactive 3D teardown of a dual-motor electric sedan: exploded view, system layers, and click-to-inspect component specs.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+  /* Single dark theme by design: a workshop light-box that paints its own ground in every host theme. */
+  :root {
+    --bg: #06080c;
+    --panel: rgba(12, 15, 21, 0.86);
+    --panel-solid: #0c0f15;
+    --line: rgba(200, 212, 232, 0.12);
+    --line-strong: rgba(200, 212, 232, 0.26);
+    --ink: #eef1f5;
+    --dim: #939cac;
+    --mute: #5e6776;
+    --focus: #9fd8ff;
+    --sans: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+    --radius: 12px;
+    color-scheme: dark;
+  }
+  [hidden] { display: none !important; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 14px/1.45 var(--sans);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  canvas.scene { position: fixed; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  canvas.scene.dragging { cursor: grabbing; }
+  canvas.scene.pointing { cursor: pointer; }
+  button, select, input { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .eyebrow {
+    margin: 0;
+    font: 500 10.5px/1.4 var(--mono);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--dim);
+  }
+  .glass {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    backdrop-filter: blur(14px) saturate(1.2);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  }
+
+  /* ---------- masthead ---------- */
+  .mast {
+    position: fixed;
+    top: calc(18px + env(safe-area-inset-top, 0px));
+    left: 20px;
+    pointer-events: none;
+    display: grid;
+    gap: 3px;
+  }
+  .mast h1 { margin: 0; font: 700 22px/1.1 var(--sans); letter-spacing: -0.01em; }
+  .mast .sub { margin: 0; font: 400 11px/1.4 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); }
+
+  /* ---------- telemetry HUD ---------- */
+  .hud {
+    position: fixed;
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    right: 16px;
+    display: flex;
+    gap: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+  .hud div { padding: 9px 14px; border-left: 1px solid var(--line); min-width: 92px; }
+  .hud div:first-child { border-left: 0; }
+  .hud dt { font: 500 9.5px/1.3 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--mute); }
+  .hud dd { margin: 3px 0 0; font: 500 13px/1.2 var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .hud dd small { color: var(--dim); font-size: 10.5px; }
+  .hud .live-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--mute); margin-right: 6px; vertical-align: 1px; }
+  .hud .live-dot.on { background: #5fd38a; box-shadow: 0 0 8px #5fd38a; }
+
+  /* ---------- systems panel ---------- */
+  .panel {
+    position: fixed;
+    left: 16px;
+    top: 84px;
+    width: 292px;
+    max-height: calc(100% - 84px - 140px);
+    overflow-y: auto;
+    padding: 14px;
+    display: grid;
+    gap: 14px;
+    align-content: start;
+    scrollbar-width: thin;
+  }
+  .panel h2 { margin: 0; font: 600 13px/1.2 var(--sans); }
+  .panel-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .link-btn { background: none; border: 0; padding: 2px 4px; color: var(--dim); font-size: 12px; cursor: pointer; border-radius: 4px; }
+  .link-btn:hover { color: var(--ink); }
+  .sys-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .sys { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 2px; border-radius: 8px; }
+  .sys-name {
+    display: flex; align-items: center; gap: 10px;
+    background: none; border: 0; text-align: left; cursor: pointer;
+    padding: 7px 8px; border-radius: 8px; min-height: 36px;
+  }
+  .sys-name:hover { background: rgba(255, 255, 255, 0.04); }
+  .sys-name[aria-pressed="true"] { background: rgba(255, 255, 255, 0.08); }
+  .sys-name .sw { width: 10px; height: 10px; border-radius: 3px; background: var(--c); flex: none; box-shadow: 0 0 0 1px rgba(255,255,255,0.12) inset; }
+  .sys-name[aria-pressed="true"] .sw { box-shadow: 0 0 10px var(--c); }
+  .sys-name .lbl { flex: 1; font-weight: 500; }
+  .sys-name .count { font: 400 11px var(--mono); color: var(--mute); }
+  .sys.off .sys-name .lbl, .sys.off .sys-name .sw { opacity: 0.35; }
+  .ico {
+    width: 32px; height: 32px; display: grid; place-items: center;
+    background: none; border: 0; border-radius: 7px; cursor: pointer; color: var(--mute);
+  }
+  .ico:hover { color: var(--ink); background: rgba(255, 255, 255, 0.05); }
+  .ico[aria-pressed="true"] { color: var(--ink); }
+  .ico svg { width: 17px; height: 17px; }
+  .ico .when-off { display: none; }
+  .ico[data-act="eye"][aria-pressed="false"] .when-on { display: none; }
+  .ico[data-act="eye"][aria-pressed="false"] .when-off { display: block; }
+  .ico[data-act="xray"][aria-pressed="true"] { color: #9fd8ff; }
+
+  .legend-note { margin: 0; font-size: 11.5px; color: var(--mute); line-height: 1.4; }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    padding: 6px 10px; border-radius: 999px; cursor: pointer; font-size: 12px; min-height: 30px;
+  }
+  .chip:hover { border-color: var(--line-strong); }
+  .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .toggles { display: grid; gap: 2px; }
+  .toggle { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 8px; cursor: pointer; min-height: 34px; }
+  .toggle:hover { background: rgba(255, 255, 255, 0.04); }
+  .toggle input { appearance: none; width: 30px; height: 17px; border-radius: 999px; background: rgba(255,255,255,0.12); position: relative; cursor: pointer; margin: 0; transition: background .2s; }
+  .toggle input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: var(--dim); transition: transform .2s, background .2s; }
+  .toggle input:checked { background: rgba(159, 216, 255, 0.35); }
+  .toggle input:checked::after { transform: translateX(13px); background: var(--ink); }
+  .jump { display: grid; gap: 6px; }
+  .jump select {
+    width: 100%; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,0.04);
+    border: 1px solid var(--line); cursor: pointer; min-height: 36px;
+  }
+  .jump select option, .jump select optgroup { background: var(--panel-solid); color: var(--ink); }
+  .divider { height: 1px; background: var(--line); margin: 0 -14px; }
+
+  .panel-toggle {
+    display: none;
+    position: fixed; left: 16px; top: 84px;
+    padding: 8px 14px; border-radius: 999px; cursor: pointer; font-weight: 600; font-size: 13px;
+  }
+
+  /* ---------- inspector drawer ---------- */
+  .drawer {
+    position: fixed;
+    right: 16px;
+    top: 84px;
+    width: 352px;
+    max-height: calc(100% - 84px - 140px);
+    overflow-y: auto;
+    padding: 18px 18px 16px;
+    display: grid;
+    gap: 14px;
+    align-content: start;
+    animation: slide-in .32s cubic-bezier(.2, .8, .2, 1);
+    scrollbar-width: thin;
+  }
+  @keyframes slide-in { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+  .drawer-head { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+  .drawer .kind { display: flex; align-items: center; gap: 8px; }
+  .drawer .kind .sw { width: 8px; height: 8px; border-radius: 2px; background: var(--c); box-shadow: 0 0 8px var(--c); }
+  .drawer h2 { margin: 6px 0 0; font: 700 21px/1.15 var(--sans); letter-spacing: -0.01em; }
+  .drawer .where { margin: 4px 0 0; font: 400 11.5px var(--mono); color: var(--dim); }
+  .drawer p { margin: 0; color: #c9cfd9; line-height: 1.55; }
+  .drawer h3 { margin: 0 0 6px; font: 500 10.5px/1.4 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
+  .specs { margin: 0; display: grid; border-top: 1px solid var(--line); }
+  .specs div { display: grid; grid-template-columns: 42% 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .specs dt { color: var(--dim); font-size: 12.5px; }
+  .specs dd { margin: 0; font: 500 12.5px/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+  .drawer-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn {
+    background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line-strong);
+    padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 12.5px; min-height: 36px;
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.1); }
+  .btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .btn.primary:hover { background: #fff; }
+  .icon-btn { width: 34px; height: 34px; flex: none; border-radius: 8px; border: 1px solid var(--line); background: none; cursor: pointer; font-size: 18px; line-height: 1; color: var(--dim); }
+  .icon-btn:hover { color: var(--ink); border-color: var(--line-strong); }
+  .footnote { font-size: 11px !important; color: var(--mute) !important; }
+
+  /* ---------- deconstruct dock ---------- */
+  .dock {
+    position: fixed;
+    left: 50%;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    width: min(640px, calc(100% - 32px));
+    padding: 12px 16px 12px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px 16px;
+    align-items: center;
+  }
+  .slider-top { display: flex; justify-content: space-between; align-items: baseline; }
+  .slider-top label { font-weight: 600; font-size: 13px; }
+  .slider-top output { font: 500 12px var(--mono); color: var(--dim); font-variant-numeric: tabular-nums; }
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 28px; background: transparent; cursor: pointer; margin: 2px 0 0;
+    --p: 0%;
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 4px; border-radius: 999px;
+    background: linear-gradient(90deg, var(--ink) var(--p), rgba(255,255,255,0.14) var(--p));
+  }
+  input[type="range"]::-moz-range-track { height: 4px; border-radius: 999px; background: rgba(255,255,255,0.14); }
+  input[type="range"]::-moz-range-progress { height: 4px; border-radius: 999px; background: var(--ink); }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; margin-top: -7px;
+    background: var(--ink); border: 3px solid var(--bg); box-shadow: 0 0 0 1px var(--ink);
+  }
+  input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--ink); border: 3px solid var(--bg); box-shadow: 0 0 0 1px var(--ink); }
+  .ticks { display: flex; justify-content: space-between; font: 400 10px var(--mono); color: var(--mute); letter-spacing: 0.04em; text-transform: uppercase; margin-top: -2px; }
+  .dock-btns { display: flex; gap: 6px; }
+  .dock-btns .btn { white-space: nowrap; }
+
+  /* ---------- hover tooltip + boot ---------- */
+  .tip {
+    position: fixed; pointer-events: none; z-index: 5;
+    padding: 5px 9px; border-radius: 6px;
+    background: rgba(8, 10, 14, 0.92); border: 1px solid var(--line-strong);
+    font-size: 12px; font-weight: 600; white-space: nowrap;
+    transform: translate(14px, 14px);
+  }
+  .tip .sw { display: inline-block; width: 7px; height: 7px; border-radius: 2px; background: var(--c); margin-right: 7px; vertical-align: 1px; }
+  .boot { position: fixed; inset: 0; display: grid; place-items: center; color: var(--dim); font: 400 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; pointer-events: none; }
+
+  /* ---------- narrow screens ---------- */
+  @media (max-width: 1100px) {
+    .hud div:nth-child(n+4) { display: none; }
+  }
+  @media (max-width: 860px) {
+    .mast h1 { font-size: 18px; }
+    .mast .sub { display: none; }
+    .mast { top: calc(14px + env(safe-area-inset-top, 0px)); left: 12px; }
+    .hud { top: calc(50px + env(safe-area-inset-top, 0px)); right: 12px; }
+    .hud div { min-width: 0; padding: 7px 10px; }
+    .hud div:nth-child(n+3) { display: none; }
+    .panel-toggle { display: block; top: calc(50px + env(safe-area-inset-top, 0px)); left: 12px; }
+    .panel { display: none; left: 12px; right: 12px; width: auto; top: 102px; max-height: calc(100% - 102px - 150px); }
+    .panel.open { display: grid; }
+    .drawer {
+      left: 12px; right: 12px; width: auto; top: auto;
+      bottom: calc(158px + env(safe-area-inset-bottom, 0px));
+      max-height: 40vh;
+      animation-name: rise-in;
+    }
+    @keyframes rise-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+    .dock { grid-template-columns: 1fr; width: calc(100% - 24px); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+    .dock-btns .btn { flex: 1; }
+    .ticks span:nth-child(2), .ticks span:nth-child(3) { display: none; }
+    .tip { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .drawer { animation: none; }
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<canvas class="scene" id="scene" aria-label="3D model of an electric sedan. Drag to orbit, scroll to zoom, click a component to inspect it."></canvas>
+<p class="boot" id="boot">Loading 3D engine…</p>
+
+<header class="mast">
+  <h1>EV Teardown Explorer</h1>
+  <p class="sub">Dual-motor sedan · stylized · 1 unit = 1 m</p>
+</header>
+
+<dl class="hud glass" aria-label="Telemetry">
+  <div><dt>Teardown</dt><dd id="hTear">0%</dd></div>
+  <div><dt>Visible parts</dt><dd id="hVis">0 / 0</dd></div>
+  <div><dt>Pack</dt><dd>355 V <small>nom.</small></dd></div>
+  <div><dt>Cells modeled</dt><dd id="hCells">0</dd></div>
+  <div><dt><span class="live-dot" id="hDot"></span>Drive sim</dt><dd id="hSim">Parked</dd></div>
+</dl>
+
+<button class="panel-toggle glass" id="panelToggle" aria-expanded="false" aria-controls="panel">Systems</button>
+
+<aside class="panel glass" id="panel" aria-label="System layers">
+  <div class="panel-head">
+    <h2>System layers</h2>
+    <button class="link-btn" id="layersReset">Reset</button>
+  </div>
+  <ul class="sys-list" id="sysList"></ul>
+  <p class="legend-note">Click a name to highlight it. Eye hides, X-ray makes it see-through.</p>
+  <div class="presets" id="presets">
+    <button class="chip" data-preset="hideBody">Hide body</button>
+    <button class="chip" data-preset="battery">Highlight battery</button>
+    <button class="chip" data-preset="thermal">Thermal loop</button>
+    <button class="chip" data-preset="motors">View motors</button>
+    <button class="chip" data-preset="hv">HV path</button>
+  </div>
+  <div class="divider"></div>
+  <div class="toggles">
+    <label class="toggle">Drive simulation <input type="checkbox" id="tSim"></label>
+    <label class="toggle">Camera coverage cones <input type="checkbox" id="tCones"></label>
+    <label class="toggle">Auto-rotate <input type="checkbox" id="tRotate"></label>
+  </div>
+  <div class="divider"></div>
+  <div class="jump">
+    <label class="eyebrow" for="jump">Inspect a component</label>
+    <select id="jump"><option value="">Choose…</option></select>
+  </div>
+</aside>
+
+<aside class="drawer glass" id="drawer" hidden aria-live="polite" aria-label="Component inspector">
+  <div class="drawer-head">
+    <div>
+      <p class="eyebrow kind" id="dKind"><span class="sw"></span><span></span></p>
+      <h2 id="dName">Component</h2>
+      <p class="where" id="dWhere"></p>
+    </div>
+    <button class="icon-btn" id="dClose" aria-label="Close inspector">&times;</button>
+  </div>
+  <p id="dSummary"></p>
+  <div>
+    <h3>Specs</h3>
+    <dl class="specs" id="dSpecs"></dl>
+  </div>
+  <div>
+    <h3>Role in the vehicle</h3>
+    <p id="dRole"></p>
+  </div>
+  <div class="drawer-actions">
+    <button class="btn primary" id="dHighlight">Highlight system</button>
+    <button class="btn" id="dIsolate">Solo this system</button>
+  </div>
+  <p class="footnote">Figures are representative public values for a long-range dual-motor mid-size EV sedan and vary by model year. Geometry is stylized, not a CAD reproduction.</p>
+</aside>
+
+<div class="dock glass">
+  <div>
+    <div class="slider-top">
+      <label for="explode">Deconstruct</label>
+      <output id="explodeOut" for="explode">Assembled</output>
+    </div>
+    <input type="range" id="explode" min="0" max="100" step="1" value="0" aria-describedby="explodeOut">
+    <div class="ticks" aria-hidden="true"><span>Assembled</span><span>Shell off</span><span>Pack dropped</span><span>Full teardown</span></div>
+  </div>
+  <div class="dock-btns">
+    <button class="btn" id="bAssemble">Assemble</button>
+    <button class="btn" id="bExplode">Explode</button>
+    <button class="btn" id="bReset">Reset view</button>
+  </div>
+</div>
+
+<div class="tip" id="tip" hidden></div>
+
+<script>
+  // If the CDN module never boots (offline, blocked), say so instead of showing a blank page.
+  setTimeout(function () {
+    var b = document.getElementById('boot');
+    if (b && !b.hidden) b.textContent = 'Could not load Three.js from cdn.jsdelivr.net. Check your connection and reload.';
+  }, 9000);
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* =====================================================================
+   Coordinate frame
+   ---------------------------------------------------------------------
+   1 unit = 1 metre. +X points to the front bumper, +Y up, +Z to the
+   passenger side (right-hand drive convention for a US car: the driver
+   sits at -Z). The ground plane is y = 0 when assembled.
+   ===================================================================== */
+
+const SYSTEMS = {
+  body:        { label: 'Body & glass',        color: '#c9d2de' },
+  chassis:     { label: 'Chassis & suspension', color: '#8e98ab' },
+  wheels:      { label: 'Wheels & brakes',      color: '#e0544a' },
+  battery:     { label: 'Battery pack',         color: '#5fd38a' },
+  drive:       { label: 'Drive units',          color: '#f0964f' },
+  thermal:     { label: 'Thermal loop',         color: '#4fc3ff' },
+  electronics: { label: 'Electronics & HV',     color: '#a58bff' },
+  sensors:     { label: 'Autopilot sensors',    color: '#ffd449' },
+};
+
+/* =====================================================================
+   Component knowledge base (what the inspector drawer shows)
+   ===================================================================== */
+const INFO = {
+  body: {
+    name: 'Body shell',
+    summary: 'The painted outer skin and crash structure. Aluminum front and rear sections join a high-strength steel passenger cell, and the low nose and tapered tail keep aerodynamic drag down.',
+    specs: [['Drag coefficient', '≈ 0.23 Cd'], ['Structure', 'Aluminum + ultra-high-strength steel'], ['Length × width', '4.72 m × 1.85 m'], ['Wheelbase', '2.875 m']],
+    role: 'At highway speed, aero drag is the largest single energy load on an EV, so body shape sets range as much as pack size does. The shell also routes crash energy around the cabin and the pack.',
+  },
+  glass: {
+    name: 'Glass roof & greenhouse',
+    summary: 'Laminated glass runs from the windshield header over the cabin to the rear deck. Tinted, IR-reflective coatings cut the solar heat that reaches the cabin.',
+    specs: [['Construction', 'Laminated safety glass'], ['Coatings', 'UV block + IR reflective'], ['Mounted here', 'Forward camera trio, B-pillar cameras'], ['Roof rails', 'Steel, carry rollover loads']],
+    role: 'Less solar gain means less compressor work from the heat pump, so the glass coating is part of the thermal budget. The windshield also gives the forward cameras a clean, wiped view.',
+  },
+  frame: {
+    name: 'Floor frame & rocker sills',
+    summary: 'Rocker sills and cabin cross-members form a ring around the battery pack. In a side impact they crush first, so load reaches the cell modules last.',
+    specs: [['Material', 'Extruded aluminum + hot-stamped steel'], ['Ground clearance', '≈ 140 mm (modeled)'], ['Pack protection', 'Side-pole crush zone'], ['Cross-members', '3 under the cabin floor']],
+    role: 'The pack floor adds stiffness to this frame, and the frame keeps the pack intact. That shared load path is why EV floors are so stiff and the centre of gravity sits so low.',
+  },
+  frontFrame: {
+    name: 'Front subframe',
+    summary: 'Carries the front drive unit, steering rack, and lower control arms, and serves as the main frontal crash load path. Newer platforms cast this area as one large aluminum part that replaces dozens of stampings.',
+    specs: [['Carries', 'Front drive unit, steering rack, arms'], ['Construction', 'Stamped rails or single-piece casting'], ['Above it', 'Front trunk (frunk)'], ['Crash role', 'Primary frontal load path']],
+    role: 'With no engine up front, the subframe can be shorter and lighter, which frees up the frunk and a long crumple zone.',
+  },
+  rearFrame: {
+    name: 'Rear subframe',
+    summary: 'Holds the rear drive unit and multi-link suspension. It isolates motor torque reactions and road noise from the cabin through rubber bushings.',
+    specs: [['Carries', 'Rear drive unit, multi-link arms'], ['Construction', 'Stamped rails or single-piece casting'], ['Isolation', 'Rubber-bushed mounts'], ['Crash role', 'Rear impact load path']],
+    role: 'The rear motor makes most of the driving torque, so this frame sees the highest powertrain loads in the car.',
+  },
+  susp: {
+    name: 'Suspension corner',
+    summary: 'Coil spring over a damper, with control arms that locate the wheel. The front uses a double-wishbone layout; the rear uses multi-link.',
+    specs: [['Front', 'Double wishbone'], ['Rear', 'Multi-link'], ['Spring', 'Steel coil over twin-tube damper'], ['Tuned for', '≈ 1,850 kg curb mass']],
+    role: 'Keeps each tire pressed flat on the road so regen braking and instant motor torque have grip to work with. The heavy low pack lets the springs run softer for the same body roll.',
+  },
+  wheel: {
+    name: 'Wheel & tire',
+    summary: 'An 18-inch alloy wheel with a flat aero cover. The cover smooths airflow over the spinning spokes, which cuts drag noticeably at highway speed.',
+    specs: [['Rim', '18 × 8.5 in. alloy'], ['Tire', '235/45 R18, low rolling resistance'], ['Rolling radius', '≈ 0.33 m'], ['Aero cover', 'Reduces wheel turbulence']],
+    role: 'Rolling resistance and wheel drag together sit behind aero as the next biggest energy loss, so wheel and tire choice moves the EPA range figure.',
+  },
+  brake: {
+    name: 'Brake disc & caliper',
+    summary: 'Friction brakes back up regenerative braking. In everyday driving the motors do most of the slowing, so pads and discs last far longer than on a combustion car.',
+    specs: [['Front caliper', 'Fixed, 4-piston'], ['Rear caliper', 'Sliding + electric parking brake'], ['Disc', 'Vented cast iron'], ['Regen share', 'Most daily deceleration']],
+    role: 'The brake controller blends regen and friction so the pedal feels the same whether the pack can accept charge or is full and cold.',
+  },
+  packTray: {
+    name: 'Pack enclosure & tray',
+    summary: 'A sealed aluminum tray bolted into the floor. It carries the modules and coolant manifolds, keeps water and road debris out, and adds stiffness to the body.',
+    specs: [['Full pack mass', '≈ 480 kg'], ['Footprint', '2.1 m × 1.5 m (modeled)'], ['Sealing', 'Gasketed, water- and dust-tight'], ['Underside', 'Aluminum skid plate']],
+    role: 'Hanging the heaviest part of the car between the axles and as low as possible gives an EV its low centre of gravity and near 50:50 weight split.',
+  },
+  packLid: {
+    name: 'Pack lid',
+    summary: 'A thin sealed cover over the modules. The cabin floor and seats sit directly on top of it.',
+    specs: [['Material', 'Steel or composite'], ['Seal', 'Perimeter gasket + bolts'], ['Thickness', 'A few millimetres']],
+    role: 'Keeps moisture out of the high-voltage space and gives a fire barrier between cells and cabin.',
+  },
+  module: {
+    name: 'Battery module',
+    summary: 'Four long modules sit side by side. Each holds about 1,100 cylindrical 2170 cells glued into a carrier, with serpentine cooling ribbons snaking between the cell rows.',
+    specs: [['Cells per module', '≈ 1,100 (1,080 modeled)'], ['Cell format', '2170: 21 × 70 mm, NCA'], ['Series groups', '23 or 25 per module'], ['Module voltage', '≈ 84 to 91 V nominal'], ['Cooling', 'Glycol ribbon, side contact']],
+    role: '46 cells in parallel act as one large cell; 96 of those groups in series set the ≈ 355 V pack voltage (96s46p = 4,416 cells). The BMS measures and balances every group.',
+  },
+  penthouse: {
+    name: 'HV junction box (penthouse)',
+    summary: 'Sits on top of the pack and routes all high-voltage power. It houses the main contactors, pyro fuse, battery management controller, DC-DC converter, and onboard AC charger.',
+    specs: [['Pack voltage', '≈ 355 V nom., ≈ 403 V full'], ['DC fast charge', 'Up to 250 kW'], ['Onboard AC charger', 'Up to 11.5 kW'], ['DC-DC output', '≈ 2.5 kW to low-voltage bus']],
+    role: 'The single gate between the cells and everything else. After a crash signal, the pyro fuse cuts the pack off from the rest of the car in milliseconds.',
+  },
+  rearDU: {
+    name: 'Rear drive unit',
+    summary: 'An interior permanent-magnet synchronous reluctance motor, a single-speed reduction gearbox, and the differential, all in one housing. It carries most of the cruising load.',
+    specs: [['Motor type', 'IPM synchronous reluctance'], ['Peak power', '≈ 210 kW'], ['Reduction', '≈ 9:1 single speed'], ['Max motor speed', '≈ 18,000 rpm'], ['Peak efficiency', '≈ 97%']],
+    role: 'Magnets give strong torque at low current, so this motor runs almost all the time. Regenerative braking flows back through it to the pack.',
+  },
+  frontDU: {
+    name: 'Front drive unit',
+    summary: 'A 3-phase AC induction motor with its own reduction gearbox. With no permanent magnets, it spins freely with almost no drag when it is not needed.',
+    specs: [['Motor type', '3-phase AC induction'], ['Peak power', '≈ 150 kW'], ['Reduction', '≈ 9:1 single speed'], ['Duty', 'Launch, slip, high load']],
+    role: 'Pairing an induction front with a magnet rear lets the car pick the more efficient motor moment to moment and still have all-wheel drive on demand.',
+  },
+  rearInverter: {
+    name: 'Rear inverter',
+    summary: 'Turns the pack\'s DC into variable-frequency 3-phase AC for the motor, and back into DC during regen. Silicon-carbide MOSFETs switch with lower losses than older silicon IGBTs.',
+    specs: [['Input', '≈ 355 V DC bus'], ['Output', '3-phase variable-frequency AC'], ['Power stage', '24 SiC MOSFET modules'], ['Cooling', 'Liquid, drive-unit loop']],
+    role: 'Every watt that moves the car passes through here twice: out to the motor, then back during regen. A point of inverter efficiency is a point of range.',
+  },
+  frontInverter: {
+    name: 'Front inverter',
+    summary: 'Drives the front induction motor. It controls slip frequency as well as current, because an induction rotor only makes torque when it turns slower than the stator field.',
+    specs: [['Input', '≈ 355 V DC bus'], ['Output', '3-phase variable-frequency AC'], ['Power stage', 'Silicon IGBT or SiC by build'], ['Cooling', 'Liquid, drive-unit loop']],
+    role: 'Lets the front motor sit idle at zero current most of the time, then deliver full torque within milliseconds when traction or acceleration calls for it.',
+  },
+  halfshaft: {
+    name: 'Half-shaft',
+    summary: 'Carries torque from the differential to each wheel hub. Constant-velocity joints at each end let the wheel steer and move with the suspension without binding.',
+    specs: [['Inner joint', 'Tripod, plunging CV'], ['Outer joint', 'Ball-type fixed CV'], ['Axle torque', '≈ 3,800 N·m peak (after 9:1)'], ['Boots', 'Rubber, grease-sealed']],
+    role: 'After the 9:1 reduction, the shafts see the highest torque in the drivetrain, far more than the motor shaft itself.',
+  },
+  heatpump: {
+    name: 'Heat pump & Octovalve',
+    summary: 'An eight-port rotary valve and coolant manifold link the pack, drive units, cabin, and radiator into one loop. An electric scroll compressor moves heat in whichever direction the car needs.',
+    specs: [['Valve', '8-port rotary "Octovalve"'], ['Operating modes', '12+ heat / cool modes'], ['Compressor', 'Electric scroll, HV powered'], ['Heat sources', 'Air, drive units, pack, cabin']],
+    role: 'In winter it scavenges waste heat from the motors and electronics before spending pack energy on heat. It can even run a motor inefficiently on purpose to warm the pack for fast charging.',
+  },
+  radiator: {
+    name: 'Radiator & active shutters',
+    summary: 'A low-temperature radiator and condenser behind the front fascia dump heat to outside air. Shutters close at cruise to keep drag down when cooling is not needed.',
+    specs: [['Core', 'Low-temp radiator + AC condenser'], ['Fans', '2 × variable speed'], ['Airflow control', 'Active grille shutters'], ['Peak use', 'DC fast charging in summer']],
+    role: 'The hardest cooling job an EV has is fast charging on a hot day, when the pack takes 250 kW and sheds several kilowatts of heat.',
+  },
+  coolant: {
+    name: 'Coolant loop',
+    summary: 'Glycol-water lines tie every heat source and sink together. Red lines carry heat away from drive units and the pack; blue lines carry chilled coolant back.',
+    specs: [['Fluid', '50/50 glycol-water'], ['Pack target', '≈ 20 to 35 °C'], ['Pumps', '2 electric coolant pumps'], ['Preconditioning', 'Warms pack before fast charge']],
+    role: 'Keeping cells in their temperature window is what lets the car charge fast, deliver full power, and keep its capacity over years of cycles.',
+  },
+  computer: {
+    name: 'Autopilot computer',
+    summary: 'A dual-SoC board behind the glovebox that runs the vision neural networks. Both chips process the same camera feeds so one can cross-check the other.',
+    specs: [['Architecture', '2 redundant SoCs + NN accelerators'], ['Compute (HW3)', '≈ 144 TOPS'], ['Inputs', '8 camera streams + vehicle data'], ['Cooling', 'Liquid cold plate']],
+    role: 'Turns raw camera pixels into a 3D model of lanes, cars, and people many times a second, then plans steering, braking, and torque requests.',
+  },
+  gateway: {
+    name: 'Gateway ECU',
+    summary: 'Routes messages between the powertrain, chassis, and body networks and stores the vehicle configuration. It checks and stages over-the-air updates before other controllers install them.',
+    specs: [['Networks', 'Powertrain, chassis, body CAN + Ethernet'], ['Supply', 'Low-voltage bus'], ['Jobs', 'Routing, config, OTA staging'], ['Security', 'Filters traffic between buses']],
+    role: 'Keeps the infotainment side from talking directly to brakes or steering, and is the reason one software download can update dozens of controllers.',
+  },
+  lvBattery: {
+    name: 'Low-voltage battery',
+    summary: 'Powers door locks, computers, and contactor coils while the high-voltage pack is disconnected. The DC-DC converter keeps it charged from the main pack.',
+    specs: [['Voltage', '12 V lead-acid or 15.5 V Li-ion'], ['Location', 'Front trunk'], ['Charged by', 'DC-DC in the penthouse'], ['Wakes', 'Contactors, BMS, gateway']],
+    role: 'The main pack\'s contactors are held closed by low-voltage coils, so this small battery is what lets the car "turn on" at all.',
+  },
+  chargePort: {
+    name: 'Charge port',
+    summary: 'A NACS connector behind the rear-left light. The same pins take AC from a home wall connector or DC straight to the pack from a fast charger.',
+    specs: [['Connector', 'NACS (SAE J3400)'], ['DC peak', '≈ 250 kW'], ['AC max', '11.5 kW'], ['Signaling', 'Power-line communication']],
+    role: 'On DC, the charger talks to the BMS and the penthouse closes fast-charge contactors that bypass the onboard charger entirely.',
+  },
+  hvCables: {
+    name: 'High-voltage cabling',
+    summary: 'Shielded orange cables carry pack current to both inverters, the compressor, and from the charge port. Orange marks circuits above 60 V DC across the industry.',
+    specs: [['Bus voltage', '≈ 355 V DC'], ['Peak current', '≈ 1,000 A at launch'], ['Shielding', 'Braided, contains inverter EMI'], ['Color code', 'Orange (SAE J1673)']],
+    role: 'Shorter, fatter cables mean lower resistive loss. Placing the penthouse and inverters close to the pack keeps these runs short.',
+  },
+  camForward: {
+    name: 'Forward camera trio',
+    summary: 'Three cameras behind the windshield: narrow, main, and wide. Together they read lanes, signs, lights, and objects from the nose out to about 250 m.',
+    specs: [['Narrow', '≈ 250 m range'], ['Main', '≈ 150 m range'], ['Wide (fisheye)', '≈ 60 m, 120° field'], ['Also here', 'Rain sensor, cabin camera']],
+    role: 'The main forward view for lane keeping and following distance. Three focal lengths give both long reach and a wide field at intersections.',
+  },
+  camBPillar: {
+    name: 'B-pillar camera',
+    summary: 'Forward-angled side cameras that watch for cross traffic at junctions and cars cutting into the lane.',
+    specs: [['Count', '2 (one per side)'], ['Range', '≈ 80 m'], ['Aim', 'Side, angled forward']],
+    role: 'Fills the gap between the forward trio and the rear-facing repeaters, which matters most when pulling out of a side road.',
+  },
+  camRepeater: {
+    name: 'Fender repeater camera',
+    summary: 'Rear-facing cameras in the front fenders that cover blind spots for lane changes and merges.',
+    specs: [['Count', '2 (one per side)'], ['Range', '≈ 100 m'], ['Aim', 'Side, rearward']],
+    role: 'Lets the system check the adjacent lane before an automatic lane change, the job a side mirror and shoulder check do for a human.',
+  },
+  camRear: {
+    name: 'Rear camera',
+    summary: 'A wide rear-view camera above the licence plate, used for reversing, parking, and rear traffic.',
+    specs: [['Range', '≈ 50 m'], ['Field', 'Wide angle'], ['Use', 'Reverse, parking, rear traffic']],
+    role: 'Completes the 360° camera ring so the car can build a full surround view with no radar or ultrasonic sensors.',
+  },
+};
+
+/* =====================================================================
+   Renderer, scene, camera
+   ===================================================================== */
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#06080c');
+scene.fog = new THREE.Fog('#06080c', 14, 30);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.05, 80);
+const HOME_TGT = new THREE.Vector3(0, 0.75, 0);
+// Pull the default viewpoint back on tall/narrow screens so the whole car fits.
+const homeCam = () => new THREE.Vector3(4.6, 2.5, 4.3).sub(HOME_TGT)
+  .multiplyScalar(Math.max(1, Math.pow(1.5 / camera.aspect, 0.75))).add(HOME_TGT);
+camera.position.copy(homeCam());
+
+const controls = new OrbitControls(camera, canvas);
+controls.target.copy(HOME_TGT);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 0.5;
+controls.maxDistance = 16;
+controls.maxPolarAngle = Math.PI * 0.53;
+controls.autoRotateSpeed = 0.6;
+
+scene.add(new THREE.HemisphereLight('#cfe0ff', '#1a1510', 0.55));
+const key = new THREE.DirectionalLight('#ffffff', 2.2);
+key.position.set(4, 7, 3);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+Object.assign(key.shadow.camera, { left: -5, right: 5, top: 5, bottom: -5, near: 1, far: 20 });
+key.shadow.bias = -0.0004;
+scene.add(key);
+const rim = new THREE.DirectionalLight('#7fb8ff', 1.1);
+rim.position.set(-5, 3, -4);
+scene.add(rim);
+
+// Ground: shadow catcher + grid. The whole group sinks during the teardown so
+// the dropped battery pack never clips through the floor.
+const ground = new THREE.Group();
+const shadowFloor = new THREE.Mesh(new THREE.CircleGeometry(9, 64), new THREE.ShadowMaterial({ opacity: 0.45 }));
+shadowFloor.rotation.x = -Math.PI / 2;
+shadowFloor.receiveShadow = true;
+ground.add(shadowFloor);
+const grid = new THREE.GridHelper(18, 72, '#27303d', '#141a23');
+grid.material.transparent = true;
+grid.material.opacity = 0.7;
+grid.position.y = 0.001;
+ground.add(grid);
+scene.add(ground);
+
+/* =====================================================================
+   Material registry
+   ---------------------------------------------------------------------
+   Every material is created through M(system, ...) so the layer panel can
+   ghost, highlight or restore a whole system by walking one list. Base
+   values are stored once so each state change starts from a clean slate.
+   ===================================================================== */
+const registry = [];
+function M(system, params, Ctor = THREE.MeshStandardMaterial) {
+  const mat = new Ctor(params);
+  registry.push({
+    mat, system,
+    base: {
+      opacity: mat.opacity,
+      transparent: mat.transparent,
+      depthWrite: mat.depthWrite,
+      emissive: mat.emissive ? mat.emissive.clone() : null,
+    },
+  });
+  return mat;
+}
+
+const V = (x, y, z = 0) => new THREE.Vector3(x, y, z);
+const V2 = (x, y) => new THREE.Vector2(x, y);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+function mesh(geo, mat, x = 0, y = 0, z = 0) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  return m;
+}
+const rbox = (w, h, d, r, mat, x, y, z) => mesh(new RoundedBoxGeometry(w, h, d, 3, Math.min(r, w / 2, h / 2, d / 2)), mat, x, y, z);
+function cylZ(r, len, mat, x, y, z, seg = 32) {
+  const g = new THREE.CylinderGeometry(r, r, len, seg);
+  g.rotateX(Math.PI / 2);
+  return mesh(g, mat, x, y, z);
+}
+function cylX(r, len, mat, x, y, z, seg = 32) {
+  const g = new THREE.CylinderGeometry(r, r, len, seg);
+  g.rotateZ(Math.PI / 2);
+  return mesh(g, mat, x, y, z);
+}
+
+/* =====================================================================
+   Part registry + exploded-view model
+   ---------------------------------------------------------------------
+   Each part is a THREE.Group parented directly to the scene (no nested
+   transforms), so its world position is simply:
+
+       position(t) = home + explode * ease(local(t))
+
+   - home     : the assembled position, in metres.
+   - explode  : the translation vector at full teardown. Its direction is
+                the axis along which that part naturally "leaves" the car
+                (shell straight up, pack straight down, motors fore/aft,
+                wheels outboard along ±Z). Its length is how far it goes.
+   - win[a,b] : the slice of the global slider (0..1) during which this
+                part moves. local(t) = clamp((t - a) / (b - a), 0, 1).
+                Staggered windows turn one slider into a sequenced
+                teardown: body lifts first, wheels slide off, then the
+                powertrain and finally the cell modules fan out.
+
+   Because every vector is linear in ease(local(t)), dragging the slider
+   backwards reassembles the car along exactly the same paths.
+   ===================================================================== */
+const parts = new Map();
+function makePart(id, system, home, explode, win, info = id, where = '') {
+  const group = new THREE.Group();
+  group.position.copy(home);
+  group.userData.partId = id;
+  scene.add(group);
+  const p = { id, system, group, home: home.clone(), explode, win, info, where, cur: new THREE.Vector3() };
+  parts.set(id, p);
+  return p;
+}
+
+/* =====================================================================
+   Materials
+   ===================================================================== */
+const MAT = {
+  paint: M('body', { color: '#d5dbe4', metalness: 0.55, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.08, side: THREE.DoubleSide }, THREE.MeshPhysicalMaterial),
+  trim: M('body', { color: '#15181e', metalness: 0.3, roughness: 0.5 }),
+  headlamp: M('body', { color: '#ffffff', emissive: '#dff1ff', emissiveIntensity: 1.6 }),
+  taillamp: M('body', { color: '#5a0c0c', emissive: '#ff2a2a', emissiveIntensity: 1.4 }),
+  bodyEdge: M('body', { color: '#9fb4d0', transparent: true, opacity: 0.22 }, THREE.LineBasicMaterial),
+  glass: M('body', { color: '#0e1824', metalness: 0.6, roughness: 0.05, transparent: true, opacity: 0.55, side: THREE.DoubleSide, envMapIntensity: 1.6 }),
+  glassEdge: M('body', { color: '#cfe0f5', transparent: true, opacity: 0.3 }, THREE.LineBasicMaterial),
+
+  frame: M('chassis', { color: '#4a5263', metalness: 0.7, roughness: 0.45 }),
+  frameAlu: M('chassis', { color: '#9aa3b3', metalness: 0.85, roughness: 0.35 }),
+  spring: M('chassis', { color: '#d9a43a', metalness: 0.6, roughness: 0.35 }),
+  damper: M('chassis', { color: '#2b2f37', metalness: 0.7, roughness: 0.3 }),
+
+  tire: M('wheels', { color: '#131519', roughness: 0.92, metalness: 0 }),
+  rim: M('wheels', { color: '#2a2e36', metalness: 0.75, roughness: 0.32 }),
+  rimCover: M('wheels', { color: '#b8c0cc', metalness: 0.85, roughness: 0.25 }),
+  disc: M('wheels', { color: '#80868f', metalness: 0.9, roughness: 0.42 }),
+  caliper: M('wheels', { color: '#c8352b', metalness: 0.3, roughness: 0.4 }),
+
+  tray: M('battery', { color: '#36433e', metalness: 0.75, roughness: 0.4 }),
+  lid: M('battery', { color: '#6fae8a', metalness: 0.4, roughness: 0.4, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }),
+  lidEdge: M('battery', { color: '#7ee0a6', transparent: true, opacity: 0.5 }, THREE.LineBasicMaterial),
+  moduleWall: M('battery', { color: '#2e6d4f', metalness: 0.3, roughness: 0.5 }),
+  cell: M('battery', { color: '#a9b7c4', metalness: 0.7, roughness: 0.32 }),
+  busbar: M('battery', { color: '#c9803f', metalness: 0.9, roughness: 0.3 }),
+  ribbon: M('battery', { color: '#1f6f93', emissive: '#2bb6ff', emissiveIntensity: 0.55, metalness: 0.4, roughness: 0.3, side: THREE.DoubleSide }),
+
+  housing: M('drive', { color: '#b8bfc9', metalness: 0.85, roughness: 0.32 }),
+  gearbox: M('drive', { color: '#8d95a3', metalness: 0.85, roughness: 0.38 }),
+  copper: M('drive', { color: '#c77a3a', metalness: 0.9, roughness: 0.3, emissive: '#3a1a06', emissiveIntensity: 0.6 }),
+  inverter: M('drive', { color: '#3c414c', metalness: 0.6, roughness: 0.4 }),
+  shaft: M('drive', { color: '#6a707b', metalness: 0.85, roughness: 0.35 }),
+  boot: M('drive', { color: '#1a1c20', roughness: 0.8 }),
+  driveAccent: M('drive', { color: '#f0964f', emissive: '#f0964f', emissiveIntensity: 0.35, roughness: 0.4 }),
+
+  manifold: M('thermal', { color: '#27313d', metalness: 0.3, roughness: 0.5 }),
+  valve: M('thermal', { color: '#4fc3ff', emissive: '#1f86c2', emissiveIntensity: 0.8, roughness: 0.3 }),
+  compressor: M('thermal', { color: '#aab3c0', metalness: 0.85, roughness: 0.3 }),
+  radCore: M('thermal', { color: '#3a4655', metalness: 0.6, roughness: 0.55 }),
+  fan: M('thermal', { color: '#1b2029', metalness: 0.3, roughness: 0.6 }),
+
+  pcb: M('electronics', { color: '#262b36', metalness: 0.4, roughness: 0.5 }),
+  heatsink: M('electronics', { color: '#8e97a6', metalness: 0.85, roughness: 0.35 }),
+  led: M('electronics', { color: '#a58bff', emissive: '#8a6bff', emissiveIntensity: 1.2 }),
+  hvOrange: M('electronics', { color: '#ff7a1a', emissive: '#b84a00', emissiveIntensity: 0.5, roughness: 0.45 }),
+  lvCase: M('electronics', { color: '#2d313a', roughness: 0.6 }),
+
+  camBody: M('sensors', { color: '#16181d', metalness: 0.4, roughness: 0.4 }),
+  camLens: M('sensors', { color: '#ffd449', emissive: '#ffb800', emissiveIntensity: 1.1, metalness: 0.2, roughness: 0.2 }),
+};
+
+/* =====================================================================
+   1. Body shell + glass greenhouse
+   ---------------------------------------------------------------------
+   Both are side-profile THREE.Shapes extruded across the car's width,
+   then reshaped per-vertex: the lower body tapers in plan view at the
+   nose and tail, and the greenhouse leans inward as it rises
+   ("tumblehome") so it reads as a sedan cabin rather than a box.
+   ===================================================================== */
+function bodyGeometry() {
+  const s = new THREE.Shape();
+  s.moveTo(2.34, 0.46);
+  s.splineThru([V2(2.31, 0.68), V2(2.12, 0.82), V2(1.65, 0.9), V2(0.98, 0.975)]);
+  s.lineTo(-1.3, 0.995);
+  s.splineThru([V2(-1.95, 0.985), V2(-2.3, 0.925), V2(-2.385, 0.72)]);
+  s.lineTo(-2.365, 0.42);
+  s.quadraticCurveTo(-2.35, 0.3, -2.2, 0.3);
+  s.lineTo(-1.88, 0.3);
+  s.absarc(-1.44, 0.34, 0.44, Math.PI, 0, true);   // rear wheel arch
+  s.lineTo(-1.0, 0.3);
+  s.lineTo(1.0, 0.3);
+  s.absarc(1.44, 0.34, 0.44, Math.PI, 0, true);    // front wheel arch
+  s.lineTo(1.88, 0.3);
+  s.lineTo(2.18, 0.3);
+  s.quadraticCurveTo(2.33, 0.31, 2.34, 0.46);
+  const g = new THREE.ExtrudeGeometry(s, { depth: 1.72, bevelEnabled: true, bevelThickness: 0.07, bevelSize: 0.06, bevelSegments: 4, curveSegments: 40 });
+  g.translate(0, 0, -0.86);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i);
+    p.setZ(i, p.getZ(i) * (1 - 0.1 * smooth(1.5, 2.42, Math.abs(x))));
+  }
+  g.computeBoundingSphere();
+  return g;
+}
+function greenhouseGeometry() {
+  const s = new THREE.Shape();
+  s.moveTo(1.0, 0.955);
+  s.splineThru([V2(0.62, 1.18), V2(0.2, 1.375), V2(-0.4, 1.44), V2(-1.0, 1.385), V2(-1.55, 1.2), V2(-1.98, 0.99)]);
+  s.lineTo(-1.98, 0.955);
+  s.lineTo(1.0, 0.955);
+  const g = new THREE.ExtrudeGeometry(s, { depth: 1.34, bevelEnabled: true, bevelThickness: 0.07, bevelSize: 0.05, bevelSegments: 4, curveSegments: 36 });
+  g.translate(0, 0, -0.67);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const t = clamp((p.getY(i) - 0.95) / 0.5, 0, 1);
+    p.setZ(i, p.getZ(i) * (1 - 0.17 * t));
+  }
+  g.computeBoundingSphere();
+  return g;
+}
+
+{
+  const body = makePart('body', 'body', V(0, 0, 0), V(0, 1.35, 0), [0, 0.45]);
+  const bg = bodyGeometry();
+  const shell = mesh(bg, MAT.paint);
+  shell.castShadow = true;
+  body.group.add(shell);
+  body.group.add(new THREE.LineSegments(new THREE.EdgesGeometry(bg, 32), MAT.bodyEdge));
+  // Light signatures and mirrors
+  for (const sz of [-1, 1]) {
+    const hl = rbox(0.2, 0.035, 0.34, 0.015, MAT.headlamp, 2.2, 0.76, sz * 0.6);
+    hl.rotation.z = -0.35;
+    hl.rotation.y = sz * 0.35;
+    body.group.add(hl);
+    const mirror = rbox(0.12, 0.08, 0.16, 0.03, MAT.trim, 0.82, 1.03, sz * 0.99);
+    body.group.add(mirror);
+  }
+  body.group.add(rbox(0.03, 0.035, 1.5, 0.012, MAT.taillamp, -2.37, 0.86, 0));
+  body.group.add(rbox(0.05, 0.1, 1.2, 0.03, MAT.trim, 2.33, 0.4, 0));
+
+  const glass = makePart('glass', 'body', V(0, 0, 0), V(0, 1.9, 0), [0, 0.5]);
+  const gg = greenhouseGeometry();
+  const gm = mesh(gg, MAT.glass);
+  gm.castShadow = false;
+  glass.group.add(gm);
+  glass.group.add(new THREE.LineSegments(new THREE.EdgesGeometry(gg, 30), MAT.glassEdge));
+}
+
+/* =====================================================================
+   2. Chassis: floor frame, subframes, suspension corners
+   ===================================================================== */
+{
+  const f = makePart('frame', 'chassis', V(0, 0, 0), V(0, 0.6, 0), [0.2, 0.7]);
+  for (const sz of [-1, 1]) f.group.add(rbox(2.3, 0.15, 0.13, 0.03, MAT.frame, 0, 0.33, sz * 0.8));
+  for (const x of [-0.9, -0.3, 0.3]) f.group.add(rbox(0.08, 0.06, 1.5, 0.015, MAT.frameAlu, x, 0.4, 0));
+
+  for (const [id, x, sx] of [['frontFrame', 1.72, 1], ['rearFrame', -1.72, -1]]) {
+    const p = makePart(id, 'chassis', V(x, 0.47, 0), V(sx * 0.5, 0.55, 0), [0.2, 0.75]);
+    for (const sz of [-1, 1]) p.group.add(rbox(1.0, 0.09, 0.09, 0.02, MAT.frameAlu, 0, 0, sz * 0.4));
+    p.group.add(rbox(0.08, 0.09, 0.9, 0.02, MAT.frameAlu, sx * 0.36, 0, 0));
+    p.group.add(rbox(0.08, 0.07, 0.9, 0.02, MAT.frame, -sx * 0.3, -0.06, 0));
+  }
+}
+
+class Helix extends THREE.Curve {
+  constructor(r, h, turns) { super(); this.r = r; this.h = h; this.turns = turns; }
+  getPoint(t, target = new THREE.Vector3()) {
+    const a = t * this.turns * Math.PI * 2;
+    return target.set(this.r * Math.cos(a), this.h * t - this.h / 2, this.r * Math.sin(a));
+  }
+}
+const springGeo = new THREE.TubeGeometry(new Helix(0.05, 0.26, 6), 160, 0.011, 6);
+for (const [ax, axle] of [[1.44, 'front'], [-1.44, 'rear']]) {
+  for (const sz of [-1, 1]) {
+    const side = sz < 0 ? 'left' : 'right';
+    const p = makePart(`susp_${axle}_${side}`, 'chassis', V(ax, 0.6, sz * 0.52), V(0, 0.15, sz * 0.3), [0.2, 0.7], 'susp', `${axle} ${side}`);
+    p.group.add(mesh(springGeo, MAT.spring));
+    p.group.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.36, 12), MAT.damper, 0, -0.02, 0));
+    p.group.add(mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.02, 20), MAT.damper, 0, 0.16, 0));
+    p.group.add(rbox(0.06, 0.03, 0.4, 0.012, MAT.frameAlu, 0, -0.29, -sz * 0.08));
+  }
+}
+
+/* =====================================================================
+   3. Wheels, tires, brakes
+   ---------------------------------------------------------------------
+   The tire is a LatheGeometry of its cross-section so the shoulders are
+   rounded. Rolling parts live in a child "spin" group that the drive
+   simulation rotates about the axle (local Z).
+   ===================================================================== */
+const tireGeo = (() => {
+  const prof = [[0.245, -0.115], [0.3, -0.119], [0.328, -0.11], [0.34, -0.08], [0.343, 0], [0.34, 0.08], [0.328, 0.11], [0.3, 0.119], [0.245, 0.115]]
+    .map(([r, y]) => V2(r, y));
+  const g = new THREE.LatheGeometry(prof, 56);
+  g.rotateX(Math.PI / 2);
+  return g;
+})();
+const spinners = [];
+for (const [ax, axle] of [[1.44, 'front'], [-1.44, 'rear']]) {
+  for (const sz of [-1, 1]) {
+    const side = sz < 0 ? 'left' : 'right';
+    const w = makePart(`wheel_${axle}_${side}`, 'wheels', V(ax, 0.34, sz * 0.8), V(0, 0, sz * 0.8), [0.1, 0.6], 'wheel', `${axle} ${side}`);
+    const spin = new THREE.Group();
+    w.group.add(spin);
+    spinners.push(spin);
+    spin.add(mesh(tireGeo, MAT.tire));
+    spin.add(cylZ(0.244, 0.2, MAT.rim, 0, 0, 0, 40));
+    spin.add(cylZ(0.235, 0.012, MAT.rimCover, 0, 0, sz * 0.1, 48));
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      const spoke = rbox(0.17, 0.045, 0.012, 0.006, MAT.rim, Math.cos(a) * 0.12, Math.sin(a) * 0.12, sz * 0.108);
+      spoke.rotation.z = a;
+      spin.add(spoke);
+    }
+    spin.add(cylZ(0.045, 0.02, MAT.rim, 0, 0, sz * 0.112, 24));
+
+    const b = makePart(`brake_${axle}_${side}`, 'wheels', V(ax, 0.34, sz * 0.645), V(0, 0, sz * 0.5), [0.15, 0.65], 'brake', `${axle} ${side}`);
+    const bspin = new THREE.Group();
+    b.group.add(bspin);
+    spinners.push(bspin);
+    bspin.add(cylZ(0.165, 0.026, MAT.disc, 0, 0, 0, 48));
+    bspin.add(cylZ(0.08, 0.05, MAT.disc, 0, 0, sz * 0.02, 32));
+    const cal = rbox(0.09, 0.16, 0.075, 0.02, MAT.caliper, -0.12, 0.09, 0);
+    cal.rotation.z = 0.55;
+    b.group.add(cal);
+  }
+}
+
+/* =====================================================================
+   4. Skateboard battery pack
+   ---------------------------------------------------------------------
+   Four modules, each 72 × 15 hex-packed 2170 cells drawn with one
+   InstancedMesh (one draw call per module instead of 1,080). Wavy
+   cooling ribbons run the length of each module between cell rows.
+   Cells are expensive to ray-test, so each module gets an invisible
+   box proxy for picking and the cells opt out of raycasting.
+   ===================================================================== */
+let cellCount = 0;
+{
+  const tray = makePart('packTray', 'battery', V(0, 0.15, 0), V(0, -1.0, 0), [0.3, 0.9]);
+  tray.group.add(rbox(2.14, 0.025, 1.5, 0.01, MAT.tray, 0, 0, 0));
+  for (const sz of [-1, 1]) tray.group.add(rbox(2.14, 0.13, 0.025, 0.008, MAT.tray, 0, 0.065, sz * 0.74));
+  for (const sx of [-1, 1]) tray.group.add(rbox(0.025, 0.13, 1.5, 0.008, MAT.tray, sx * 1.06, 0.065, 0));
+  for (const z of [-0.36, 0, 0.36]) tray.group.add(rbox(2.0, 0.012, 0.02, 0.004, MAT.tray, 0, 0.018, z));
+
+  const lid = makePart('packLid', 'battery', V(0, 0.305, 0), V(0, -0.3, 0), [0.3, 0.85]);
+  const lidGeo = new THREE.BoxGeometry(2.14, 0.012, 1.5);
+  const lidMesh = mesh(lidGeo, MAT.lid);
+  lidMesh.castShadow = false;
+  lid.group.add(lidMesh);
+  lid.group.add(new THREE.LineSegments(new THREE.EdgesGeometry(lidGeo), MAT.lidEdge));
+
+  const NX = 72, NZ = 15, LEN = 1.92, WID = 0.3;
+  const px = LEN / NX, pz = WID / NZ;
+  const cellGeo = new THREE.CylinderGeometry(0.0098, 0.0098, 0.07, 10);
+  const ribbonGeo = (() => {
+    const g = new THREE.PlaneGeometry(LEN, 0.074, 240, 1);
+    const p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) p.setZ(i, 0.0045 * Math.sin((p.getX(i) / px) * Math.PI * 2));
+    g.computeVertexNormals();
+    return g;
+  })();
+  const dummy = new THREE.Object3D();
+  const zs = [-0.54, -0.18, 0.18, 0.54];
+  zs.forEach((zc, k) => {
+    // Outer modules fan out further than inner ones: the explode Z offset
+    // scales with the module's own Z so they spread like a hand of cards.
+    const m = makePart(`module_${k + 1}`, 'battery', V(0, 0.225, zc), V(0, -0.65, zc * 1.2), [0.35, 0.95], 'module', `module ${k + 1} of 4`);
+    for (const sz of [-1, 1]) m.group.add(rbox(1.96, 0.08, 0.008, 0.003, MAT.moduleWall, 0, 0, sz * 0.166));
+    for (const sx of [-1, 1]) m.group.add(rbox(0.012, 0.08, 0.34, 0.004, MAT.moduleWall, sx * 0.975, 0, 0));
+
+    const cells = new THREE.InstancedMesh(cellGeo, MAT.cell, NX * NZ);
+    let n = 0;
+    for (let j = 0; j < NZ; j++) {
+      for (let i = 0; i < NX; i++) {
+        const x = -LEN / 2 + (i + 0.25) * px + (j % 2 ? px / 2 : 0);
+        dummy.position.set(x, 0, -WID / 2 + (j + 0.5) * pz);
+        dummy.updateMatrix();
+        cells.setMatrixAt(n++, dummy.matrix);
+      }
+    }
+    cells.computeBoundingBox();
+    cells.computeBoundingSphere();
+    cells.raycast = () => {};
+    cellCount += n;
+    m.group.add(cells);
+
+    for (const rz of [-0.11, -0.04, 0.03, 0.1]) m.group.add(mesh(ribbonGeo, MAT.ribbon, 0, 0.002, rz));
+    for (let b = 0; b < 7; b++) m.group.add(mesh(new THREE.BoxGeometry(1.9, 0.004, 0.012), MAT.busbar, 0, 0.037, -0.135 + b * 0.045));
+
+    const proxy = new THREE.Mesh(new THREE.BoxGeometry(1.96, 0.08, 0.34), new THREE.MeshBasicMaterial({ visible: false }));
+    proxy.userData.proxy = true;
+    m.group.add(proxy);
+  });
+}
+
+/* =====================================================================
+   5. Drive units, inverters, half-shafts
+   ===================================================================== */
+const bootGeo = (() => {
+  const pts = [];
+  for (let i = 0; i <= 24; i++) {
+    const t = i / 24;
+    pts.push(V2(0.026 + 0.02 * t + 0.007 * Math.sin(t * Math.PI * 8), (t - 0.5) * 0.09));
+  }
+  const g = new THREE.LatheGeometry(pts, 24);
+  g.rotateX(Math.PI / 2);
+  return g;
+})();
+for (const [x, sx, du, inv, axle] of [[-1.44, -1, 'rearDU', 'rearInverter', 'rear'], [1.44, 1, 'frontDU', 'frontInverter', 'front']]) {
+  const d = makePart(du, 'drive', V(x, 0.34, 0), V(sx * 0.9, 0, 0), [0.25, 0.8]);
+  d.group.add(cylZ(0.145, 0.32, MAT.housing, 0, 0, -0.13, 40));
+  for (let i = 0; i < 6; i++) {
+    const rib = mesh(new THREE.TorusGeometry(0.146, 0.007, 8, 40), MAT.housing, 0, 0, -0.26 + i * 0.05);
+    d.group.add(rib);
+  }
+  d.group.add(mesh(new THREE.TorusGeometry(0.11, 0.018, 10, 40), MAT.copper, 0, 0, -0.295));
+  d.group.add(cylZ(0.15, 0.02, MAT.gearbox, 0, 0, -0.3, 40));
+  d.group.add(rbox(0.36, 0.3, 0.2, 0.05, MAT.gearbox, sx * 0.03, 0.01, 0.12));
+  for (const sz of [-1, 1]) d.group.add(cylZ(0.042, 0.05, MAT.gearbox, 0, 0, sz < 0 ? -0.33 : 0.245, 20));
+  d.group.add(rbox(0.05, 0.05, 0.1, 0.01, MAT.driveAccent, -sx * 0.12, 0.13, -0.1));
+
+  const iv = makePart(inv, 'drive', V(x + sx * 0.02, 0.555, -0.06), V(sx * 0.9, 0.5, 0), [0.3, 0.85]);
+  iv.group.add(rbox(0.3, 0.1, 0.3, 0.02, MAT.inverter, 0, 0, 0));
+  for (let i = 0; i < 6; i++) iv.group.add(rbox(0.26, 0.018, 0.008, 0.003, MAT.gearbox, 0, 0.058, -0.11 + i * 0.044));
+  iv.group.add(rbox(0.07, 0.05, 0.1, 0.012, MAT.driveAccent, -sx * 0.1, 0.05, -0.1));
+
+  for (const sz of [-1, 1]) {
+    const side = sz < 0 ? 'left' : 'right';
+    const hs = makePart(`shaft_${axle}_${side}`, 'drive', V(x, 0.34, sz * 0.47), V(sx * 0.9, 0, sz * 0.3), [0.3, 0.85], 'halfshaft', `${axle} ${side}`);
+    hs.group.add(cylZ(0.018, 0.34, MAT.shaft, 0, 0, 0, 16));
+    hs.group.add(mesh(bootGeo, MAT.boot, 0, 0, -sz * 0.14));
+    hs.group.add(mesh(bootGeo, MAT.boot, 0, 0, sz * 0.14));
+  }
+}
+
+/* =====================================================================
+   6. Thermal: heat pump / Octovalve manifold, radiator
+   ===================================================================== */
+{
+  const hp = makePart('heatpump', 'thermal', V(1.72, 0.62, 0.05), V(0.35, 1.0, 0), [0.3, 0.85]);
+  hp.group.add(rbox(0.26, 0.12, 0.34, 0.03, MAT.manifold, 0, 0, 0));
+  hp.group.add(mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.07, 32), MAT.valve, 0, 0.09, 0.02));
+  hp.group.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.03, 16), MAT.manifold, 0, 0.14, 0.02));
+  hp.group.add(cylX(0.06, 0.18, MAT.compressor, 0, -0.01, 0.3, 32));
+  hp.group.add(rbox(0.12, 0.08, 0.1, 0.02, MAT.manifold, 0.03, -0.02, -0.18));
+
+  const rad = makePart('radiator', 'thermal', V(2.22, 0.46, 0), V(0.95, 0.25, 0), [0.3, 0.85]);
+  rad.group.add(rbox(0.05, 0.3, 1.0, 0.012, MAT.radCore, 0, 0, 0));
+  for (let i = 0; i < 18; i++) rad.group.add(mesh(new THREE.BoxGeometry(0.052, 0.004, 0.96), MAT.fan, 0, -0.14 + i * 0.0165, 0));
+  for (const sz of [-1, 1]) {
+    rad.group.add(cylX(0.13, 0.035, MAT.fan, -0.045, 0, sz * 0.24, 32));
+    rad.group.add(cylX(0.03, 0.05, MAT.valve, -0.05, 0, sz * 0.24, 16));
+  }
+}
+
+/* =====================================================================
+   7. Electronics: penthouse, computers, LV battery, charge port
+   ===================================================================== */
+{
+  const ph = makePart('penthouse', 'electronics', V(0.9, 0.36, 0), V(0, 0.5, 0), [0.25, 0.8]);
+  ph.group.add(rbox(0.22, 0.1, 0.8, 0.02, MAT.pcb, 0, 0, 0));
+  for (const z of [-0.3, -0.1, 0.1, 0.3]) ph.group.add(cylZ(0.018, 0.04, MAT.hvOrange, 0.04, 0.06, z, 12).rotateX(Math.PI / 2));
+  ph.group.add(rbox(0.2, 0.004, 0.02, 0.002, MAT.led, 0, 0.051, -0.38));
+
+  const cp = makePart('computer', 'electronics', V(1.05, 0.82, 0.4), V(0.2, 1.05, 0.2), [0.2, 0.75]);
+  cp.group.add(rbox(0.3, 0.035, 0.24, 0.01, MAT.pcb, 0, 0, 0));
+  for (let i = 0; i < 9; i++) cp.group.add(mesh(new THREE.BoxGeometry(0.28, 0.03, 0.004), MAT.heatsink, 0, 0.03, -0.1 + i * 0.025));
+  cp.group.add(rbox(0.004, 0.006, 0.18, 0.002, MAT.led, -0.152, 0, 0));
+
+  const gw = makePart('gateway', 'electronics', V(0.95, 0.7, -0.05), V(0.1, 0.95, -0.1), [0.2, 0.75]);
+  gw.group.add(rbox(0.16, 0.045, 0.12, 0.01, MAT.pcb, 0, 0, 0));
+  gw.group.add(rbox(0.12, 0.004, 0.004, 0.002, MAT.led, 0, 0.024, 0.04));
+
+  const lv = makePart('lvBattery', 'electronics', V(1.98, 0.6, -0.42), V(0.6, 0.7, -0.25), [0.25, 0.8]);
+  lv.group.add(rbox(0.22, 0.14, 0.14, 0.015, MAT.lvCase, 0, 0, 0));
+  lv.group.add(cylZ(0.012, 0.02, MAT.hvOrange, 0.07, 0.075, 0, 12).rotateX(Math.PI / 2));
+  lv.group.add(rbox(0.16, 0.006, 0.004, 0.002, MAT.led, 0, 0.072, 0.07));
+
+  const port = makePart('chargePort', 'electronics', V(-2.03, 0.8, -0.9), V(-0.35, 0.9, -0.5), [0.2, 0.75]);
+  port.group.add(rbox(0.1, 0.08, 0.04, 0.012, MAT.pcb, 0, 0, 0));
+  port.group.add(cylZ(0.022, 0.012, MAT.led, 0, 0, -0.02, 20));
+}
+
+/* =====================================================================
+   8. Autopilot sensor suite (+ optional coverage cones)
+   ---------------------------------------------------------------------
+   Cameras explode with the panel they are mounted on (glass or body)
+   so they stay visually attached. Cones are cosmetic: they are flagged
+   noPick and excluded from the material registry.
+   ===================================================================== */
+const cones = [];
+const coneMat = new THREE.MeshBasicMaterial({ color: '#ffd449', vertexColors: true, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending });
+function coverageCone(dir, len, halfDeg) {
+  const r = Math.tan(THREE.MathUtils.degToRad(halfDeg)) * len;
+  const g = new THREE.ConeGeometry(r, len, 32, 6, true);
+  g.translate(0, -len / 2, 0);                     // apex at the lens
+  // RGBA vertex colours: alpha fades from the lens to the far edge of the range.
+  const pos = g.attributes.position, col = new Float32Array(pos.count * 4);
+  for (let i = 0; i < pos.count; i++) {
+    const a = Math.pow(1 + pos.getY(i) / len, 1.6);
+    col.set([a, a, a, a], i * 4);
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 4));
+  const c = new THREE.Mesh(g, coneMat);
+  c.quaternion.setFromUnitVectors(V(0, -1, 0), dir.clone().normalize());
+  c.userData.noPick = true;
+  c.visible = false;
+  cones.push(c);
+  return c;
+}
+function camera3(group, dir) {
+  const b = rbox(0.05, 0.035, 0.04, 0.01, MAT.camBody, 0, 0, 0);
+  const lens = mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.012, 16), MAT.camLens, 0, 0, 0);
+  lens.quaternion.setFromUnitVectors(V(0, 1, 0), dir.clone().normalize());
+  lens.position.copy(dir.clone().normalize().multiplyScalar(0.026));
+  b.quaternion.setFromUnitVectors(V(1, 0, 0), dir.clone().normalize());
+  group.add(b, lens);
+}
+{
+  const f = makePart('camForward', 'sensors', V(0.36, 1.33, 0), V(0, 1.9, 0), [0, 0.5]);
+  for (const z of [-0.045, 0, 0.045]) {
+    const g = new THREE.Group();
+    g.position.z = z;
+    camera3(g, V(1, -0.05, 0));
+    f.group.add(g);
+  }
+  f.group.add(coverageCone(V(1, -0.04, 0), 6.5, 17.5), coverageCone(V(1, -0.06, 0), 4.5, 25), coverageCone(V(1, -0.1, 0), 1.8, 60));
+
+  for (const sz of [-1, 1]) {
+    const side = sz < 0 ? 'left' : 'right';
+    const bp = makePart(`camB_${side}`, 'sensors', V(-0.22, 1.08, sz * 0.72), V(0, 1.9, 0), [0, 0.5], 'camBPillar', side);
+    camera3(bp.group, V(0.35, 0, sz));
+    bp.group.add(coverageCone(V(0.5, -0.05, sz), 3.2, 40));
+
+    const rp = makePart(`camRep_${side}`, 'sensors', V(0.9, 0.82, sz * 0.94), V(0, 1.35, 0), [0, 0.45], 'camRepeater', side);
+    camera3(rp.group, V(-1, 0, sz * 0.3));
+    rp.group.add(coverageCone(V(-1, -0.04, sz * 0.35), 3.5, 28));
+  }
+  const r = makePart('camRear', 'sensors', V(-2.4, 0.8, 0), V(0, 1.35, 0), [0, 0.45]);
+  camera3(r.group, V(-1, -0.2, 0));
+  r.group.add(coverageCone(V(-1, -0.18, 0), 1.8, 62));
+}
+
+/* =====================================================================
+   9. Coolant lines + HV cables (stretchy tubes)
+   ---------------------------------------------------------------------
+   Pipes connect parts that fly apart in different directions, so they
+   can't be rigid. Each waypoint is pinned to a part: its current world
+   position = rest position + that part's current explode offset. When
+   the slider moves, every tube's CatmullRom curve and TubeGeometry are
+   rebuilt from the moved anchors, so pipes stretch to stay connected.
+   Coolant flow is a scrolling stripe texture along the tube's U axis.
+   ===================================================================== */
+const tubes = [];
+function stripeTexture(hex) {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 4;
+  const x = c.getContext('2d');
+  const g = x.createLinearGradient(0, 0, 64, 0);
+  g.addColorStop(0, '#000'); g.addColorStop(0.45, hex); g.addColorStop(0.6, '#fff'); g.addColorStop(0.75, hex); g.addColorStop(1, '#000');
+  x.fillStyle = g;
+  x.fillRect(0, 0, 64, 4);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const A = (part, x, y, z) => ({ part, p: V(x, y, z) });
+function addTube(partId, system, pts, radius, color, flowing) {
+  let mat;
+  if (flowing) {
+    const tex = stripeTexture(color);
+    mat = M(system, { color: new THREE.Color(color).multiplyScalar(0.35), emissive: color, emissiveMap: tex, emissiveIntensity: 1.3, roughness: 0.35, metalness: 0.2 });
+  } else {
+    mat = M(system, { color, emissive: '#7a2d00', emissiveIntensity: 0.5, roughness: 0.45 });
+  }
+  const m = new THREE.Mesh(new THREE.BufferGeometry(), mat);
+  m.castShadow = true;
+  parts.get(partId).group.add(m);
+  tubes.push({ mesh: m, pts, radius, tex: flowing ? mat.emissiveMap : null });
+}
+makePart('coolant', 'thermal', V(0, 0, 0), V(0, 0, 0), [0, 1]);
+makePart('hvCables', 'electronics', V(0, 0, 0), V(0, 0, 0), [0, 1]);
+const HOT = '#ff5468', COLD = '#3fc8ff', HV = '#ff7a1a';
+// Coolant: blue = chilled supply, amber = heated return.
+addTube('coolant', 'thermal', [A('heatpump', 1.62, 0.56, -0.08), A('packTray', 1.18, 0.3, -0.3), A('packTray', 1.07, 0.22, -0.3)], 0.014, COLD, true);
+addTube('coolant', 'thermal', [A('heatpump', 1.6, 0.58, -0.1), A('packTray', 1.25, 0.3, -0.55), A('packTray', 1.08, 0.22, -0.79), A('packTray', -1.08, 0.22, -0.79), A('packTray', -1.22, 0.3, -0.55), A('rearDU', -1.3, 0.44, -0.2)], 0.014, COLD, true);
+addTube('coolant', 'thermal', [A('heatpump', 1.62, 0.66, 0.18), A('computer', 1.3, 0.78, 0.3), A('computer', 1.19, 0.8, 0.36)], 0.012, COLD, true);
+addTube('coolant', 'thermal', [A('radiator', 2.19, 0.36, -0.3), A('heatpump', 1.95, 0.5, -0.1), A('heatpump', 1.84, 0.56, -0.08)], 0.014, COLD, true);
+addTube('coolant', 'thermal', [A('rearDU', -1.3, 0.46, 0.22), A('packTray', -1.22, 0.3, 0.55), A('packTray', -1.08, 0.24, 0.79), A('packTray', 1.08, 0.24, 0.79), A('packTray', 1.25, 0.32, 0.55), A('heatpump', 1.62, 0.58, 0.18)], 0.014, HOT, true);
+addTube('coolant', 'thermal', [A('packTray', 1.07, 0.22, 0.3), A('packTray', 1.18, 0.3, 0.3), A('heatpump', 1.62, 0.56, 0.12)], 0.014, HOT, true);
+addTube('coolant', 'thermal', [A('frontDU', 1.36, 0.5, 0.2), A('heatpump', 1.5, 0.6, 0.16), A('heatpump', 1.6, 0.62, 0.14)], 0.014, HOT, true);
+addTube('coolant', 'thermal', [A('heatpump', 1.84, 0.64, 0.14), A('radiator', 2.0, 0.6, 0.3), A('radiator', 2.19, 0.52, 0.3)], 0.014, HOT, true);
+// High-voltage: penthouse feeds both inverters, the compressor, and the charge port.
+addTube('hvCables', 'electronics', [A('penthouse', 0.96, 0.38, -0.25), A('frontFrame', 1.2, 0.56, -0.2), A('frontInverter', 1.34, 0.56, -0.14)], 0.016, HV, false);
+addTube('hvCables', 'electronics', [A('penthouse', 0.82, 0.37, -0.22), A('packLid', 0.2, 0.33, -0.22), A('packLid', -0.9, 0.33, -0.22), A('rearInverter', -1.28, 0.55, -0.14)], 0.016, HV, false);
+addTube('hvCables', 'electronics', [A('chargePort', -2.0, 0.78, -0.86), A('rearFrame', -1.75, 0.55, -0.62), A('packLid', -0.95, 0.33, -0.55), A('penthouse', 0.82, 0.38, -0.36)], 0.016, HV, false);
+addTube('hvCables', 'electronics', [A('penthouse', 0.98, 0.4, 0.3), A('heatpump', 1.4, 0.55, 0.34), A('heatpump', 1.62, 0.6, 0.34)], 0.013, HV, false);
+
+function rebuildTubes() {
+  for (const t of tubes) {
+    const world = t.pts.map(({ part, p }) => p.clone().add(parts.get(part).cur));
+    const curve = new THREE.CatmullRomCurve3(world, false, 'centripetal');
+    const len = curve.getLength();
+    t.mesh.geometry.dispose();
+    t.mesh.geometry = new THREE.TubeGeometry(curve, Math.max(24, Math.round(len * 40)), t.radius, 8, false);
+    if (t.tex) t.tex.repeat.set(Math.max(1, len * 5), 1);
+  }
+}
+
+/* =====================================================================
+   Exploded view: apply the translation model described above
+   ===================================================================== */
+function applyExplode(t) {
+  for (const p of parts.values()) {
+    const [a, b] = p.win;
+    const local = easeInOut(clamp((t - a) / (b - a), 0, 1));
+    p.cur.copy(p.explode).multiplyScalar(local);
+    p.group.position.copy(p.home).add(p.cur);
+  }
+  ground.position.y = -1.25 * easeInOut(t);
+  rebuildTubes();
+}
+
+/* =====================================================================
+   Layer state: visibility, X-ray, highlight
+   ===================================================================== */
+const layerDefaults = () => Object.fromEntries(Object.keys(SYSTEMS).map((k) => [k, { visible: true, xray: k === 'body' }]));
+const state = { sys: layerDefaults(), highlight: null, coverage: false, sim: false };
+const isGhost = (sys) => state.sys[sys].xray || (state.highlight !== null && state.highlight !== sys);
+const tmpC = new THREE.Color();
+
+function applyLayers() {
+  clearSelectionLook();
+  for (const p of parts.values()) p.group.visible = state.sys[p.system].visible;
+  for (const e of registry) {
+    const m = e.mat;
+    const ghost = isGhost(e.system);
+    const floor = e.system === 'body' ? 0.1 : 0.07;
+    const transparent = ghost || e.base.transparent;
+    if (m.transparent !== transparent) m.needsUpdate = true;
+    m.transparent = transparent;
+    m.opacity = ghost ? Math.min(e.base.opacity, floor) : e.base.opacity;
+    m.depthWrite = ghost ? false : e.base.depthWrite;
+    if (m.emissive && e.base.emissive) {
+      m.emissive.copy(e.base.emissive);
+      if (state.highlight === e.system) m.emissive.add(tmpC.set(SYSTEMS[e.system].color).multiplyScalar(0.3));
+    }
+  }
+  for (const c of cones) c.visible = state.coverage;
+  applySelectionLook();
+  syncPanel();
+}
+
+/* =====================================================================
+   Raycast selection
+   ---------------------------------------------------------------------
+   1. Pointer position → normalized device coords (-1..1).
+   2. Raycaster.setFromCamera fires a ray through that pixel.
+   3. intersectObjects(partGroups, true) returns every mesh hit, nearest
+      first. Three.js does not skip hidden objects on its own, so each
+      hit is filtered: the mesh and all ancestors must be visible, its
+      system must not be ghosted (X-ray or dimmed by a highlight), and
+      see-through materials (glass, pack lid) let the ray pass. That is
+      what lets you click a motor through an X-rayed body.
+   4. The first surviving hit is walked up the parent chain to the group
+      carrying userData.partId, which maps to the part and its INFO.
+   ===================================================================== */
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+const partGroups = [...parts.values()].map((p) => p.group);
+
+function visibleChain(o) {
+  for (let n = o; n; n = n.parent) if (!n.visible) return false;
+  return true;
+}
+function partOf(o) {
+  for (let n = o; n; n = n.parent) if (n.userData.partId) return parts.get(n.userData.partId);
+  return null;
+}
+function pickAt(clientX, clientY) {
+  const r = canvas.getBoundingClientRect();
+  ndc.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const hits = raycaster.intersectObjects(partGroups, true);
+  for (const h of hits) {
+    const o = h.object;
+    if (!o.isMesh || o.userData.noPick) continue;
+    if (!visibleChain(o)) continue;
+    const part = partOf(o);
+    if (!part || isGhost(part.system)) continue;
+    if (!o.userData.proxy && o.material.transparent && o.material.opacity < 0.3) continue;
+    return part;
+  }
+  return null;
+}
+
+/* =====================================================================
+   Selection look + camera focus
+   ---------------------------------------------------------------------
+   Selected meshes get a cloned material with a pulsing white emissive,
+   so shared materials elsewhere stay untouched; the originals are
+   swapped back on deselect. A Box3Helper brackets the part.
+   ===================================================================== */
+let selected = null;
+const selClones = [];
+const selBox = new THREE.Box3();
+const boxHelper = new THREE.Box3Helper(selBox, new THREE.Color('#ffffff'));
+boxHelper.material.transparent = true;
+boxHelper.material.opacity = 0.55;
+boxHelper.material.depthTest = false;
+boxHelper.renderOrder = 10;
+boxHelper.visible = false;
+scene.add(boxHelper);
+
+function clearSelectionLook() {
+  for (const { mesh: m, orig } of selClones) { m.material.dispose(); m.material = orig; }
+  selClones.length = 0;
+}
+function applySelectionLook() {
+  if (!selected) return;
+  selected.group.traverse((o) => {
+    if (!o.isMesh || o.userData.proxy || !o.material.emissive) return;
+    const clone = o.material.clone();
+    clone.emissive = new THREE.Color('#ffffff');
+    clone.emissiveMap = null;
+    selClones.push({ mesh: o, orig: o.material, base: o.material.emissiveIntensity });
+    o.material = clone;
+  });
+}
+function selectionBox(p, out) {
+  out.makeEmpty();
+  p.group.updateMatrixWorld(true);
+  p.group.traverse((o) => {
+    if ((o.isMesh && !o.userData.noPick) && o.geometry) {
+      if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+      const bb = o.isInstancedMesh ? o.boundingBox : o.geometry.boundingBox;
+      out.union(tmpBox.copy(bb).applyMatrix4(o.matrixWorld));
+    }
+  });
+  return out;
+}
+const tmpBox = new THREE.Box3();
+
+let tween = null;
+function flyTo(camPos, tgt, dur = 900) {
+  tween = { fc: camera.position.clone(), ft: controls.target.clone(), tc: camPos, tt: tgt, t0: performance.now(), dur };
+}
+function focusOn(p) {
+  const box = selectionBox(p, new THREE.Box3());
+  const c = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const r = Math.max(size.x, size.y, size.z);
+  const dist = clamp(r * 2.2 + 1.0, 1.6, 9);
+  // Keep the current viewing azimuth but look down from at least ~30°, which
+  // clears most same-height neighbours (springs, shafts) out of the sightline.
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  if (dir.y < 0.5) { dir.y = 0; dir.normalize().multiplyScalar(0.866); dir.y = 0.5; }
+  flyTo(c.clone().add(dir.multiplyScalar(dist)), c);
+}
+
+const drawer = document.getElementById('drawer');
+function select(p, { fly = true } = {}) {
+  clearSelectionLook();
+  selected = p;
+  applySelectionLook();
+  boxHelper.visible = !!p;
+  if (!p) { drawer.hidden = true; jumpSel.value = ''; updateViewOffset(); return; }
+  lastCenter = null;
+  const info = INFO[p.info];
+  const sys = SYSTEMS[p.system];
+  drawer.style.setProperty('--c', sys.color);
+  document.querySelector('#dKind span:last-child').textContent = sys.label;
+  document.getElementById('dName').textContent = info.name;
+  document.getElementById('dWhere').textContent = p.where ? `Position: ${p.where}` : '';
+  document.getElementById('dSummary').textContent = info.summary;
+  document.getElementById('dRole').textContent = info.role;
+  const dl = document.getElementById('dSpecs');
+  dl.replaceChildren(...info.specs.map(([k, v]) => {
+    const d = document.createElement('div');
+    const dt = document.createElement('dt'); dt.textContent = k;
+    const dd = document.createElement('dd'); dd.textContent = v;
+    d.append(dt, dd);
+    return d;
+  }));
+  document.getElementById('dHighlight').textContent = state.highlight === p.system ? 'Clear highlight' : `Highlight ${sys.label.toLowerCase()}`;
+  drawer.hidden = false;
+  jumpSel.value = p.id;
+  updateViewOffset();
+  if (fly) focusOn(p);
+}
+
+/* =====================================================================
+   UI wiring
+   ===================================================================== */
+const ICON_EYE = '<svg class="when-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="when-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.7 10.7 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6C3.9 8.3 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+const ICON_XRAY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3" stroke-dasharray="3 3"/><rect x="8.5" y="8.5" width="7" height="7" rx="1.5"/></svg>';
+
+const sysList = document.getElementById('sysList');
+const partCounts = {};
+for (const p of parts.values()) partCounts[p.system] = (partCounts[p.system] || 0) + 1;
+for (const [k, s] of Object.entries(SYSTEMS)) {
+  const li = document.createElement('li');
+  li.className = 'sys';
+  li.dataset.sys = k;
+  li.innerHTML = `
+    <button class="sys-name" aria-pressed="false" title="Highlight ${s.label}"><span class="sw" style="--c:${s.color}"></span><span class="lbl">${s.label}</span><span class="count">${partCounts[k]}</span></button>
+    <button class="ico" data-act="xray" aria-pressed="false" aria-label="X-ray ${s.label}" title="X-ray">${ICON_XRAY}</button>
+    <button class="ico" data-act="eye" aria-pressed="true" aria-label="Show ${s.label}" title="Show / hide">${ICON_EYE}</button>`;
+  sysList.append(li);
+}
+sysList.addEventListener('click', (e) => {
+  const li = e.target.closest('.sys');
+  if (!li) return;
+  const k = li.dataset.sys;
+  const s = state.sys[k];
+  if (e.target.closest('.sys-name')) {
+    state.highlight = state.highlight === k ? null : k;
+    if (state.highlight) { s.visible = true; s.xray = false; }
+  } else if (e.target.closest('[data-act="xray"]')) {
+    s.xray = !s.xray;
+    if (s.xray && state.highlight === k) state.highlight = null;
+    s.visible = true;
+  } else if (e.target.closest('[data-act="eye"]')) {
+    s.visible = !s.visible;
+    if (!s.visible && state.highlight === k) state.highlight = null;
+    if (!s.visible && selected && selected.system === k) select(null);
+  } else return;
+  clearPresetMarks();
+  applyLayers();
+});
+
+function syncPanel() {
+  for (const li of sysList.children) {
+    const k = li.dataset.sys;
+    const s = state.sys[k];
+    li.classList.toggle('off', !s.visible);
+    li.querySelector('.sys-name').setAttribute('aria-pressed', String(state.highlight === k));
+    li.querySelector('[data-act="xray"]').setAttribute('aria-pressed', String(s.xray));
+    const eye = li.querySelector('[data-act="eye"]');
+    eye.setAttribute('aria-pressed', String(s.visible));
+    eye.setAttribute('aria-label', `${s.visible ? 'Hide' : 'Show'} ${SYSTEMS[k].label}`);
+  }
+  if (selected) document.getElementById('dHighlight').textContent = state.highlight === selected.system ? 'Clear highlight' : `Highlight ${SYSTEMS[selected.system].label.toLowerCase()}`;
+}
+
+const presetBtns = [...document.querySelectorAll('#presets .chip')];
+function clearPresetMarks() { presetBtns.forEach((b) => b.setAttribute('aria-pressed', 'false')); }
+const PRESETS = {
+  hideBody: () => { state.sys = layerDefaults(); state.sys.body.visible = false; state.highlight = null; },
+  battery: () => { state.sys = layerDefaults(); state.highlight = 'battery'; },
+  thermal: () => { state.sys = layerDefaults(); state.highlight = 'thermal'; },
+  motors: () => { state.sys = layerDefaults(); state.highlight = 'drive'; },
+  hv: () => { state.sys = layerDefaults(); state.highlight = 'electronics'; },
+};
+document.getElementById('presets').addEventListener('click', (e) => {
+  const b = e.target.closest('.chip');
+  if (!b) return;
+  const on = b.getAttribute('aria-pressed') === 'true';
+  if (on) { state.sys = layerDefaults(); state.highlight = null; clearPresetMarks(); }
+  else { PRESETS[b.dataset.preset](); clearPresetMarks(); b.setAttribute('aria-pressed', 'true'); }
+  applyLayers();
+});
+document.getElementById('layersReset').addEventListener('click', () => {
+  state.sys = layerDefaults(); state.highlight = null; clearPresetMarks(); applyLayers();
+});
+
+document.getElementById('tSim').addEventListener('change', (e) => { state.sim = e.target.checked; });
+document.getElementById('tCones').addEventListener('change', (e) => {
+  state.coverage = e.target.checked;
+  if (state.coverage) state.sys.sensors.visible = true;
+  applyLayers();
+});
+document.getElementById('tRotate').addEventListener('change', (e) => { controls.autoRotate = e.target.checked; });
+
+// Component jump list (keyboard-accessible path to every part)
+const jumpSel = document.getElementById('jump');
+for (const [k, s] of Object.entries(SYSTEMS)) {
+  const og = document.createElement('optgroup');
+  og.label = s.label;
+  for (const p of parts.values()) {
+    if (p.system !== k) continue;
+    const o = document.createElement('option');
+    o.value = p.id;
+    o.textContent = INFO[p.info].name + (p.where ? ` (${p.where})` : '');
+    og.append(o);
+  }
+  jumpSel.append(og);
+}
+jumpSel.addEventListener('change', () => {
+  const p = parts.get(jumpSel.value);
+  if (!p) return;
+  const s = state.sys[p.system];
+  if (!s.visible || isGhost(p.system)) { s.visible = true; s.xray = false; if (state.highlight && state.highlight !== p.system) state.highlight = null; applyLayers(); }
+  select(p);
+  if (window.innerWidth <= 860) setPanel(false);
+});
+
+document.getElementById('dClose').addEventListener('click', () => select(null));
+document.getElementById('dHighlight').addEventListener('click', () => {
+  if (!selected) return;
+  state.highlight = state.highlight === selected.system ? null : selected.system;
+  state.sys[selected.system].xray = false;
+  clearPresetMarks();
+  applyLayers();
+});
+document.getElementById('dIsolate').addEventListener('click', () => {
+  if (!selected) return;
+  for (const k of Object.keys(SYSTEMS)) state.sys[k] = { visible: k === selected.system, xray: false };
+  state.highlight = null;
+  clearPresetMarks();
+  applyLayers();
+});
+
+// Deconstruct slider: the input sets a target; the render loop eases the
+// actual progress toward it so button presses and drags both glide.
+const explodeIn = document.getElementById('explode');
+const explodeOut = document.getElementById('explodeOut');
+let explodeTarget = 0, explodeT = 0, lastApplied = -1;
+function setExplodeTarget(v) {
+  explodeTarget = clamp(v, 0, 1);
+  explodeIn.value = Math.round(explodeTarget * 100);
+  explodeIn.style.setProperty('--p', `${explodeIn.value}%`);
+}
+explodeIn.addEventListener('input', () => setExplodeTarget(explodeIn.value / 100));
+document.getElementById('bAssemble').addEventListener('click', () => setExplodeTarget(0));
+document.getElementById('bExplode').addEventListener('click', () => setExplodeTarget(1));
+document.getElementById('bReset').addEventListener('click', () => { select(null); flyTo(homeCam(), HOME_TGT.clone(), 1100); });
+
+const panel = document.getElementById('panel');
+const panelToggle = document.getElementById('panelToggle');
+function setPanel(open) { panel.classList.toggle('open', open); panelToggle.setAttribute('aria-expanded', String(open)); }
+panelToggle.addEventListener('click', () => setPanel(!panel.classList.contains('open')));
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && selected) select(null);
+});
+
+// Pointer: a short, still press counts as a click; anything else is an orbit drag.
+const tip = document.getElementById('tip');
+let down = null, hoverXY = null;
+canvas.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; tween = null; });
+canvas.addEventListener('pointermove', (e) => {
+  if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) canvas.classList.add('dragging');
+  hoverXY = down ? null : { x: e.clientX, y: e.clientY };
+  if (down) tip.hidden = true;
+});
+canvas.addEventListener('pointerleave', () => { hoverXY = null; tip.hidden = true; canvas.classList.remove('pointing'); });
+window.addEventListener('pointerup', (e) => {
+  canvas.classList.remove('dragging');
+  if (!down) return;
+  const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+  const quick = performance.now() - down.t < 600;
+  down = null;
+  if (e.target !== canvas || moved > 6 || !quick) return;
+  const p = pickAt(e.clientX, e.clientY);
+  if (p) select(p);
+});
+
+function updateHover() {
+  if (!hoverXY) return;
+  const p = pickAt(hoverXY.x, hoverXY.y);
+  canvas.classList.toggle('pointing', !!p);
+  if (!p) { tip.hidden = true; return; }
+  tip.innerHTML = '';
+  const sw = document.createElement('span');
+  sw.className = 'sw';
+  sw.style.setProperty('--c', SYSTEMS[p.system].color);
+  tip.append(sw, INFO[p.info].name + (p.where ? ` · ${p.where}` : ''));
+  tip.style.left = `${hoverXY.x}px`;
+  tip.style.top = `${hoverXY.y}px`;
+  tip.hidden = false;
+  hoverXY = null;
+}
+
+// On narrow screens the inspector is a bottom sheet. Shifting the projection
+// window down moves the rendered scene up, so the focused part stays in view
+// above the sheet. Raycasting uses the same projection, so picking stays exact.
+function updateViewOffset() {
+  const w = window.innerWidth, h = window.innerHeight;
+  if (!drawer.hidden && w <= 860) camera.setViewOffset(w, h, 0, h * 0.24, w, h);
+  else camera.clearViewOffset();
+}
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  updateViewOffset();
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* =====================================================================
+   Telemetry HUD
+   ===================================================================== */
+const hTear = document.getElementById('hTear');
+const hVis = document.getElementById('hVis');
+const hSim = document.getElementById('hSim');
+const hDot = document.getElementById('hDot');
+document.getElementById('hCells').textContent = cellCount.toLocaleString('en-US');
+const STAGES = [[0.02, 'Assembled'], [0.35, 'Shell off'], [0.7, 'Pack dropped'], [0.98, 'Powertrain out'], [1.01, 'Full teardown']];
+let hudTimer = 0;
+function updateHud(time) {
+  const pct = Math.round(explodeT * 100);
+  hTear.textContent = `${pct}%`;
+  explodeOut.textContent = `${STAGES.find(([t]) => explodeT < t)[1]} · ${pct}%`;
+  let vis = 0;
+  for (const p of parts.values()) if (p.group.visible) vis++;
+  hVis.textContent = `${vis} / ${parts.size}`;
+  hDot.classList.toggle('on', state.sim);
+  if (state.sim) {
+    // Simulated steady highway cruise with gentle speed variation.
+    const kmh = 104 + 6 * Math.sin(time * 0.25);
+    const kw = 15 + 0.9 * (kmh - 104) + 2.5 * Math.cos(time * 0.25);
+    hSim.innerHTML = `${kmh.toFixed(0)} km/h <small>${kw.toFixed(1)} kW</small>`;
+  } else {
+    hSim.textContent = 'Parked';
+  }
+}
+
+/* =====================================================================
+   Render loop
+   ===================================================================== */
+const clock = new THREE.Clock();
+let lastCenter = null;
+const center = new THREE.Vector3();
+let wheelSpeed = 0;
+
+function tick() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const time = clock.elapsedTime;
+
+  // Critically damped approach toward the slider target.
+  explodeT += (explodeTarget - explodeT) * (1 - Math.exp(-dt * 5));
+  if (Math.abs(explodeTarget - explodeT) < 5e-4) explodeT = explodeTarget;
+  const explodeMoved = explodeT !== lastApplied;
+  if (explodeMoved) { applyExplode(explodeT); lastApplied = explodeT; }
+
+  // Camera: tween for focus/reset, otherwise follow a selected part as it explodes.
+  if (tween) {
+    const k = easeInOut(clamp((performance.now() - tween.t0) / tween.dur, 0, 1));
+    camera.position.lerpVectors(tween.fc, tween.tc, k);
+    controls.target.lerpVectors(tween.ft, tween.tt, k);
+    if (k >= 1) tween = null;
+  }
+  if (selected) {
+    selectionBox(selected, selBox);
+    selBox.getCenter(center);
+    if (lastCenter && explodeMoved && !tween) {
+      const d = center.clone().sub(lastCenter);
+      camera.position.add(d);
+      controls.target.add(d);
+    }
+    lastCenter = (lastCenter || new THREE.Vector3()).copy(center);
+    const pulse = 0.18 + 0.14 * (0.5 + 0.5 * Math.sin(time * 4));
+    for (const s of selClones) s.mesh.material.emissiveIntensity = pulse;
+  }
+
+  // Drive simulation: wheels and discs roll (forward = negative Z rotation), coolant speeds up.
+  wheelSpeed += ((state.sim ? 9 : 0) - wheelSpeed) * (1 - Math.exp(-dt * 1.5));
+  for (const s of spinners) s.rotation.z -= wheelSpeed * dt;
+  const flow = state.sim ? 1.4 : 0.45;
+  for (const t of tubes) if (t.tex) t.tex.offset.x -= dt * flow;
+
+  hudTimer -= dt;
+  if (hudTimer <= 0) { updateHud(time); hudTimer = 0.1; }
+  updateHover();
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+
+setExplodeTarget(0);
+applyExplode(0);
+applyLayers();
+document.getElementById('boot').hidden = true;
+if (window.innerWidth > 860) setPanel(true);
+tick();
+
+// Exposed for debugging in the console only.
+window.__ev = { parts, state, setExplodeTarget, select, pickAt, camera, controls };
+</script>
+</body>
+</html>

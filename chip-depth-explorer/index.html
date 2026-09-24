@@ -1,0 +1,1634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chip Depth Explorer</title>
+<meta name="description" content="Multi-scale 3D explorer that zooms from a packaged processor down to a single FinFET transistor gate.">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #05080f;
+    --panel: rgba(11, 16, 28, 0.84);
+    --panel-border: rgba(120, 150, 210, 0.16);
+    --text: #e6ecf7;
+    --muted: #8a97b0;
+    --faint: #56627a;
+    --accent: #38d6ff;
+    --accent-2: #7c5cff;
+    --good: #2ee68a;
+    --bad: #ff5d6c;
+    --amber: #ffb547;
+    --copper: #e08a52;
+    --btn: rgba(255, 255, 255, 0.06);
+    --btn-hover: rgba(255, 255, 255, 0.11);
+    --radius: 12px;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 13px; }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; outline: none; touch-action: none; }
+
+  /* Radial streaks shown while the camera is diving between scales */
+  #warp { position: fixed; inset: 0; pointer-events: none; opacity: 0; z-index: 2;
+    background:
+      radial-gradient(circle at 50% 50%, transparent 0 22%, rgba(5, 8, 15, 0.55) 75%),
+      repeating-conic-gradient(from 0deg at 50% 50%, rgba(120, 210, 255, 0.16) 0deg 0.8deg, transparent 0.8deg 5deg);
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 12%, #000 62%);
+            mask-image: radial-gradient(circle at 50% 50%, transparent 12%, #000 62%); }
+
+  #labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 3; }
+  .lbl { position: absolute; left: 0; top: 0; font-size: 11px; font-weight: 500; color: #dfe8ff; white-space: nowrap;
+    background: rgba(7, 11, 20, 0.74); border: 1px solid rgba(120, 160, 230, 0.28); padding: 2px 8px; border-radius: 99px;
+    will-change: transform; display: none; }
+  .lbl::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 1px; height: 6px; background: rgba(160, 200, 255, 0.55); }
+  .lbl.metal { border-color: rgba(224, 138, 82, 0.55); }
+  .lbl.target { border-color: var(--accent); color: var(--accent); }
+
+  .panel { position: fixed; top: 16px; background: var(--panel); border: 1px solid var(--panel-border); z-index: 10;
+    border-radius: var(--radius); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); padding: 14px; max-height: calc(100vh - 32px); overflow-y: auto;
+    scrollbar-width: thin; scrollbar-color: #2a3550 transparent; }
+  #controls { left: 16px; width: 290px; }
+  #info { right: 16px; width: 330px; }
+
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .brand .logo { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex: none;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2)); font-weight: 700; color: #061019; font-size: 13px; }
+  .brand h1 { font-size: 14px; margin: 0; font-weight: 700; letter-spacing: 0.01em; }
+  .brand p { margin: 1px 0 0; color: var(--muted); font-size: 11px; }
+
+  h2 { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted);
+    margin: 16px 0 8px; font-weight: 600; }
+  h2:first-of-type { margin-top: 4px; }
+
+  .row { display: flex; gap: 6px; }
+  .row > * { flex: 1; }
+  button { font: inherit; color: var(--text); background: var(--btn); border: 1px solid var(--panel-border);
+    border-radius: 8px; padding: 8px 10px; cursor: pointer; transition: background .15s, border-color .15s, opacity .15s; }
+  button:hover:not(:disabled) { background: var(--btn-hover); border-color: rgba(140, 170, 230, 0.32); }
+  button:disabled { opacity: 0.38; cursor: not-allowed; }
+  button.primary { background: linear-gradient(135deg, #1fb8e6, #6a4cf0); border-color: transparent; font-weight: 600; color: #fff; }
+  button.primary:hover:not(:disabled) { filter: brightness(1.1); background: linear-gradient(135deg, #1fb8e6, #6a4cf0); }
+  button.on { border-color: var(--accent); background: rgba(56, 214, 255, 0.13); }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .mt { margin-top: 6px; }
+
+  /* Scale ladder */
+  #ladder { list-style: none; margin: 0; padding: 0; position: relative; }
+  #ladder::before { content: ""; position: absolute; left: 13px; top: 14px; bottom: 14px; width: 2px;
+    background: linear-gradient(var(--accent), var(--accent-2)); opacity: 0.35; border-radius: 2px; }
+  #ladder button { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; background: transparent;
+    border-color: transparent; padding: 6px 6px 6px 2px; }
+  #ladder button:hover { background: var(--btn); }
+  #ladder .dot { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; flex: none; position: relative;
+    background: #0d1422; border: 1.5px solid #34425f; font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+  #ladder .nm { font-weight: 600; font-size: 12.5px; display: block; }
+  #ladder .sc { color: var(--muted); font-size: 11px; font-family: var(--mono); }
+  #ladder button.active .dot { border-color: var(--accent); color: #061019; background: var(--accent);
+    box-shadow: 0 0 0 4px rgba(56, 214, 255, 0.16); }
+  #ladder button.active .nm { color: var(--accent); }
+
+  .check { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 12px; margin: 5px 0; cursor: pointer; }
+  .check input { accent-color: var(--accent); margin: 0; }
+  .sw { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+  .chips { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 6px 0 2px 19px; }
+  .chips button { padding: 4px 0; font-family: var(--mono); font-size: 11px; }
+  .chips button.on { border-color: var(--copper); background: rgba(224, 138, 82, 0.16); }
+
+  .slider { margin: 8px 0 2px; }
+  .slider label { display: flex; justify-content: space-between; color: var(--muted); font-size: 11.5px; margin-bottom: 4px; }
+  .slider label b { color: var(--text); font-family: var(--mono); font-weight: 600; font-size: 11px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); margin: 0; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
+  .readout div { background: rgba(255, 255, 255, 0.035); border: 1px solid var(--panel-border); border-radius: 8px; padding: 6px 8px; }
+  .readout span { display: block; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .readout b { font-family: var(--mono); font-size: 12px; font-weight: 600; }
+  #ivPlot { width: 100%; height: 96px; display: block; margin-top: 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.025);
+    border: 1px solid var(--panel-border); }
+  .hint { color: var(--faint); font-size: 11px; line-height: 1.55; margin-top: 14px; }
+  .hint kbd { font-family: var(--mono); font-size: 10.5px; color: var(--muted); border: 1px solid var(--panel-border);
+    border-radius: 4px; padding: 0 4px; }
+
+  /* Info panel */
+  .eyebrow { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); font-weight: 600; }
+  #info h3 { margin: 6px 0 2px; font-size: 16px; font-weight: 700; }
+  #infoKind { color: var(--muted); font-size: 11.5px; font-family: var(--mono); }
+  #infoBody { color: #c9d3e6; line-height: 1.55; margin: 10px 0; }
+  #infoStats { display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; margin: 10px 0 0; font-size: 12px; }
+  #infoStats dt { color: var(--muted); }
+  #infoStats dd { margin: 0; font-family: var(--mono); font-size: 11.5px; text-align: right; }
+  #infoLive { margin-top: 10px; }
+  #infoLive:empty { display: none; }
+  .live { border: 1px solid var(--panel-border); border-radius: 9px; padding: 8px 10px; background: rgba(56, 214, 255, 0.05);
+    font-family: var(--mono); font-size: 11.5px; line-height: 1.7; }
+  .live .on { color: var(--good); } .live .off { color: var(--muted); }
+  #infoDive { width: 100%; margin-top: 12px; }
+  .legend { display: flex; gap: 12px; margin-top: 12px; color: var(--muted); font-size: 11px; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }
+
+  /* Bottom HUD: live scale readout */
+  #hud { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 9; display: flex; align-items: center;
+    gap: 18px; padding: 10px 16px; background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); white-space: nowrap; }
+  #hud .k { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; display: block; }
+  #hud .v { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+  #hudLevel { color: var(--accent); }
+  .bar { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+  #scaleLbl { text-transform: none; letter-spacing: 0.02em; font-family: var(--mono); }
+  #scaleBar { height: 7px; border: 1.5px solid var(--text); border-top: none; width: 100px; transition: width .08s linear; }
+
+  #hover { position: fixed; pointer-events: none; z-index: 20; background: rgba(8, 12, 22, 0.94); display: none;
+    border: 1px solid var(--panel-border); border-radius: 8px; padding: 5px 9px; font-size: 11.5px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); }
+  #hover small { color: var(--muted); display: block; font-size: 10.5px; }
+
+  #toast { position: fixed; left: 50%; top: 18px; transform: translateX(-50%) translateY(-16px); opacity: 0; z-index: 30;
+    background: rgba(12, 18, 30, 0.95); border: 1px solid var(--panel-border); padding: 8px 14px; border-radius: 99px;
+    font-size: 12px; transition: all .25s; pointer-events: none; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 1180px) { #hud .opt { display: none; } }
+  @media (max-width: 900px) {
+    .panel { left: 16px; right: 16px; width: auto !important; max-height: 44vh; }
+    #controls { top: 16px; }
+    #info { top: auto; bottom: 16px; }
+    .panel.collapsed > :not(.brand) { display: none; }
+    .brand { cursor: pointer; margin-bottom: 0; }
+    .panel:not(.collapsed) .brand { margin-bottom: 12px; }
+    #hud { top: 82px; bottom: auto; gap: 12px; padding: 8px 12px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="warp"></div>
+<div id="labels"></div>
+<div id="hover"></div>
+<div id="toast"></div>
+
+<aside id="controls" class="panel">
+  <div class="brand" data-collapse>
+    <div class="logo">Si</div>
+    <div><h1>Chip Depth Explorer</h1><p>Package to FinFET gate, six scales</p></div>
+  </div>
+
+  <h2>Scale ladder</h2>
+  <ol id="ladder"></ol>
+  <div class="row mt">
+    <button id="btnUp" title="Surface one scale ( [ )">▲ Surface</button>
+    <button id="btnDive" class="primary" title="Dive one scale ( ] )">Dive ▼</button>
+  </div>
+
+  <h2>Layers</h2>
+  <label class="check"><input type="checkbox" data-t="lid" checked><span class="sw" style="background:#c9ced6"></span>Heat spreader + TIM</label>
+  <label class="check"><input type="checkbox" data-t="pkg" checked><span class="sw" style="background:#2f7a4a"></span>PCB, substrate, bumps</label>
+  <label class="check"><input type="checkbox" data-t="metal" checked><span class="sw" style="background:var(--copper)"></span>Metal routing layers</label>
+  <div class="chips" id="metalChips"></div>
+  <label class="check"><input type="checkbox" data-t="dielectric" checked><span class="sw" style="background:#8fb8ff;opacity:.6"></span>Dielectric insulation</label>
+  <label class="check"><input type="checkbox" data-t="substrate" checked><span class="sw" style="background:#56647e"></span>Silicon substrate</label>
+  <label class="check"><input type="checkbox" data-t="transistor" checked><span class="sw" style="background:#3cc79e"></span>Transistors (fins, gates, S/D)</label>
+  <label class="check"><input type="checkbox" data-t="flow" checked><span class="sw" style="background:var(--accent);border-radius:50%"></span>Electron / data flow</label>
+  <label class="check"><input type="checkbox" data-t="labels" checked><span class="sw" style="border:1px solid var(--muted)"></span>Labels</label>
+
+  <h2>View</h2>
+  <div class="slider"><label><span id="sepLabel">Layer separation</span><b id="sepVal">0%</b></label>
+    <input type="range" id="sep" min="0" max="1" step="0.01" value="0"></div>
+  <div class="slider"><label><span>Clock (visual)</span><b id="clkVal">1.2 Hz</b></label>
+    <input type="range" id="clk" min="0" max="4" step="0.1" value="1.2"></div>
+  <div class="row mt">
+    <button id="btnCut" class="on" title="Remove the gate slab in front of the nearest fin">Gate cutaway</button>
+    <button id="btnXray" title="Make the gate metal translucent">X-ray gate</button>
+  </div>
+
+  <h2>Transistor gate (level 6)</h2>
+  <div class="slider"><label><span>Gate voltage V<sub>G</sub></span><b id="vgVal">0.00 V</b></label>
+    <input type="range" id="vg" min="0" max="0.8" step="0.01" value="0"></div>
+  <button id="btnAuto" class="on mt" style="width:100%">Auto-switch with clock</button>
+  <div class="readout">
+    <div><span>State</span><b id="roState">OFF</b></div>
+    <div><span>I<sub>D</sub> / fin</span><b id="roId">0</b></div>
+    <div><span>Logic out</span><b id="roOut">1</b></div>
+  </div>
+  <canvas id="ivPlot"></canvas>
+
+  <div class="hint">
+    <kbd>Scroll</kbd> continuous zoom through every scale · <kbd>Drag</kbd> orbit · <kbd>Click</kbd> inspect ·
+    <kbd>Double-click</kbd> dive · <kbd>[</kbd> <kbd>]</kbd> step scale · <kbd>1</kbd>-<kbd>6</kbd> jump · <kbd>Esc</kbd> clear
+  </div>
+</aside>
+
+<aside id="info" class="panel">
+  <div class="brand" data-collapse style="display:none"></div>
+  <div class="eyebrow" id="infoLevel">Level 1 · Package</div>
+  <h3 id="infoTitle">Package</h3>
+  <div id="infoKind"></div>
+  <p id="infoBody"></p>
+  <dl id="infoStats"></dl>
+  <div id="infoLive"></div>
+  <button id="infoDive" class="primary">Dive in ▼</button>
+  <div class="legend">
+    <span><i style="background:#5ff2ff;box-shadow:0 0 6px #5ff2ff"></i>bit 1</span>
+    <span><i style="background:#6a4fd0"></i>bit 0</span>
+    <span><i style="background:#8fd0ff"></i>electrons</span>
+  </div>
+</aside>
+
+<div id="hud">
+  <div><span class="k">Scale</span><span class="v" id="hudLevel">Package</span></div>
+  <div><span class="k">Field of view</span><span class="v" id="hudFov">-</span></div>
+  <div class="opt"><span class="k">Zoom</span><span class="v" id="hudZoom">×1</span></div>
+  <div class="bar"><span class="k" id="scaleLbl">10 mm</span><div id="scaleBar"></div></div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* =====================================================================
+   HOW THE MULTI-SCALE MODEL WORKS
+   ---------------------------------------------------------------------
+   World unit = 1 millimetre. Every finer scale is a real child group,
+   nested inside its parent and scaled down, so the whole chip is one
+   continuous scene graph:
+
+     pkgRoot (1 unit = 1 mm)
+       dieRoot                        silicon die, 12 mm
+         cellsRoot   scale 1e-4       1 local unit = 100 nm
+           stackRoot scale 0.1        1 local unit = 10 nm
+             finRoot scale 0.1        1 local unit = 1 nm
+
+   Float precision holds up because three.js multiplies the camera and
+   object matrices in 64-bit JS numbers before handing the GPU a
+   camera-relative matrix; vertex data itself stays small. The near and
+   far planes are rescaled every frame from the orbit distance so the
+   depth buffer always spans the scale being looked at.
+
+   The camera's orbit distance d is the single "zoom" variable:
+     * each level has a natural viewing distance LEVELS[i].D,
+     * the orbit target is a function of d (focusAt), so zooming pulls
+       the camera toward the next level's anchor point,
+     * each level fades in and out by where d sits between two
+       neighbouring D values in log space (updateFades).
+   Scroll-wheel zoom therefore moves continuously through all six scales,
+   and the scripted "dive" just animates d exponentially (flyTo).
+   ===================================================================== */
+
+await Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 1200))]);
+
+const $ = (id) => document.getElementById(id);
+const V3 = THREE.Vector3;
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+const easeInOut = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const rand = mulberry32(20260923);
+const rr = (a, b) => a + (b - a) * rand();
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------------- renderer, scene, camera ---------------- */
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+$('stage').appendChild(renderer.domElement);
+const MAX_ANISO = renderer.capabilities.getMaxAnisotropy();
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05080f);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+// Directional and hemisphere lights have no position falloff, so they light every scale identically.
+scene.add(new THREE.HemisphereLight(0xbcd4ff, 0x1a1208, 0.7));
+const key = new THREE.DirectionalLight(0xffffff, 1.7); key.position.set(40, 80, 30); scene.add(key);
+const rim = new THREE.DirectionalLight(0x6c8cff, 0.7); rim.position.set(-50, 20, -40); scene.add(rim);
+
+const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 5000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.enablePan = false;
+controls.zoomSpeed = 1.6;
+controls.rotateSpeed = 0.8;
+
+/* ---------------- shared state ---------------- */
+const state = {
+  pkgExplode: 0, stackExplode: 0, finLift: 0,
+  clockHz: 1.2, clockPhase: 0, cycle: 0,
+  vg: 0, auto: true, cutaway: true, xray: false,
+};
+const toggles = { lid: true, pkg: true, metal: true, m1: true, m2: true, m3: true, m4: true, m5: true,
+  dielectric: true, substrate: true, transistor: true, flow: true, labels: true };
+
+/* ---------------- registries ----------------
+   FADE:   per-scale opacity groups (content roots + every material they use)
+   TAGGED: objects whose visibility follows the layer toggles
+   PICK:   objects that open the info panel when clicked                 */
+const FADE = {
+  macro: { objs: [], mats: [], alpha: 1 },
+  lid:   { objs: [], mats: [], alpha: 1 },
+  cells: { objs: [], mats: [], alpha: 0 },
+  stack: { objs: [], mats: [], alpha: 0 },
+  fin:   { objs: [], mats: [], alpha: 0 },
+};
+function reg(fade, m) {
+  m.userData.baseOpacity = m.opacity;
+  m.userData.baseTransparent = m.transparent;
+  FADE[fade].mats.push(m);
+  return m;
+}
+const mat = (fade, p) => reg(fade, new THREE.MeshStandardMaterial(p));
+const basic = (fade, p) => reg(fade, new THREE.MeshBasicMaterial(p));
+
+const TAGGED = [];
+function tag(o, ...tags) { o.userData.tags = tags; TAGGED.push(o); return o; }
+function applyTags() {
+  for (const o of TAGGED) {
+    o.visible = o.userData.tags.every(t => toggles[t] !== false) && !(o.userData.cutaway && state.cutaway);
+  }
+}
+const PICK = [];
+function pickable(o, fade, info, low = false) { o.userData.info = info; o.userData.fade = fade; o.userData.low = low; PICK.push(o); return o; }
+
+const EXPLODE = [];
+function explodePart(o, k) { EXPLODE.push({ o, base: o.position.y, k }); }
+
+/* ---------------- canvas textures ---------------- */
+function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return { c, g: c.getContext('2d') }; }
+function tex(c) { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = MAX_ANISO; return t; }
+function noise(g, w, h, n, a) { for (let i = 0; i < n; i++) { g.fillStyle = `rgba(255,255,255,${rand() * a})`; g.fillRect(rand() * w, rand() * h, 2, 2); } }
+
+const GLOW = (() => {
+  const { c, g } = canvas(64, 64);
+  const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.22, 'rgba(255,255,255,0.9)');
+  grd.addColorStop(0.5, 'rgba(255,255,255,0.22)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
+  return tex(c);
+})();
+
+/* ---------------- particle flows ----------------
+   A Flow is one THREE.Points cloud riding along polylines in the local
+   space of its parent group. Each particle stores its arc length s along
+   a path; every frame s advances by speed * dt and the position is found
+   by walking the path's cumulative-length table. Each packet carries a
+   bit: 1 = bright cyan, 0 = dim violet, re-rolled when it wraps around.
+   Path points carry a tag so exploded layers can shift particles by the
+   same offset as the geometry they ride on (offset(tag) -> local dy).
+   Point size is given in world units because PointsMaterial attenuates
+   size by view-space depth, which already includes the parent scale.  */
+const FLOWS = [];
+const BIT1 = [0.37, 0.95, 1.0], BIT0 = [0.30, 0.21, 0.62], ELEC = [0.55, 0.82, 1.0];
+class Flow {
+  constructor({ parent, fade, paths, count, size, speed, palette = 'data', offset = null, gate = null }) {
+    this.fade = fade; this.speed = speed; this.offset = offset; this.palette = palette; this.gate = gate;
+    this.paths = paths.map(pts => {
+      const cum = [0];
+      for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + pts[i].p.distanceTo(pts[i - 1].p));
+      return { pts, cum, len: cum[cum.length - 1] };
+    }).filter(p => p.len > 0);
+    this.n = count; this.active = count; this.rate = 1;
+    this.parts = [];
+    for (let i = 0; i < count; i++) {
+      const path = this.paths[i % this.paths.length];
+      this.parts.push({ path, s: Math.random() * path.len, v: rr(0.75, 1.25), bit: Math.random() < 0.5 ? 1 : 0 });
+    }
+    this.pos = new Float32Array(count * 3); this.col = new Float32Array(count * 3);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('color', new THREE.BufferAttribute(this.col, 3).setUsage(THREE.DynamicDrawUsage));
+    this.geo = g;
+    this.mat = reg(fade, new THREE.PointsMaterial({ size, map: GLOW, vertexColors: true, transparent: true,
+      depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }));
+    this.points = new THREE.Points(g, this.mat);
+    this.points.frustumCulled = false;
+    parent.add(this.points);
+    tag(this.points, 'flow');
+    for (let i = 0; i < count; i++) this.paint(i);
+    FLOWS.push(this);
+  }
+  paint(i) {
+    const c = this.palette === 'electron' ? ELEC : (this.parts[i].bit ? BIT1 : BIT0);
+    this.col.set(c, i * 3);
+  }
+  update(dt) {
+    let recolor = false;
+    for (let i = 0; i < this.active; i++) {
+      const q = this.parts[i], P = q.path;
+      q.s += dt * this.speed * q.v * this.rate;
+      if (q.s > P.len) { q.s %= P.len; q.bit = Math.random() < 0.5 ? 1 : 0; this.paint(i); recolor = true; }
+      let k = 1;
+      while (k < P.cum.length - 1 && P.cum[k] < q.s) k++;
+      const a = P.pts[k - 1], b = P.pts[k];
+      const t = (q.s - P.cum[k - 1]) / ((P.cum[k] - P.cum[k - 1]) || 1);
+      let y = lerp(a.p.y, b.p.y, t);
+      if (this.offset) y += lerp(this.offset(a.t), this.offset(b.t), t);
+      this.pos[i * 3] = lerp(a.p.x, b.p.x, t); this.pos[i * 3 + 1] = y; this.pos[i * 3 + 2] = lerp(a.p.z, b.p.z, t);
+    }
+    this.geo.setDrawRange(0, this.active);
+    this.geo.attributes.position.needsUpdate = true;
+    if (recolor) this.geo.attributes.color.needsUpdate = true;
+  }
+}
+const P = (x, y, z, t = 0) => ({ p: new V3(x, y, z), t });
+
+/* ---------------- routing generator ----------------
+   Used for both the standard-cell wiring (level 4) and the BEOL stack
+   (level 5). Layers alternate direction; each net climbs layer by layer,
+   and every run ends on a track of the next layer so the via lands on a
+   real wire. Nets become both copper geometry and particle paths.     */
+function makeRouter(layers, ext) {
+  for (const L of layers) {
+    L.tracks = [];
+    const n = Math.floor((2 * ext) / L.pitch);
+    for (let k = 0; k < n; k++) L.tracks.push(-ext + L.pitch * (k + 0.5));
+    L.occ = L.tracks.map(() => []); L.segs = []; L.vias = [];
+  }
+  const nearest = (L, v) => { let best = 0; for (let k = 1; k < L.tracks.length; k++) if (Math.abs(L.tracks[k] - v) < Math.abs(L.tracks[best] - v)) best = k; return best; };
+  const free = (L, ti, a, b) => L.occ[ti].every(([c, d]) => b + L.pitch * 0.7 < c || a - L.pitch * 0.7 > d);
+  const add = (L, ti, a, b, net) => { L.occ[ti].push([a, b]); L.segs.push({ ti, a, b, net }); };
+
+  function route(start, depth) {
+    let x = start.x, z = start.z;
+    const L0 = layers[0];
+    if (L0.dir === 'x') z = L0.tracks[nearest(L0, z)]; else x = L0.tracks[nearest(L0, x)];
+    const pts = [P(x, start.y0, z, 0)];
+    for (let li = 0; li < depth && li < layers.length; li++) {
+      const L = layers[li], next = li + 1 < depth ? layers[li + 1] : null;
+      const ti = L.dir === 'x' ? nearest(L, z) : nearest(L, x);
+      const cur = L.dir === 'x' ? x : z;
+      let ok = false;
+      for (let attempt = 0; attempt < 10 && !ok; attempt++) {
+        let target = cur + rr(2.5, 9) * L.pitch * (rand() < 0.5 ? -1 : 1);
+        target = clamp(target, -ext + L.pitch, ext - L.pitch);
+        if (next) target = next.tracks[nearest(next, target)];
+        if (Math.abs(target - cur) < L.pitch * 1.5) continue;
+        const a = Math.min(cur, target), b = Math.max(cur, target);
+        if (!free(L, ti, a, b)) continue;
+        add(L, ti, a, b, true);
+        L.vias.push({ x, z, y0: li === 0 ? start.y0 : layers[li - 1].y + layers[li - 1].h / 2, y1: L.y - L.h / 2 });
+        const ride = L.y + L.h / 2 + L.h * 0.25;   // packets travel just above the copper so the wire does not hide them
+        pts.push(P(x, ride, z, li + 1));
+        if (L.dir === 'x') x = target; else z = target;
+        pts.push(P(x, ride, z, li + 1));
+        ok = true;
+      }
+      if (!ok) break;
+    }
+    return pts.length >= 3 ? pts : null;
+  }
+  function fill() {
+    for (const L of layers) L.tracks.forEach((tc, ti) => {
+      let pos = -ext + rr(0, 3) * L.pitch;
+      while (pos < ext - L.pitch) {
+        const a = pos, b = Math.min(pos + rr(2, 9) * L.pitch, ext - L.pitch * 0.5);
+        if (rand() < L.fill && free(L, ti, a, b)) add(L, ti, a, b, false);
+        pos = b + rr(1.2, 4) * L.pitch;
+      }
+    });
+  }
+  return { layers, route, fill, nearest };
+}
+const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);
+const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new V3(), _p = new V3();
+function instancedSegments(L, material, netColor, fillColor) {
+  const mesh = new THREE.InstancedMesh(UNIT_BOX, material, Math.max(1, L.segs.length));
+  L.segs.forEach((sg, i) => {
+    const tc = L.tracks[sg.ti], mid = (sg.a + sg.b) / 2, len = sg.b - sg.a + L.w;
+    if (L.dir === 'x') { _p.set(mid, L.y, tc); _s.set(len, L.h, L.w); } else { _p.set(tc, L.y, mid); _s.set(L.w, L.h, len); }
+    mesh.setMatrixAt(i, _m4.compose(_p, _q, _s));
+    mesh.setColorAt(i, sg.net ? netColor : fillColor);
+  });
+  mesh.count = L.segs.length;
+  return mesh;
+}
+function instancedVias(L, material) {
+  const mesh = new THREE.InstancedMesh(UNIT_BOX, material, Math.max(1, L.vias.length));
+  const vw = L.vw ?? L.w * 0.85;
+  L.vias.forEach((v, i) => {
+    _p.set(v.x, (v.y0 + v.y1) / 2, v.z); _s.set(vw, Math.max(0.01, v.y1 - v.y0), vw);
+    mesh.setMatrixAt(i, _m4.compose(_p, _q, _s));
+  });
+  mesh.count = L.vias.length;
+  return mesh;
+}
+
+/* ---------------- labels (HTML, projected every frame) ---------------- */
+const LABELS = [];
+function label(parent, x, y, z, text, fade, levels, cls = '') {
+  const o = new THREE.Object3D(); o.position.set(x, y, z); parent.add(o);
+  const el = document.createElement('div'); el.className = 'lbl ' + cls; el.textContent = text;
+  $('labels').appendChild(el);
+  LABELS.push({ o, el, fade, levels });
+}
+
+/* =====================================================================
+   INFO CONTENT
+   ===================================================================== */
+const INFO = {
+  lid: { title: 'Integrated heat spreader', kind: 'Package · thermal', body: 'Nickel-plated copper lid bonded over the die. Heat leaves hot spots a few square millimetres across; the lid spreads it over its full area so the cooler can carry it away.',
+    stats: { Material: 'Ni-plated Cu', 'Cu conductivity': '~400 W/m·K', 'Model size': '26 × 26 mm' } },
+  tim: { title: 'Thermal interface material', kind: 'Package · thermal', body: 'A thin layer (solder or polymer) between the die backside and the lid. It fills microscopic air gaps, and it is often the largest single thermal resistance between transistor and heat sink.',
+    stats: { 'Typical thickness': '20-100 µm', Role: 'Die to lid heat path' } },
+  die: { title: 'Silicon die', kind: 'Die · 12 × 12 mm', body: 'All active circuitry lives in the top few micrometres of this slab; the rest of the silicon is mechanical support. It is rendered active side up for clarity. In a real flip-chip package the transistor side faces down onto the bumps.',
+    stats: { Area: '144 mm²', Thickness: '~0.75 mm', 'Transistor count': 'billions' }, diveTo: 2 },
+  bumps: { title: 'C4 / micro-bumps', kind: 'Package · die attach', body: 'Solder or copper-pillar bumps join the die pads to the package substrate. They carry every signal plus power and ground into the chip. Drawn here at a coarser pitch so they stay visible.',
+    stats: { 'Real pitch': '~100-150 µm', 'Model pitch': '580 µm', Count: 'thousands' } },
+  substrate: { title: 'Package substrate', kind: 'Package · organic build-up', body: 'A laminate of thin copper redistribution layers and micro-vias. It fans the fine bump pitch out to the much coarser ball pitch, and carries power delivery and the die-side decoupling capacitors.',
+    stats: { Layers: '8-16 copper', 'Model size': '30 × 30 mm' }, diveTo: 1 },
+  subcap: { title: 'Die-side capacitor', kind: 'Package · power integrity', body: 'Small ceramic capacitors mounted close to the die. They supply charge in the first nanoseconds of a current spike, before the board regulator can respond.',
+    stats: { Role: 'Supply decoupling' } },
+  bga: { title: 'Ball grid array', kind: 'Package · board attach', body: 'Solder balls attach the package to the motherboard. A large share of them carry power and ground, because the core can draw well over 100 A at under 1 V.',
+    stats: { 'Model grid': '31 × 31', 'Pitch': '0.9 mm' } },
+  pcb: { title: 'Motherboard (PCB)', kind: 'Board · FR-4 laminate', body: 'A multi-layer board with signal layers sandwiched between ground and power planes. Parallel bus traces are length-matched so every bit of a word arrives inside the same timing window.',
+    stats: { Layers: '8-14 typical', 'Model area': '70 × 70 mm' }, diveTo: 1 },
+  dram: { title: 'DRAM package', kind: 'Board · memory', body: 'Main memory. The processor streams data to and from it over a wide parallel bus; the matched traces you see carry clock, command and data bits.',
+    stats: { Interface: 'x32 parallel bus', Latency: '~80-100 ns' } },
+  vrm: { title: 'Voltage regulator inductor', kind: 'Board · power', body: 'Part of a multi-phase buck converter that steps the board supply down to the ~0.7-1.1 V the core logic runs at, delivering tens to hundreds of amps.',
+    stats: { Output: '~0.75 V core rail' } },
+  cap: { title: 'Decoupling capacitor', kind: 'Board · power integrity', body: 'A local charge reservoir that holds the supply steady when millions of transistors switch in the same nanosecond.',
+    stats: { Typical: '0.1-22 µF MLCC' } },
+  finger: { title: 'Edge connector lanes', kind: 'Board · high-speed I/O', body: 'Gold fingers for high-speed serial links. Each lane is a differential pair carrying serialized bits at many gigabits per second.',
+    stats: { Signaling: 'Differential pairs' } },
+  core: (n, anchor) => ({ title: `CPU core ${n}`, kind: 'Die floorplan · logic', body: 'Fetches, decodes and executes instructions. Holds integer ALUs, a floating-point and vector unit, a register file, a branch predictor and private L1/L2 caches.' + (anchor ? ' The zoom target sits inside this core.' : ''),
+    stats: { 'Model size': '2.6 × 3.3 mm', Transistors: 'hundreds of millions' }, diveTo: 3 }),
+  cache: (n) => ({ title: `L3 cache slice ${n}`, kind: 'Die floorplan · SRAM', body: 'Part of the shared last-level cache, built from dense arrays of 6-transistor SRAM bit cells. A hit here saves a round trip to DRAM that costs roughly 100 ns.',
+    stats: { 'Bit cell': '6T SRAM', 'Access': '~10 ns' } }),
+  gpu: { title: 'GPU', kind: 'Die floorplan · parallel compute', body: 'Many small shader cores running the same instruction across many data elements at once. It trades single-thread speed for throughput.',
+    stats: { 'Model size': '5.4 × 5.1 mm' } },
+  npu: { title: 'Neural processing unit', kind: 'Die floorplan · ML accelerator', body: 'A grid of multiply-accumulate units for the matrix math in ML inference, with local SRAM to keep weights close to the arithmetic.',
+    stats: { Core: 'MAC array' } },
+  mem: { title: 'Memory controller + PHY', kind: 'Die floorplan · I/O', body: 'Schedules reads and writes to DRAM and drives the analog signalling on the memory bus traces you saw on the board.',
+    stats: { Interface: 'DDR-class PHY' } },
+  ring: { title: 'Global interconnect', kind: 'Die · top metal', body: 'Thick, wide copper in the top metal layers carries the ring bus between cores, cache, GPU and memory controller. Wide wires keep resistance low over millimetre distances.',
+    stats: { Width: 'several µm', Layer: 'top metal' } },
+  reticle: { title: 'Zoom target', kind: 'Die · Core 1', body: 'Double-click here, press ], or use Dive to zoom into the standard-cell layout under this spot.', stats: {}, diveTo: 3 },
+
+  cellsBase: { title: 'Placement area', kind: 'Cells · silicon', body: 'The silicon under a block of standard cells. Wells and diffusion for every transistor in these rows are formed here.', stats: {} },
+  rail: { title: 'Power rail (VDD / VSS)', kind: 'Cells · power', body: 'Supply rails run along the top and bottom edge of every cell row. Alternate rows are flipped so neighbours share a rail, which saves area.',
+    stats: { Rows: '33 in view', 'Cell height': '240 nm' } },
+  cellWire: (name) => ({ title: `Local routing, ${name}`, kind: 'Cells · copper interconnect', body: 'Short copper wires that connect cell pins into logic. Routing tools assign each metal layer a preferred direction, which is why wires alternate between horizontal and vertical.',
+    stats: { Layer: name } }),
+  cellTarget: { title: 'Zoom target: NAND2 cell', kind: 'Cells · anchor', body: 'Double-click or Dive to open a 400 nm cross-section around this cell: fins, gates and five metal layers.', stats: {}, diveTo: 4 },
+
+  substrateSi: { title: 'Silicon substrate', kind: 'Stack · bulk Si', body: 'The p-type wafer. Transistors are built in its top ~100 nm; doped wells separate the nMOS and pMOS regions.',
+    stats: { Material: 'Crystalline Si' } },
+  sti: { title: 'Shallow trench isolation', kind: 'Stack · SiO₂', body: 'Oxide fills the trenches between fins so neighbouring transistors cannot leak into each other. Only the fin tops poke above it.',
+    stats: { Material: 'SiO₂' } },
+  fin: { title: 'Silicon fin', kind: 'Stack · channel', body: 'The transistor channel. Current flows along the fin under the gate, on its top surface and both sidewalls. More fins per transistor means more drive current.',
+    stats: { Width: '~7 nm', Height: '~40-50 nm', 'Fin pitch': '30 nm' }, diveTo: 5 },
+  spacer: { title: 'Gate spacer', kind: 'Stack · SiN', body: 'Silicon nitride walls that insulate the gate from the source and drain contacts and set the gate-to-contact distance.',
+    stats: { Material: 'SiN / SiOCN' } },
+  nepi: { title: 'n-type source / drain', kind: 'Stack · SiP epitaxy', body: 'Phosphorus-doped silicon grown on the fins, merging across them. It supplies electrons to the nFET channel.',
+    stats: { Carrier: 'electrons' } },
+  pepi: { title: 'p-type source / drain', kind: 'Stack · SiGe epitaxy', body: 'Boron-doped silicon-germanium. The larger Ge atoms squeeze the channel, and that strain raises hole mobility in the pFET.',
+    stats: { Carrier: 'holes' } },
+  tc: { title: 'Trench contact', kind: 'Stack · middle of line', body: 'Cobalt or tungsten bar that connects a source or drain to the first metal layer.',
+    stats: { Material: 'Co / W' } },
+  gc: { title: 'Gate contact', kind: 'Stack · middle of line', body: 'Brings the input signal down from metal onto the gate electrode.', stats: { Material: 'Co / W' } },
+  metal: (L) => ({ title: `Copper wire, ${L.name}`, kind: 'Stack · BEOL interconnect', body: 'Built by dual damascene: trenches etched into the dielectric, lined with a TaN/Ta barrier, filled with copper, then polished flat. Lower layers are fine and short; upper layers are wider for long runs and power.',
+    stats: { Width: `~${Math.round(L.w * 10)} nm`, Pitch: `~${Math.round(L.pitch * 10)} nm`, Direction: L.dir === 'x' ? 'along fins' : 'across fins' } }),
+  via: (L) => ({ title: `Via into ${L.name}`, kind: 'Stack · BEOL interconnect', body: 'A vertical copper plug joining one metal layer to the next. Via resistance is a growing share of wire delay at advanced nodes.',
+    stats: { Layer: L.name } }),
+  ild: (name) => ({ title: `Low-k dielectric (${name})`, kind: 'Stack · insulation', body: 'Carbon-doped oxide insulates neighbouring wires. A lower dielectric constant means less wire capacitance, so signals switch faster and burn less power.',
+    stats: { 'k value': '~2.5-3.0', 'vs SiO₂': 'k = 3.9' } }),
+
+  finSub: { title: 'Silicon substrate', kind: 'FinFET · bulk Si', body: 'Bulk silicon the fins are etched from. The fins stay connected to it below the isolation oxide.', stats: {} },
+  finSti: { title: 'Isolation oxide (STI)', kind: 'FinFET · SiO₂', body: 'Oxide fills the space between fins up to about 15 nm; only the fin above it is wrapped by the gate and conducts.', stats: {} },
+  hk: { title: 'High-k gate dielectric', kind: 'FinFET · HfO₂', body: 'A ~1.5-2 nm hafnium-oxide film between gate metal and fin. Its high permittivity gives strong gate control while staying physically thick enough to block tunnelling leakage.',
+    stats: { Material: 'HfO₂ on SiO₂ interlayer', 'k value': '~20-25' } },
+  finSpacer: { title: 'Gate spacer', kind: 'FinFET · SiN', body: 'Insulating nitride walls on both sides of the gate. They keep the gate electrically separate from the source and drain contacts only a few nanometres away.', stats: {} },
+  source: { title: 'Source (n+ SiP)', kind: 'FinFET · terminal', body: 'Connected to VSS through the trench contact and M1. When the channel inverts, electrons leave the source, cross under the gate and arrive at the drain.', stats: { Potential: '0 V (VSS)' } },
+  drain: { title: 'Drain (n+ SiP)', kind: 'FinFET · terminal', body: 'Connected to the gate output node. With the gate on, this nFET pulls the output toward 0 V; with the gate off, the paired pFET pulls it up to VDD.', stats: { Potential: 'output node' } },
+  finTc: { title: 'Trench contact', kind: 'FinFET · middle of line', body: 'Lands on the merged source/drain epitaxy and carries current up to M1 through a V0 via.', stats: {} },
+  finGc: { title: 'Gate contact', kind: 'FinFET · middle of line', body: 'Carries the input signal from M1 down to the gate.', stats: {} },
+  m1: (n) => ({ title: `M1 wire (${n})`, kind: 'FinFET · first metal', body: 'The first copper routing layer, the same M1 you saw in the stack view, now at nanometre scale.', stats: { Width: '~10 nm' } }),
+};
+
+/* =====================================================================
+   LEVEL 1-3: PACKAGE, SUBSTRATE, DIE  (1 unit = 1 mm)
+   ===================================================================== */
+const pkgRoot = new THREE.Group(); scene.add(pkgRoot);
+const pkgContent = new THREE.Group(); pkgRoot.add(pkgContent);
+const lidContent = new THREE.Group(); pkgRoot.add(lidContent);
+const dieRoot = new THREE.Group(); dieRoot.position.y = 1.75; pkgRoot.add(dieRoot); explodePart(dieRoot, 5.5);
+const dieContent = new THREE.Group(); dieRoot.add(dieContent);
+FADE.macro.objs.push(pkgContent, dieContent); FADE.lid.objs.push(lidContent);
+
+// ---- PCB routes are shared by the board texture and the particle flows
+const PCB_ROUTES = [];
+for (let i = 0; i < 12; i++) {
+  const xs = -12.5 + i * 0.9, xe = -15 + i * 1.15;
+  PCB_ROUTES.push([[xs, 15.3], [xs, 17.2], [xe, 20.6], [xe, 22.2]]);
+  PCB_ROUTES.push([[-xs, 15.3], [-xs, 17.2], [-xe, 20.6], [-xe, 22.2]]);
+}
+const FINGERS = [];
+for (let i = 0; i < 16; i++) {
+  const z = -9 + i * 1.2, ze = z * 1.45;
+  PCB_ROUTES.push([[15.3, z], [19, z], [25, ze], [31.6, ze]]);
+  FINGERS.push(ze);
+}
+const POWER_ROUTES = [-13.5, -4.5, 4.5, 13.5].map(z => [[-23, z], [-19, z], [-15.3, z * 0.6]]);
+
+function pcbTexture() {
+  const S = 2048, k = S / 70; const { c, g } = canvas(S, S);
+  const Pt = (x, z) => [(x + 35) * k, (z + 35) * k];
+  g.fillStyle = '#0e3a29'; g.fillRect(0, 0, S, S); noise(g, S, S, 9000, 0.03);
+  const trace = (pts, w, col) => {
+    g.strokeStyle = col; g.lineWidth = w * k; g.lineJoin = 'round'; g.lineCap = 'round'; g.beginPath();
+    pts.forEach(([x, z], i) => { const [px, py] = Pt(x, z); i ? g.lineTo(px, py) : g.moveTo(px, py); }); g.stroke();
+  };
+  // Decorative background routing, kept out of the component footprints
+  const keepOut = [[-17, -17, 17, 17], [-17, 21, 17, 33], [-30, -18, -19, 18], [30, -15, 35, 15]];
+  const blocked = (x, z) => keepOut.some(([a, b, c2, d]) => x > a && x < c2 && z > b && z < d);
+  for (let i = 0; i < 140; i++) {
+    let x = rr(-34, 34), z = rr(-34, 34); const pts = [[x, z]]; let bad = blocked(x, z);
+    for (let s = 0; s < 3 && !bad; s++) { if (s % 2) z += rr(-8, 8); else x += rr(-8, 8); x = clamp(x, -34, 34); z = clamp(z, -34, 34); bad = blocked(x, z); pts.push([x, z]); }
+    if (!bad) trace(pts, 0.14, 'rgba(95,170,105,0.32)');
+  }
+  for (const r of POWER_ROUTES) trace(r, 1.6, 'rgba(100,180,105,0.42)');
+  for (const r of PCB_ROUTES) trace(r, 0.16, 'rgba(140,215,135,0.6)');
+  g.fillStyle = 'rgba(210,190,120,0.8)';
+  for (let i = 0; i < 90; i++) { const x = rr(-33, 33), z = rr(-33, 33); if (blocked(x, z)) continue; const [px, py] = Pt(x, z); g.beginPath(); g.arc(px, py, 0.22 * k, 0, 7); g.fill(); }
+  // silkscreen
+  g.strokeStyle = 'rgba(236,240,232,0.85)'; g.fillStyle = 'rgba(236,240,232,0.85)'; g.lineWidth = 0.14 * k;
+  const rect = (x0, z0, x1, z1) => { const [a, b] = Pt(x0, z0), [c2, d] = Pt(x1, z1); g.strokeRect(a, b, c2 - a, d - b); };
+  const text = (s, x, z, size = 1.3) => { g.font = `600 ${size * k}px Inter, sans-serif`; const [px, py] = Pt(x, z); g.fillText(s, px, py); };
+  rect(-16, -16, 16, 16); text('U1', -16, -16.8);
+  rect(-16.5, 21.5, -1.5, 32.5); text('U2', -16.5, 34.2); rect(1.5, 21.5, 16.5, 32.5); text('U3', 1.5, 34.2);
+  [-13.5, -4.5, 4.5, 13.5].forEach((z, i) => text('L' + (i + 1), -33.5, z + 0.5));
+  text('J1', 30.2, -15.5);
+  text('EXPLORER-9  REV B', 18, -31.5, 1.1);
+  g.fillStyle = 'rgba(210,190,120,0.9)';
+  for (const [x, z] of [[-32, -32], [32, -32], [-32, 32], [32, 32]]) { const [px, py] = Pt(x, z); g.beginPath(); g.arc(px, py, 1.4 * k, 0, 7); g.fill();
+    g.fillStyle = '#05080f'; g.beginPath(); g.arc(px, py, 0.8 * k, 0, 7); g.fill(); g.fillStyle = 'rgba(210,190,120,0.9)'; }
+  return tex(c);
+}
+
+function substrateTexture() {
+  const S = 1024, k = S / 30; const { c, g } = canvas(S, S);
+  const Pt = (x, z) => [(x + 15) * k, (z + 15) * k];
+  g.fillStyle = '#1d2a25'; g.fillRect(0, 0, S, S); noise(g, S, S, 4000, 0.04);
+  g.strokeStyle = 'rgba(214,170,90,0.55)'; g.lineWidth = 0.05 * k;
+  for (let side = 0; side < 4; side++) for (let i = 0; i < 38; i++) {
+    const t = -5.6 + i * 0.3, T = -13.6 + i * 0.735;
+    let a = [t, -6.3], b = [t, -8.2], c2 = [T, -14.2];
+    const rot = ([x, z]) => side === 0 ? [x, z] : side === 1 ? [-z, x] : side === 2 ? [-x, -z] : [z, -x];
+    [a, b, c2] = [a, b, c2].map(rot);
+    g.beginPath(); g.moveTo(...Pt(...a)); g.lineTo(...Pt(...b)); g.lineTo(...Pt(...c2)); g.stroke();
+  }
+  g.fillStyle = '#2d2a22'; const [a, b] = Pt(-6.4, -6.4); g.fillRect(a, b, 12.8 * k, 12.8 * k);
+  g.fillStyle = 'rgba(214,170,90,0.9)'; g.beginPath(); g.moveTo(...Pt(-14.4, -14.4)); g.lineTo(...Pt(-12.6, -14.4)); g.lineTo(...Pt(-14.4, -12.6)); g.fill();
+  return tex(c);
+}
+
+function lidTexture() {
+  const S = 1024; const { c, g } = canvas(S, S);
+  const grd = g.createLinearGradient(0, 0, S, S); grd.addColorStop(0, '#aeb4bd'); grd.addColorStop(0.5, '#d9dde3'); grd.addColorStop(1, '#b3b9c2');
+  g.fillStyle = grd; g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 2600; i++) { g.fillStyle = `rgba(${rand() < 0.5 ? '255,255,255' : '60,66,78'},${rand() * 0.06})`; g.fillRect(0, rand() * S, S, 1); }
+  g.fillStyle = 'rgba(38,44,56,0.62)'; g.textAlign = 'center';
+  g.font = '700 92px Inter, sans-serif'; g.fillText('AURORA X9', S / 2, S / 2 - 30);
+  g.font = '500 38px "JetBrains Mono", monospace'; g.fillText('8C · FINFET · ENG SAMPLE', S / 2, S / 2 + 40);
+  g.font = '500 30px "JetBrains Mono", monospace'; g.fillText('2638A7 · LOT 0417', S / 2, S / 2 + 90);
+  g.beginPath(); g.moveTo(40, 40); g.lineTo(110, 40); g.lineTo(40, 110); g.fill();
+  return tex(c);
+}
+
+function dramTexture() {
+  const { c, g } = canvas(512, 384);
+  g.fillStyle = '#15171b'; g.fillRect(0, 0, 512, 384); noise(g, 512, 384, 1500, 0.05);
+  g.fillStyle = 'rgba(200,205,215,0.6)'; g.font = '700 58px Inter, sans-serif'; g.fillText('DRAM', 36, 150);
+  g.font = '500 30px "JetBrains Mono", monospace'; g.fillText('16 Gb · x32', 38, 206); g.fillText('2638 · A1', 38, 250);
+  g.beginPath(); g.arc(470, 44, 14, 0, 7); g.fill();
+  return tex(c);
+}
+
+// ---- die floorplan textures, drawn per block at ~128 px per mm
+const BLOCK_STYLE = {
+  core: { bg: '#1c2444', edge: 'rgba(150,180,255,0.6)' }, sram: { bg: '#1c2133', edge: 'rgba(150,170,220,0.5)' },
+  gpu: { bg: '#2a1d3c', edge: 'rgba(200,150,255,0.55)' }, npu: { bg: '#15321f', edge: 'rgba(120,230,160,0.55)' },
+  mem: { bg: '#332818', edge: 'rgba(255,190,110,0.55)' },
+};
+function hatch(g, x, y, w, h, step, col) { g.strokeStyle = col; g.lineWidth = 1; g.beginPath();
+  for (let i = x; i < x + w; i += step) { g.moveTo(i, y); g.lineTo(i, y + h); }
+  for (let j = y; j < y + h; j += step) { g.moveTo(x, j); g.lineTo(x + w, j); } g.stroke(); }
+function blockTexture(type, text, wmm, hmm) {
+  const s = Math.min(128, 1024 / Math.max(wmm, hmm));
+  const W = Math.round(wmm * s), H = Math.round(hmm * s); const { c, g } = canvas(W, H);
+  const st = BLOCK_STYLE[type]; g.fillStyle = st.bg; g.fillRect(0, 0, W, H); noise(g, W, H, W * H / 90, 0.05);
+  const sub = (fx, fy, fw, fh, name, col, dense) => {
+    const x = fx * W, y = fy * H, w = fw * W, h = fh * H;
+    g.fillStyle = col; g.fillRect(x, y, w, h);
+    if (dense) hatch(g, x + 2, y + 2, w - 4, h - 4, 4, 'rgba(170,190,255,0.16)');
+    g.strokeStyle = st.edge; g.lineWidth = 1.5; g.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    g.fillStyle = 'rgba(225,232,255,0.8)'; g.font = `600 ${Math.max(9, H * 0.045)}px Inter, sans-serif`; g.fillText(name, x + 5, y + H * 0.055);
+  };
+  if (type === 'core') {
+    sub(0.04, 0.16, 0.44, 0.22, 'FETCH / DECODE', '#29376a'); sub(0.52, 0.16, 0.44, 0.22, 'BRANCH PRED', '#342f6a');
+    sub(0.04, 0.42, 0.28, 0.25, 'INT ALU ×4', '#20496a'); sub(0.35, 0.42, 0.28, 0.25, 'FP / SIMD', '#1e5656');
+    sub(0.66, 0.42, 0.30, 0.25, 'REG FILE', '#383c68', true);
+    sub(0.04, 0.71, 0.27, 0.25, 'L1-I', '#262c44', true); sub(0.34, 0.71, 0.27, 0.25, 'L1-D', '#262c44', true);
+    sub(0.64, 0.71, 0.32, 0.25, 'L2', '#262c44', true);
+  } else if (type === 'sram') {
+    for (let i = 0; i < 2; i++) for (let j = 0; j < 4; j++) sub(0.06 + i * 0.46, 0.2 + j * 0.19, 0.42, 0.16, '', '#232a40', true);
+  } else if (type === 'gpu') {
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) {
+      const x = 0.04 + i * 0.24, y = 0.14 + j * 0.28; sub(x, y, 0.21, 0.24, `CU ${j * 4 + i}`, '#34244d');
+      for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) { g.fillStyle = 'rgba(200,160,255,0.22)'; g.fillRect((x + 0.02 + a * 0.063) * W, (y + 0.07 + b * 0.055) * H, 0.05 * W, 0.04 * H); }
+    }
+  } else if (type === 'npu') {
+    sub(0.05, 0.16, 0.9, 0.62, 'MAC ARRAY', '#193d27');
+    for (let a = 0; a < 12; a++) for (let b = 0; b < 8; b++) { g.fillStyle = `rgba(120,240,170,${0.12 + 0.2 * rand()})`; g.fillRect((0.08 + a * 0.071) * W, (0.24 + b * 0.065) * H, 0.055 * W, 0.05 * H); }
+    sub(0.05, 0.82, 0.9, 0.13, 'WEIGHT SRAM', '#1d2c2a', true);
+  } else if (type === 'mem') {
+    sub(0.05, 0.16, 0.9, 0.36, 'SCHEDULER', '#43321c');
+    for (let a = 0; a < 16; a++) { g.fillStyle = 'rgba(255,200,120,0.28)'; g.fillRect((0.06 + a * 0.056) * W, 0.6 * H, 0.03 * W, 0.34 * H); }
+    g.fillStyle = 'rgba(255,220,170,0.8)'; g.font = `600 ${H * 0.05}px Inter, sans-serif`; g.fillText('DDR PHY', 0.06 * W, 0.58 * H);
+  }
+  g.strokeStyle = st.edge; g.lineWidth = 3; g.strokeRect(1.5, 1.5, W - 3, H - 3);
+  g.fillStyle = '#ffffff'; g.font = `700 ${Math.max(11, Math.min(W, H) * 0.085)}px Inter, sans-serif`; g.fillText(text, 7, Math.max(13, Math.min(W, H) * 0.1));
+  return tex(c);
+}
+function dieTexture() {
+  const S = 1536, k = S / 12; const { c, g } = canvas(S, S);
+  g.fillStyle = '#161c2a'; g.fillRect(0, 0, S, S); noise(g, S, S, 12000, 0.04);
+  g.strokeStyle = '#8a93a8'; g.lineWidth = 6; g.strokeRect(10, 10, S - 20, S - 20);
+  g.fillStyle = '#b8a36a';
+  for (let i = 0; i < 25; i++) {
+    const t = (0.35 + i * 0.47) * k, p = 0.12 * k, s = 0.24 * k;
+    g.fillRect(t, p, s, s); g.fillRect(t, S - p - s, s, s); g.fillRect(p, t, s, s); g.fillRect(S - p - s, t, s, s);
+  }
+  g.fillStyle = 'rgba(200,210,230,0.5)'; g.font = '500 22px "JetBrains Mono", monospace'; g.fillText('X9-A0  2026', S - 190, S - 50);
+  return tex(c);
+}
+
+// ---- PCB
+{
+  const side = mat('macro', { color: 0x2d4a2d, roughness: 0.85 });
+  const top = mat('macro', { map: pcbTexture(), roughness: 0.5, metalness: 0.05 });
+  const pcb = new THREE.Mesh(new THREE.BoxGeometry(70, 1.6, 70), [side, side, top, side, side, side]);
+  pcb.position.y = -0.8; pkgContent.add(pcb); tag(pcb, 'pkg'); pickable(pcb, 'macro', INFO.pcb);
+
+  const dramTop = mat('macro', { map: dramTexture(), roughness: 0.6 });
+  const dramSide = mat('macro', { color: 0x141619, roughness: 0.7 });
+  for (const x of [-9, 9]) {
+    const d = new THREE.Mesh(new THREE.BoxGeometry(14, 1.1, 10), [dramSide, dramSide, dramTop, dramSide, dramSide, dramSide]);
+    d.position.set(x, 0.55, 27); pkgContent.add(d); tag(d, 'pkg'); pickable(d, 'macro', INFO.dram);
+  }
+  const indMat = mat('macro', { color: 0x3a3e46, roughness: 0.45, metalness: 0.5 });
+  [-13.5, -4.5, 4.5, 13.5].forEach(z => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(6, 3.2, 6), indMat); m.position.set(-26, 1.6, z);
+    pkgContent.add(m); tag(m, 'pkg'); pickable(m, 'macro', INFO.vrm);
+  });
+  const capPos = [];
+  for (let x = -12; x <= 12; x += 3) capPos.push([x, -17.4]);
+  for (let z = -12; z <= 12; z += 3) capPos.push([-17.4, z]);
+  const caps = new THREE.InstancedMesh(new THREE.BoxGeometry(1.0, 0.55, 0.5), mat('macro', { color: 0xb99b6b, roughness: 0.5 }), capPos.length);
+  capPos.forEach(([x, z], i) => caps.setMatrixAt(i, _m4.compose(_p.set(x, 0.28, z), _q.setFromAxisAngle(new V3(0, 1, 0), x === -17.4 ? Math.PI / 2 : 0), _s.set(1, 1, 1))));
+  _q.identity();
+  pkgContent.add(caps); tag(caps, 'pkg'); pickable(caps, 'macro', INFO.cap);
+  const fingers = new THREE.InstancedMesh(UNIT_BOX, mat('macro', { color: 0xf2c46b, metalness: 1, roughness: 0.22 }), FINGERS.length);
+  FINGERS.forEach((z, i) => fingers.setMatrixAt(i, _m4.compose(_p.set(33.2, 0.02, z), _q, _s.set(3.2, 0.04, 0.7))));
+  pkgContent.add(fingers); tag(fingers, 'pkg'); pickable(fingers, 'macro', INFO.finger);
+}
+
+// ---- BGA balls, substrate, bumps
+{
+  const bgaMat = mat('macro', { color: 0xc4c8cf, metalness: 0.9, roughness: 0.3 });
+  const n = 31, bga = new THREE.InstancedMesh(new THREE.SphereGeometry(0.3, 10, 8), bgaMat, n * n);
+  for (let i = 0, c = 0; i < n; i++) for (let j = 0; j < n; j++, c++) bga.setMatrixAt(c, _m4.compose(_p.set(-13.5 + i * 0.9, 0.25, -13.5 + j * 0.9), _q, _s.set(1, 0.85, 1)));
+  pkgContent.add(bga); tag(bga, 'pkg'); pickable(bga, 'macro', INFO.bga); explodePart(bga, 0.5);
+
+  const subGroup = new THREE.Group(); pkgContent.add(subGroup); tag(subGroup, 'pkg');
+  const side = mat('macro', { color: 0x2a3028, roughness: 0.7 });
+  const top = mat('macro', { map: substrateTexture(), roughness: 0.55, metalness: 0.1 });
+  const sub = new THREE.Mesh(new THREE.BoxGeometry(30, 1.0, 30), [side, side, top, side, side, side]);
+  sub.position.y = 1.0; subGroup.add(sub); pickable(sub, 'macro', INFO.substrate);
+  const cp = [];
+  for (let t = -6; t <= 6; t += 1.5) cp.push([t, -8.6], [t, 8.6], [-8.6, t], [8.6, t]);
+  const sc = new THREE.InstancedMesh(new THREE.BoxGeometry(0.9, 0.4, 0.5), mat('macro', { color: 0xa88f63, roughness: 0.5 }), cp.length);
+  cp.forEach(([x, z], i) => sc.setMatrixAt(i, _m4.compose(_p.set(x, 1.7, z), _q, _s.set(1, 1, 1))));
+  subGroup.add(sc); pickable(sc, 'macro', INFO.subcap);
+  explodePart(subGroup, 1.2);
+
+  const m = 20, bumps = new THREE.InstancedMesh(new THREE.SphereGeometry(0.13, 8, 6), mat('macro', { color: 0xd8b07a, metalness: 0.9, roughness: 0.35 }), m * m);
+  for (let i = 0, c = 0; i < m; i++) for (let j = 0; j < m; j++, c++) bumps.setMatrixAt(c, _m4.compose(_p.set(-5.51 + i * 0.58, 1.62, -5.51 + j * 0.58), _q, _s.set(1, 1, 1)));
+  pkgContent.add(bumps); tag(bumps, 'pkg'); pickable(bumps, 'macro', INFO.bumps); explodePart(bumps, 3.0);
+}
+
+// ---- lid + TIM (own fade group so they can dissolve as you approach the die)
+{
+  const tim = new THREE.Mesh(new THREE.BoxGeometry(12, 0.08, 12), mat('lid', { color: 0x8b8f99, roughness: 0.8, metalness: 0.3 }));
+  tim.position.y = 2.555; lidContent.add(tim); tag(tim, 'lid'); pickable(tim, 'macro', INFO.tim); explodePart(tim, 8.5);
+  const lid = new THREE.Group(); lidContent.add(lid); tag(lid, 'lid');
+  const nickel = mat('lid', { color: 0xc8ccd2, metalness: 0.85, roughness: 0.32 });
+  const nickelTop = mat('lid', { map: lidTexture(), metalness: 0.8, roughness: 0.3 });
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(26, 0.9, 26), [nickel, nickel, nickelTop, nickel, nickel, nickel]);
+  plate.position.y = 3.05; lid.add(plate); pickable(plate, 'macro', INFO.lid);
+  for (const [w, d, x, z] of [[26, 1.2, 0, 12.4], [26, 1.2, 0, -12.4], [1.2, 23.6, 12.4, 0], [1.2, 23.6, -12.4, 0]]) {
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(w, 1.1, d), nickel); wall.position.set(x, 2.05, z); lid.add(wall); pickable(wall, 'macro', INFO.lid);
+  }
+  explodePart(lid, 13);
+  label(lid, 0, 3.6, 13, 'Heat spreader (IHS)', 'lid', [0, 1]);
+  label(tim, 0, 0.05, 6, 'Thermal interface', 'lid', [1, 1]);
+}
+
+// ---- die body + floorplan
+const DIE_TOP = 0.762;                 // top of the floorplan tiles, in die-local mm
+const ANCHOR = new V3(-1.4, DIE_TOP, -3.85);  // zoom target inside Core 1
+{
+  const siSide = mat('macro', { color: 0x2a3140, metalness: 0.6, roughness: 0.32 });
+  const siTop = mat('macro', { map: dieTexture(), emissiveMap: null, metalness: 0.4, roughness: 0.4 });
+  const die = new THREE.Mesh(new THREE.BoxGeometry(12, 0.75, 12), [siSide, siSide, siTop, siSide, siSide, siSide]);
+  die.position.y = 0.375; dieContent.add(die); tag(die, 'substrate'); pickable(die, 'macro', INFO.die);
+
+  const blocks = [
+    [-5.5, -5.5, -2.9, -2.2, 'core', 'CORE 0', INFO.core(0)], [-2.7, -5.5, -0.1, -2.2, 'core', 'CORE 1', INFO.core(1, true)],
+    [0.1, -5.5, 2.7, -2.2, 'core', 'CORE 2', INFO.core(2)], [2.9, -5.5, 5.5, -2.2, 'core', 'CORE 3', INFO.core(3)],
+    [-5.5, 0.4, -2.9, 3.0, 'core', 'CORE 4', INFO.core(4)], [-2.7, 0.4, -0.1, 3.0, 'core', 'CORE 5', INFO.core(5)],
+    [0.1, 0.4, 5.5, 5.5, 'gpu', 'GPU', INFO.gpu], [-5.5, 3.2, -2.9, 5.5, 'mem', 'MEMORY CTRL', INFO.mem],
+    [-2.7, 3.2, -0.1, 5.5, 'npu', 'NPU', INFO.npu],
+  ];
+  for (let i = 0; i < 8; i++) { const x0 = -5.5 + i * 1.375; blocks.push([x0 + 0.04, -2.0, x0 + 1.335, 0.2, 'sram', `L3 · ${i}`, INFO.cache(i)]); }
+  for (const [x0, z0, x1, z1, type, text, info] of blocks) {
+    const t = blockTexture(type, text, x1 - x0, z1 - z0);
+    const m = mat('macro', { map: t, emissiveMap: t, emissive: 0xffffff, emissiveIntensity: 0.42, roughness: 0.5, metalness: 0.15 });
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 0.012, z1 - z0), m);
+    mesh.position.set((x0 + x1) / 2, 0.756, (z0 + z1) / 2); dieContent.add(mesh); tag(mesh, 'transistor'); pickable(mesh, 'macro', info);
+  }
+
+  // Ring bus + spokes in top metal, with data packets
+  const Y = 0.772;
+  const ring = [[-5.3, -2.1], [5.3, -2.1], [5.3, 0.3], [-5.3, 0.3], [-5.3, -2.1]].map(([x, z]) => P(x, Y, z));
+  const spokes = [[-4.2, -3.85, -2.1], [-1.4, -3.85, -2.1], [1.4, -3.85, -2.1], [4.2, -3.85, -2.1], [-4.2, 1.7, 0.3], [-1.4, 1.7, 0.3],
+    [2.8, 2.95, 0.3], [-4.2, 4.35, 0.3], [-1.4, 4.35, 0.3]].map(([x, z0, z1]) => [P(x, Y, z0), P(x, Y, z1)]);
+  spokes.push([P(5.3, Y, -0.9), P(5.95, Y, -0.9)]);
+  const busMat = mat('macro', { color: 0xf0b56e, metalness: 1, roughness: 0.25, emissive: 0x4a2a10 });
+  const addWire = (pts) => { for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1].p, b = pts[i].p, len = a.distanceTo(b) + 0.07;
+    const w = new THREE.Mesh(UNIT_BOX, busMat); w.position.copy(a).add(b).multiplyScalar(0.5); w.position.y = 0.765;
+    w.scale.set(Math.abs(a.x - b.x) > 0.001 ? len : 0.07, 0.008, Math.abs(a.z - b.z) > 0.001 ? len : 0.07);
+    dieContent.add(w); tag(w, 'metal'); pickable(w, 'macro', INFO.ring);
+  } };
+  addWire(ring); spokes.forEach(addWire);
+  new Flow({ parent: dieContent, fade: 'macro', paths: [ring], count: 34, size: 0.3, speed: 2.4 });
+  new Flow({ parent: dieContent, fade: 'macro', paths: spokes, count: 40, size: 0.26, speed: 1.2 });
+
+  // Reticle marking the zoom target
+  const ret = new THREE.Group(); ret.position.set(ANCHOR.x, 0.775, ANCHOR.z); dieContent.add(ret);
+  const retMat = basic('macro', { color: 0x38d6ff, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false });
+  const ring1 = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.25, 48), retMat); ring1.rotation.x = -Math.PI / 2; ret.add(ring1);
+  for (let i = 0; i < 4; i++) { const t = new THREE.Mesh(new THREE.PlaneGeometry(0.03, 0.14), retMat); t.rotation.x = -Math.PI / 2; t.rotation.z = i * Math.PI / 2;
+    t.position.set(Math.sin(i * Math.PI / 2) * 0.33, 0, Math.cos(i * Math.PI / 2) * 0.33); ret.add(t); }
+  const hit = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.02, 24), new THREE.MeshBasicMaterial({ visible: false }));
+  ret.add(hit); pickable(hit, 'macro', INFO.reticle);
+  window.__reticle = ret;
+}
+
+// ---- PCB data flows (DRAM bus + edge lanes)
+new Flow({ parent: pkgContent, fade: 'macro', paths: PCB_ROUTES.map(r => r.map(([x, z]) => P(x, 0.04, z))), count: 120, size: 0.62, speed: 5 });
+
+label(pkgContent, 15, 1.5, 0, 'Package substrate', 'macro', [1, 1]);
+label(pkgContent, -13.5, 0.6, 13.5, 'BGA solder balls', 'macro', [1, 1]);
+label(pkgContent, 0, -0.4, 35, 'Motherboard', 'macro', [0, 1]);
+label(pkgContent, -9, 1.2, 27, 'DRAM', 'macro', [0, 1]);
+label(pkgContent, -26, 3.3, -13.5, 'VRM inductors', 'macro', [0, 0]);
+label(dieRoot, 6, 0.8, 6, 'Silicon die', 'macro', [1, 1]);
+label(dieRoot, ANCHOR.x, 0.8, ANCHOR.z - 0.35, 'Zoom target', 'macro', [2, 2], 'target');
+
+/* =====================================================================
+   LEVEL 4: STANDARD CELLS  (1 unit = 100 nm, scale 1e-4 of a mm)
+   ===================================================================== */
+const cellsRoot = new THREE.Group();
+cellsRoot.position.set(ANCHOR.x, DIE_TOP + 2e-5, ANCHOR.z);  // base slab top sits 2 nm above the die tile
+cellsRoot.scale.setScalar(1e-4);
+dieRoot.add(cellsRoot);
+const cellsContent = new THREE.Group(); cellsRoot.add(cellsContent); FADE.cells.objs.push(cellsContent);
+const CELL_TYPES = {
+  INV:   { w: 1.14, color: 0x3d7fd6, fn: 'Y = NOT A', t: 2 },
+  NAND2: { w: 1.71, color: 0x5f6bd8, fn: 'Y = NOT (A AND B)', t: 4 },
+  NOR2:  { w: 1.71, color: 0x8a5cd0, fn: 'Y = NOT (A OR B)', t: 4 },
+  AOI21: { w: 2.28, color: 0x6a4fb8, fn: 'Y = NOT ((A AND B) OR C)', t: 6 },
+  XOR2:  { w: 3.42, color: 0xb85aa6, fn: 'Y = A XOR B', t: 10 },
+  BUF:   { w: 1.71, color: 0x4b9bd6, fn: 'Y = A, with more drive strength', t: 4 },
+  DFF:   { w: 9.12, color: 0x2f9e8f, fn: 'Stores one bit on the rising clock edge', t: 24 },
+  FILL:  { w: 0.57, color: 0x252b38, fn: 'Filler: keeps wells and power rails continuous', t: 0 },
+};
+const CELL_BAG = ['INV', 'INV', 'NAND2', 'NAND2', 'NAND2', 'NOR2', 'NOR2', 'AOI21', 'XOR2', 'BUF', 'DFF', 'FILL'];
+const CELLS = [];
+{
+  const base = new THREE.Mesh(new THREE.BoxGeometry(84, 0.2, 84), mat('cells', { color: 0x151b28, roughness: 0.6, metalness: 0.3 }));
+  base.position.y = -0.1; cellsContent.add(base); tag(base, 'substrate'); pickable(base, 'cells', INFO.cellsBase, true);
+  for (let k = 0; k <= 32; k++) {
+    const zc = (k - 16) * 2.4;
+    let x = -40 + rr(0, 1);
+    while (x < 39) {
+      let type = CELL_BAG[Math.floor(rand() * CELL_BAG.length)];
+      let w = CELL_TYPES[type].w;
+      if (k === 16 && x + w > -0.9 && x < 0.9) { // keep the zoom-target NAND2 centred on the origin
+        if (x < -0.9) CELLS.push({ type: 'FILL', x: x, w: -0.9 - x, z: zc });
+        CELLS.push({ type: 'NAND2', x: -0.855, w: 1.71, z: zc, anchor: true }); x = 0.9; continue;
+      }
+      if (x + w > 40) { type = 'FILL'; w = 40 - x; }
+      CELLS.push({ type, x, w, z: zc }); x += w;
+    }
+  }
+  const cellMat = mat('cells', { color: 0xffffff, roughness: 0.45, metalness: 0.2, emissive: 0x0c1220 });
+  const cells = new THREE.InstancedMesh(UNIT_BOX, cellMat, CELLS.length);
+  const col = new THREE.Color();
+  CELLS.forEach((c, i) => {
+    cells.setMatrixAt(i, _m4.compose(_p.set(c.x + c.w / 2, 0.125, c.z), _q, _s.set(Math.max(0.05, c.w - 0.06), 0.25, 2.1)));
+    col.setHex(CELL_TYPES[c.type].color).multiplyScalar(c.anchor ? 1.6 : rr(0.85, 1.1)); c.base = col.clone();
+    cells.setColorAt(i, col);
+  });
+  cellsContent.add(cells); tag(cells, 'transistor');
+  pickable(cells, 'cells', (id) => { const c = CELLS[id]; const T = CELL_TYPES[c.type];
+    return { title: `${c.type} standard cell` + (c.anchor ? ' (zoom target)' : ''), kind: 'Cells · logic gate', body: `${T.fn}. Standard cells share one fixed height so they tile in rows; placement tools arrange millions of them and routing tools wire their pins together.`,
+      stats: { Width: `${Math.round(c.w * 100)} nm`, Height: '240 nm', Transistors: T.t }, diveTo: c.anchor ? 4 : undefined }; });
+  window.__cells = cells;
+
+  const rails = new THREE.InstancedMesh(UNIT_BOX, mat('cells', { color: 0xffffff, metalness: 1, roughness: 0.3 }), 34);
+  for (let k = 0; k < 34; k++) {
+    rails.setMatrixAt(k, _m4.compose(_p.set(0, 0.29, (k - 16.5) * 2.4), _q, _s.set(80, 0.08, 0.26)));
+    rails.setColorAt(k, new THREE.Color(k % 2 ? 0xe07a5a : 0x6a9ae0));
+  }
+  cellsContent.add(rails); tag(rails, 'metal'); pickable(rails, 'cells', INFO.rail);
+
+  const layers = [
+    { name: 'M2', dir: 'x', y: 0.46, h: 0.1, w: 0.14, pitch: 0.8, fill: 0.3, chip: 'm2' },
+    { name: 'M3', dir: 'z', y: 0.66, h: 0.12, w: 0.18, pitch: 1.0, fill: 0.28, chip: 'm3' },
+    { name: 'M4', dir: 'x', y: 0.9, h: 0.16, w: 0.28, pitch: 1.6, fill: 0.22, chip: 'm4' },
+  ];
+  const R = makeRouter(layers, 40);
+  const nets = [];
+  for (let i = 0; i < 70; i++) { const pts = R.route({ x: rr(-36, 36), z: rr(-36, 36), y0: 0.25 }, rand() < 0.5 ? 2 : 3); if (pts) nets.push(pts); }
+  R.fill();
+  const cu = mat('cells', { color: 0xffffff, metalness: 1, roughness: 0.3, emissive: 0x2a1206 });
+  const viaMat = mat('cells', { color: 0xd9844f, metalness: 1, roughness: 0.35 });
+  layers.forEach(L => {
+    const m = instancedSegments(L, cu, new THREE.Color(0xffb27a), new THREE.Color(0xb86a40));
+    cellsContent.add(m); tag(m, 'metal', L.chip); pickable(m, 'cells', INFO.cellWire(L.name));
+    const v = instancedVias(L, viaMat); cellsContent.add(v); tag(v, 'metal', L.chip);
+  });
+  new Flow({ parent: cellsContent, fade: 'cells', paths: nets, count: nets.length * 3, size: 0.7e-4, speed: 6 });
+
+  const tgt = new THREE.Mesh(new THREE.RingGeometry(1.9, 2.15, 48), basic('cells', { color: 0x38d6ff, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
+  tgt.rotation.x = -Math.PI / 2; tgt.position.y = 1.1; cellsContent.add(tgt); window.__cellTarget = tgt;
+  const hit = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.1, 0.1, 24), new THREE.MeshBasicMaterial({ visible: false }));
+  hit.position.y = 1.1; cellsContent.add(hit); pickable(hit, 'cells', INFO.cellTarget);
+
+  label(cellsContent, 0, 1.2, -2.3, 'NAND2 · zoom target', 'cells', [3, 3], 'target');
+  label(cellsContent, -30, 0.35, 1.2, 'VDD / VSS rails', 'cells', [3, 3], 'metal');
+  label(cellsContent, 22, 0.3, 14.4, 'Standard cell row (240 nm)', 'cells', [3, 3]);
+  label(cellsContent, -18, 1.05, -26, 'M2 · M3 · M4 local wires', 'cells', [3, 3], 'metal');
+}
+
+/* =====================================================================
+   LEVEL 5: INTERCONNECT STACK  (1 unit = 10 nm)
+   ===================================================================== */
+const stackRoot = new THREE.Group(); stackRoot.scale.setScalar(0.1); cellsRoot.add(stackRoot);
+const stackContent = new THREE.Group(); stackRoot.add(stackContent); FADE.stack.objs.push(stackContent);
+const STACK_LAYERS = [
+  { name: 'M1', dir: 'x', y: 10.3, h: 1.6, w: 1.0, pitch: 2.8, fill: 0.5, vw: 0.9 },
+  { name: 'M2', dir: 'z', y: 13.9, h: 1.6, w: 1.0, pitch: 2.8, fill: 0.45, vw: 0.9 },
+  { name: 'M3', dir: 'x', y: 17.5, h: 2.0, w: 1.2, pitch: 4.0, fill: 0.45 },
+  { name: 'M4', dir: 'z', y: 22.2, h: 2.4, w: 1.8, pitch: 6.0, fill: 0.45 },
+  { name: 'M5', dir: 'x', y: 27.5, h: 3.0, w: 2.6, pitch: 8.0, fill: 0.5 },
+];
+const layerGroups = [];              // [0] = contacts + PMD, [1..5] = M1..M5 (each shifts when exploded)
+const stackOffset = (t) => state.stackExplode * t * 6;
+const GATE_X = [-16.5, -11, -5.5, 0, 5.5, 11, 16.5];
+const GATES = [];                    // { mesh, mat, key, on, level }
+{
+  for (let i = 0; i <= 5; i++) { const g = new THREE.Group(); stackContent.add(g); layerGroups.push(g); }
+  const siMat = mat('stack', { color: 0x46536b, metalness: 0.35, roughness: 0.5 });
+  const sub = new THREE.Mesh(new THREE.BoxGeometry(40, 10, 40), siMat); sub.position.y = -5;
+  stackContent.add(sub); tag(sub, 'substrate'); pickable(sub, 'stack', INFO.substrateSi, true);
+  const sti = new THREE.Mesh(new THREE.BoxGeometry(40, 1.5, 40), mat('stack', { color: 0x9cc3ff, transparent: true, opacity: 0.22, depthWrite: false, roughness: 0.2 }));
+  sti.position.y = 0.75; stackContent.add(sti); tag(sti, 'dielectric'); pickable(sti, 'stack', INFO.sti, true);
+
+  const finMat = mat('stack', { color: 0x7f95bd, metalness: 0.3, roughness: 0.4, emissive: 0x16223a });
+  for (const zf of [-13, -10, -7, 7, 10, 13]) {
+    const f = new THREE.Mesh(new THREE.BoxGeometry(39, 5.5, 0.7), finMat); f.position.set(0, 2.25, zf);
+    stackContent.add(f); tag(f, 'transistor'); pickable(f, 'stack', INFO.fin);
+  }
+  const spacerMat = mat('stack', { color: 0xe8edf5, transparent: true, opacity: 0.5, roughness: 0.4 });
+  GATE_X.forEach((gx, k) => {
+    const cut = k === 1 || k === 4;
+    const spans = cut ? [[-16, -0.6, 'n'], [0.6, 16, 'p']] : [[-16, 16, 'np']];
+    for (const [z0, z1, kind] of spans) {
+      const gm = mat('stack', { color: 0x9a927c, metalness: 0.85, roughness: 0.32, emissive: 0x38d6ff, emissiveIntensity: 0 });
+      const g = new THREE.Mesh(new THREE.BoxGeometry(1.8, 5.5, z1 - z0), gm); g.position.set(gx, 4.25, (z0 + z1) / 2);
+      stackContent.add(g); tag(g, 'transistor');
+      const rec = { mesh: g, mat: gm, key: k * 7 + (kind === 'p' ? 3 : 0), on: false, level: 0, kind };
+      GATES.push(rec);
+      pickable(g, 'stack', () => ({ title: `Gate ${k + 1}` + (kind === 'np' ? ' (shared n + p)' : kind === 'n' ? ' (nFET half)' : ' (pFET half)'), kind: 'Stack · metal gate on high-k',
+        body: 'The gate wraps three sides of each fin it crosses. A HIGH input turns the nFET fins (front group) on and the pFET fins (back group) off; a LOW input does the reverse. That complementary pair is what makes CMOS logic draw almost no static current.' + (cut ? ' A gate cut splits this line into two separate inputs.' : ''),
+        stats: { 'Gate length': '~18 nm', 'Gate pitch': '55 nm', Fins: kind === 'np' ? '3 n + 3 p' : '3' },
+        live: () => `Input: <span class="${rec.on ? 'on' : 'off'}">${rec.on ? 'HIGH (VDD)' : 'LOW (0 V)'}</span><br>nFET: ${rec.on ? 'conducting' : 'off'} · pFET: ${rec.on ? 'off' : 'conducting'}`, diveTo: 5 }));
+    }
+    for (const s of [-1, 1]) {
+      const sp = new THREE.Mesh(new THREE.BoxGeometry(0.6, 5.5, 32), spacerMat); sp.position.set(gx + s * 1.2, 4.25, 0);
+      stackContent.add(sp); tag(sp, 'dielectric'); pickable(sp, 'stack', INFO.spacer, true);
+    }
+  });
+  const diamond = new THREE.CylinderGeometry(1, 1, 1, 4, 1); diamond.rotateZ(Math.PI / 2);
+  const nEpi = mat('stack', { color: 0x3cc79e, roughness: 0.5, flatShading: true, emissive: 0x0a2a20 });
+  const pEpi = mat('stack', { color: 0xd27bd0, roughness: 0.5, flatShading: true, emissive: 0x2a0a28 });
+  const tcMat = mat('stack', { color: 0xb9c3d4, metalness: 0.6, roughness: 0.35, emissive: 0x151a24 });
+  const contacts = [];
+  for (let j = 0; j < 6; j++) {
+    const mx = (GATE_X[j] + GATE_X[j + 1]) / 2;
+    for (const [zc, m, info] of [[-10, nEpi, INFO.nepi], [10, pEpi, INFO.pepi]]) {
+      const e = new THREE.Mesh(diamond, m); e.position.set(mx, 4.2, zc); e.scale.set(2.3, 1.6, 4.3);
+      stackContent.add(e); tag(e, 'transistor'); pickable(e, 'stack', info);
+      const tc = new THREE.Mesh(new THREE.BoxGeometry(1.3, 3, 8), tcMat); tc.position.set(mx, 6.5, zc);
+      layerGroups[0].add(tc); tag(tc, 'metal'); pickable(tc, 'stack', INFO.tc);
+      contacts.push({ x: mx, zmin: zc - 3.6, zmax: zc + 3.6, y0: 8 });
+    }
+  }
+  const R = makeRouter(STACK_LAYERS, 20);
+  const gcZ = STACK_LAYERS[0].tracks[R.nearest(STACK_LAYERS[0], 0)];
+  GATE_X.forEach((gx, k) => {
+    if (k === 1 || k === 4) return;
+    const gc = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.5, 1.1), tcMat); gc.position.set(gx, 7.75, gcZ);
+    layerGroups[0].add(gc); tag(gc, 'metal'); pickable(gc, 'stack', INFO.gc);
+    contacts.push({ x: gx, zmin: gcZ, zmax: gcZ, y0: 8.5 });
+  });
+  const pmd = new THREE.Mesh(new THREE.BoxGeometry(40, 6.5, 40), mat('stack', { color: 0x8fb8ff, transparent: true, opacity: 0.06, depthWrite: false }));
+  pmd.position.y = 4.75; layerGroups[0].add(pmd); tag(pmd, 'dielectric'); pickable(pmd, 'stack', INFO.ild('pre-metal'), true);
+
+  const nets = [];
+  for (let i = 0; i < 60 && nets.length < 20; i++) {
+    const c = contacts[Math.floor(rand() * contacts.length)];
+    const z = c.zmin === c.zmax ? c.zmin : rr(c.zmin, c.zmax);
+    const snapped = STACK_LAYERS[0].tracks[R.nearest(STACK_LAYERS[0], z)];
+    if (snapped < c.zmin - 0.01 || snapped > c.zmax + 0.01) continue;
+    const pts = R.route({ x: c.x, z: snapped, y0: c.y0 }, [2, 3, 3, 4, 5][Math.floor(rand() * 5)]);
+    if (pts) nets.push(pts);
+  }
+  R.fill();
+  const edgeMat = reg('stack', new THREE.LineBasicMaterial({ color: 0x8fb8ff, transparent: true, opacity: 0.22 }));
+  STACK_LAYERS.forEach((L, i) => {
+    const g = layerGroups[i + 1], chip = 'm' + (i + 1);
+    const cu = mat('stack', { color: 0xffffff, metalness: 0.7, roughness: 0.34, emissive: 0x3a1806 });
+    const m = instancedSegments(L, cu, new THREE.Color(0xffb27a), new THREE.Color(0xc0703f));
+    g.add(m); tag(m, 'metal', chip); pickable(m, 'stack', INFO.metal(L));
+    const v = instancedVias(L, mat('stack', { color: 0xe7955c, metalness: 0.7, roughness: 0.35, emissive: 0x2a1004 }));
+    g.add(v); tag(v, 'metal', chip); pickable(v, 'stack', INFO.via(L));
+    const y0 = i === 0 ? 8 : STACK_LAYERS[i - 1].y + STACK_LAYERS[i - 1].h / 2, y1 = L.y + L.h / 2;
+    const slabGeo = new THREE.BoxGeometry(40, y1 - y0, 40);
+    const slab = new THREE.Mesh(slabGeo, mat('stack', { color: 0x8fb8ff, transparent: true, opacity: 0.07, depthWrite: false, roughness: 0.15 }));
+    slab.position.y = (y0 + y1) / 2; g.add(slab); tag(slab, 'dielectric'); pickable(slab, 'stack', INFO.ild(L.name), true);
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(slabGeo), edgeMat); edges.position.copy(slab.position); g.add(edges); tag(edges, 'dielectric');
+    label(g, 21.5, L.y, 20, `${L.name} · ${Math.round(L.pitch * 10)} nm pitch`, 'stack', [4, 4], 'metal');
+  });
+  new Flow({ parent: stackContent, fade: 'stack', paths: nets, count: nets.length * 5, size: 2.2e-5, speed: 9, offset: stackOffset });
+
+  label(stackContent, -20, -5, 20, 'Silicon substrate', 'stack', [4, 4]);
+  label(stackContent, 19.5, 5.2, -10, 'Fins (nFET)', 'stack', [4, 4]);
+  label(stackContent, 0, 7.2, 16, 'Metal gate', 'stack', [4, 4]);
+  label(stackContent, -13.75, 5.8, -14, 'n+ SiP source/drain', 'stack', [4, 4]);
+  label(stackContent, -13.75, 5.8, 14, 'p+ SiGe source/drain', 'stack', [4, 4]);
+  label(stackContent, 0, 0, -10, 'Zoom target: nFET', 'stack', [4, 4], 'target');
+}
+
+/* =====================================================================
+   LEVEL 6: FINFET GATE  (1 unit = 1 nm), a 3-fin nFET
+   ===================================================================== */
+const finRoot = new THREE.Group(); finRoot.position.set(0, 0, -10); finRoot.scale.setScalar(0.1); stackRoot.add(finRoot);
+const finContent = new THREE.Group(); finRoot.add(finContent); FADE.fin.objs.push(finContent);
+const gateGroup = new THREE.Group(); finContent.add(gateGroup);
+const molGroup = new THREE.Group(); finContent.add(molGroup);
+const FIN_Z = [-30, 0, 30];
+const fin = { gateMats: [], glowMat: null, flow: null };
+{
+  const box = (w, h, d, m, x, y, z, parent = finContent) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); parent.add(b); return b; };
+  const sub = box(160, 40, 100, mat('fin', { color: 0x46536b, metalness: 0.35, roughness: 0.5 }), 0, -20, 0);
+  tag(sub, 'substrate'); pickable(sub, 'fin', INFO.finSub, true);
+  const sti = box(160, 15, 100, mat('fin', { color: 0x9cc3ff, transparent: true, opacity: 0.2, depthWrite: false, roughness: 0.2 }), 0, 7.5, 0);
+  tag(sti, 'dielectric'); pickable(sti, 'fin', INFO.finSti, true);
+
+  const finMat = mat('fin', { color: 0x8aa2cc, metalness: 0.25, roughness: 0.4, emissive: 0x16223a });
+  fin.glowMat = basic('fin', { color: 0x2fc8ff, transparent: true, opacity: 0.85, depthWrite: false });
+  fin.glowMat.userData.dyn = 0;
+  const hkMat = mat('fin', { color: 0xffc46b, transparent: true, opacity: 0.32, depthWrite: false, roughness: 0.3, emissive: 0x3a2400 });
+  for (const zf of FIN_Z) {
+    const f = box(150, 90, 7, finMat, 0, 5, zf); tag(f, 'transistor');
+    pickable(f, 'fin', () => ({ title: 'Fin channel', kind: 'FinFET · Si fin', body: 'Under the gate, the fin top and both sidewalls form the channel. Above threshold, the gate field pulls electrons to these surfaces and a conducting inversion layer appears (the glow).',
+      stats: { Width: '7 nm', 'Height above STI': '35 nm', 'Gate length': '18 nm' }, live: liveTransistor }));
+    for (const [w, h, d, y, dz] of [[18, 0.8, 7.4, 50.4, 0], [18, 35, 0.6, 32.5, 3.8], [18, 35, 0.6, 32.5, -3.8]]) {
+      const gl = box(w, h, d, fin.glowMat, 0, y, zf + dz); tag(gl, 'transistor');
+    }
+    for (const [h, d, y, dz] of [[1.5, 10, 50.75, 0], [36.5, 1.5, 33.25, 4.25], [36.5, 1.5, 33.25, -4.25]]) {
+      const hk = box(18, h, d, hkMat, 0, y, zf + dz, gateGroup); tag(hk, 'dielectric'); pickable(hk, 'fin', INFO.hk);
+    }
+  }
+  // Gate metal: a comb that drapes over the three fins; the slab in front of the last fin can be cut away.
+  const gateLive = () => ({ title: 'Metal gate', kind: 'FinFET · work-function metal + W fill', body: 'The gate electrode. A thin work-function metal sets the threshold voltage; tungsten fills the rest. Because it wraps three sides of each fin, it controls the channel far better than a planar gate, which cuts leakage when the transistor is off.',
+    stats: { 'Gate length': '18 nm', Wraps: 'top + 2 sidewalls', Fins: '3' }, live: liveTransistor });
+  const gMat = mat('fin', { color: 0x9a927c, metalness: 0.85, roughness: 0.3, emissive: 0x38d6ff, emissiveIntensity: 0 });
+  fin.gateMats.push(gMat);
+  for (const [z0, z1] of [[-48, -35], [-25, -5], [5, 25], [35, 48]]) {
+    const g = box(18, 55, z1 - z0, gMat, 0, 42.5, (z0 + z1) / 2, gateGroup); tag(g, 'transistor'); pickable(g, 'fin', gateLive);
+    if (z0 === 35) g.userData.cutaway = true;
+  }
+  for (const zf of FIN_Z) { const g = box(18, 18.5, 10, gMat, 0, 60.75, zf, gateGroup); tag(g, 'transistor'); pickable(g, 'fin', gateLive); }
+  const spMat = mat('fin', { color: 0xe8edf5, transparent: true, opacity: 0.45, roughness: 0.4 });
+  for (const sx of [-12, 12]) {
+    for (const [z0, z1] of [[-48, -33.5], [-26.5, -3.5], [3.5, 26.5], [33.5, 48]]) {
+      const s = box(6, 55, z1 - z0, spMat, sx, 42.5, (z0 + z1) / 2, gateGroup); tag(s, 'dielectric'); pickable(s, 'fin', INFO.finSpacer, true);
+      if (z0 === 33.5) s.userData.cutaway = true;
+    }
+    for (const zf of FIN_Z) { const s = box(6, 20, 7, spMat, sx, 60, zf, gateGroup); tag(s, 'dielectric'); pickable(s, 'fin', INFO.finSpacer, true); }
+  }
+  // Merged source / drain epitaxy: one diamond per fin, overlapping
+  const diamond = new THREE.CylinderGeometry(1, 1, 1, 4, 1); diamond.rotateZ(Math.PI / 2);
+  const epiMat = mat('fin', { color: 0x3cc79e, roughness: 0.45, flatShading: true, emissive: 0x0a2a20 });
+  for (const [sx, info] of [[-42.5, INFO.source], [42.5, INFO.drain]]) for (const zf of FIN_Z) {
+    const e = new THREE.Mesh(diamond, epiMat); e.position.set(sx, 36, zf); e.scale.set(55, 18, 17);
+    finContent.add(e); tag(e, 'transistor'); pickable(e, 'fin', info);
+  }
+  // Middle of line + M1
+  const coMat = mat('fin', { color: 0xb9c3d4, metalness: 0.6, roughness: 0.35, emissive: 0x151a24 });
+  const cuMat = mat('fin', { color: 0xe08a52, metalness: 0.65, roughness: 0.34, emissive: 0x3a1806 });
+  for (const sx of [-42.5, 42.5]) { const t = box(16, 38, 70, coMat, sx, 71, 0, molGroup); tag(t, 'metal'); pickable(t, 'fin', INFO.finTc); }
+  const gc = box(12, 20, 10, coMat, 0, 80, -40, molGroup); tag(gc, 'metal'); pickable(gc, 'fin', INFO.finGc);
+  for (const [x, z] of [[-42.5, -12], [42.5, 12], [0, -40]]) { const v = box(9, 5, 9, cuMat, x, 92.5, z, molGroup); tag(v, 'metal', 'm1'); }
+  for (const [x0, x1, z, n] of [[-80, -37.5, -12, 'VSS'], [37.5, 80, 12, 'OUT'], [-80, 5, -40, 'IN']]) {
+    const w = box(x1 - x0, 16, 10, cuMat, (x0 + x1) / 2, 103, z, molGroup); tag(w, 'metal', 'm1'); pickable(w, 'fin', INFO.m1(n));
+  }
+  // Electron paths: source M1 -> contact -> source epi -> channel lanes -> drain epi -> contact -> output M1
+  const lanes = [];
+  for (const zf of FIN_Z) for (const [dz, y] of [[0, 50.6], [3.9, 42], [-3.9, 42], [3.9, 26], [-3.9, 26]]) lanes.push([zf + dz, y]);
+  const paths = lanes.map(([lz, ly]) => [
+    P(-80, 112, -12, 2), P(-42.5, 112, -12, 2), P(-42.5, 56, lz * 0.6, 2), P(-40, 44, lz, 0), P(-16, ly, lz, 0),
+    P(16, ly, lz, 0), P(40, 44, lz, 0), P(42.5, 56, lz * 0.6, 2), P(42.5, 112, 12, 2), P(80, 112, 12, 2)]);
+  fin.flow = new Flow({ parent: finContent, fade: 'fin', paths, count: 150, size: 5.5e-6, speed: 60, palette: 'electron',
+    offset: (t) => t === 2 ? state.finLift * 100 : 0 });
+
+  label(gateGroup, 0, 72, 20, 'Metal gate', 'fin', [5, 5]);
+  label(gateGroup, 0, 52, 36, 'High-k HfO₂', 'fin', [5, 5]);
+  label(finContent, -72, 50, 30, 'Si fin', 'fin', [5, 5]);
+  label(finContent, -42.5, 30, 46, 'Source · n+ SiP', 'fin', [5, 5]);
+  label(finContent, 42.5, 30, 46, 'Drain · n+ SiP', 'fin', [5, 5]);
+  label(gateGroup, 15, 70, 44, 'Spacer', 'fin', [5, 5]);
+  label(molGroup, -42.5, 90, 42, 'Trench contact', 'fin', [5, 5], 'metal');
+  label(molGroup, -72, 111, -12, 'M1 · VSS', 'fin', [5, 5], 'metal');
+  label(molGroup, 72, 111, 12, 'M1 · OUT', 'fin', [5, 5], 'metal');
+  label(molGroup, -72, 111, -40, 'M1 · IN', 'fin', [5, 5], 'metal');
+  label(finContent, -72, 15, 50, 'STI oxide', 'fin', [5, 5]);
+}
+
+/* ---------------- transistor physics (display model) ----------------
+   EKV-style interpolation between subthreshold and strong inversion:
+   Id = Ion * [ln(1+e^((Vg-Vt)/2nφt))]² / [ln(1+e^((Vdd-Vt)/2nφt))]²
+   With n·φt = 30 mV the subthreshold slope is ~70 mV/decade.          */
+const VT = 0.30, VDD = 0.75, ION = 55e-6, TWO_N_PHI = 0.0607;
+const soft = (x) => x > 30 ? x : Math.log1p(Math.exp(x));
+const IDN = soft((VDD - VT) / TWO_N_PHI) ** 2;
+const idOf = (vg) => ION * soft((vg - VT) / TWO_N_PHI) ** 2 / IDN;
+const intensityOf = (id) => clamp((Math.log10(id) + 11) / (Math.log10(ION) + 11), 0, 1);
+function fmtAmp(a) { if (a >= 1e-6) return (a * 1e6).toFixed(a >= 1e-5 ? 1 : 2) + ' µA'; if (a >= 1e-9) return (a * 1e9).toFixed(1) + ' nA'; return (a * 1e12).toFixed(1) + ' pA'; }
+function liveTransistor() {
+  const id = idOf(state.vg), on = state.vg > VT;
+  return `V<sub>G</sub> = ${state.vg.toFixed(2)} V (V<sub>T</sub> ≈ ${VT.toFixed(2)} V)<br>State: <span class="${on ? 'on' : 'off'}">${on ? 'ON, channel inverted' : 'OFF, subthreshold leakage'}</span><br>I<sub>D</sub> per fin: ${fmtAmp(id)}<br>Device (3 fins): ${fmtAmp(id * 3)}`;
+}
+
+/* =====================================================================
+   LEVELS: natural viewing distance D (mm), view direction, focus point
+   ===================================================================== */
+const LEVELS = [
+  { name: 'Package', scale: '70 mm board', D: 95, dir: [0.55, 0.62, 1.0], explode: 0,
+    focus: () => new V3(0, 2 + 6 * state.pkgExplode, 0),
+    blurb: 'The finished part: a heat spreader lid on a package substrate, soldered to a motherboard beside its DRAM and voltage regulators. Click any part, or scroll in to keep zooming.' },
+  { name: 'PCB & Substrate', scale: '30 mm stack', D: 52, dir: [1.0, 0.24, 0.62], explode: 1,
+    focus: () => new V3(0, 3 + 6 * state.pkgExplode, 0),
+    blurb: 'The package pulled apart: board, solder balls, substrate, die bumps, silicon die, thermal interface and lid. Each stage converts a fine connection pitch into a coarser one the next layer can handle.' },
+  { name: 'Silicon Die', scale: '12 mm floorplan', D: 18, dir: [0.12, 1.0, 0.55], explode: 0,
+    focus: () => dieRoot.localToWorld(new V3(0, DIE_TOP, 0)),
+    blurb: 'The die floorplan: six CPU cores, a shared L3 cache, GPU, NPU and memory controller, linked by a ring bus in the top metal. The reticle in Core 1 marks where the zoom goes next.' },
+  { name: 'Standard Cells', scale: '8 µm logic rows', D: 7.5e-3, dir: [0.35, 1.0, 0.75], explode: 0,
+    focus: () => cellsRoot.localToWorld(new V3(0, 0, 0)),
+    blurb: 'Inside a core, logic is built from standard cells placed in rows of fixed height that share VDD and VSS rails. Copper wires above the cells connect their pins. Cells flash as they switch.' },
+  { name: 'Interconnect Stack', scale: '400 nm section', D: 8.6e-4, dir: [0.8, 0.78, 1.0], explode: 0,
+    focus: () => stackRoot.localToWorld(new V3(0, 9 + state.stackExplode * 14, 0)),
+    blurb: 'A 400 nm cross-section: fins and metal gates at the bottom, contacts, then five copper layers separated by low-k dielectric. Packets show bits moving through real nets, via by via.' },
+  { name: 'FinFET Gate', scale: '18 nm gate', D: 3.0e-4, dir: [0.62, 0.5, 1.0], explode: 0,
+    focus: () => finRoot.localToWorld(new V3(0, 40 + state.finLift * 40, 0)),
+    blurb: 'One 3-fin nFET. The gate wraps each fin on three sides. When the gate voltage passes threshold, an inversion layer forms and electrons stream from source to drain. Try the gate voltage slider.' },
+];
+const LOG_D = LEVELS.map(L => Math.log(L.D));
+
+// Orbit target as a function of zoom distance: between two levels the target slides from the
+// parent's focus to the child's, finishing early so the anchor is centred well before it is tiny.
+function focusAt(d) {
+  const ld = Math.log(d);
+  if (ld >= LOG_D[0]) return LEVELS[0].focus();
+  for (let i = 0; i < LEVELS.length - 1; i++) {
+    if (ld >= LOG_D[i + 1]) {
+      const u = (ld - LOG_D[i + 1]) / (LOG_D[i] - LOG_D[i + 1]);   // 1 at parent, 0 at child
+      return LEVELS[i].focus().lerp(LEVELS[i + 1].focus(), smooth((1 - u) / 0.6));
+    }
+  }
+  return LEVELS[LEVELS.length - 1].focus();
+}
+const uBetween = (ld, i) => (ld - LOG_D[i + 1]) / (LOG_D[i] - LOG_D[i + 1]);
+function levelFloat(d) {
+  const ld = Math.log(d);
+  if (ld >= LOG_D[0]) return 0;
+  for (let i = 0; i < LEVELS.length - 1; i++) if (ld >= LOG_D[i + 1]) return i + 1 - uBetween(ld, i);
+  return LEVELS.length - 1;
+}
+
+/* ---------------- fades ---------------- */
+function applyFade(key, a) {
+  const f = FADE[key]; f.alpha = a;
+  for (const o of f.objs) o.visible = a > 0.004;
+  for (const m of f.mats) {
+    const dyn = m.userData.dyn ?? 1;
+    m.opacity = m.userData.baseOpacity * a * dyn;
+    const tr = m.userData.baseTransparent || a < 0.999;
+    if (tr !== m.transparent) { m.transparent = tr; m.needsUpdate = true; }
+  }
+}
+function updateFades(d) {
+  const ld = Math.log(d);
+  const u23 = uBetween(ld, 2), u34 = uBetween(ld, 3), u45 = uBetween(ld, 4);
+  const macro = smooth((u23 - 0.12) / 0.33);
+  applyFade('macro', macro);
+  applyFade('lid', macro * smooth((d - 22) / 12));
+  applyFade('cells', smooth((0.8 - u23) / 0.4) * smooth((u34 - 0.12) / 0.33));
+  applyFade('stack', smooth((0.8 - u34) / 0.4) * smooth((u45 - 0.1) / 0.3));
+  applyFade('fin', smooth((0.85 - u45) / 0.4));
+}
+
+function updateExplode() {
+  for (const e of EXPLODE) e.o.position.y = e.base + e.k * state.pkgExplode;
+  layerGroups.forEach((g, i) => { g.position.y = stackOffset(i); });
+  gateGroup.position.y = state.finLift * 50;
+  molGroup.position.y = state.finLift * 100;
+}
+
+/* =====================================================================
+   CAMERA: scale teleruptor
+   ---------------------------------------------------------------------
+   flyTo() animates three things together:
+     1. log(d) from the current distance to the level's D. Interpolating
+        the logarithm makes each second cover the same zoom ratio, which
+        is what makes a 400,000x plunge feel smooth rather than instant.
+     2. the view direction, slerped between unit vectors.
+     3. the package explode amount, so the lid peels off on the way.
+   The orbit target is not interpolated directly: it is re-derived every
+   frame from d through focusAt(), which keeps the dive locked onto the
+   nested anchors even while the parts they sit on are still moving.
+   ===================================================================== */
+let flight = null;
+function currentDistance() { return camera.position.distanceTo(controls.target); }
+function flyTo(idx) {
+  idx = clamp(idx, 0, LEVELS.length - 1);
+  const L = LEVELS[idx];
+  const d0 = currentDistance();
+  const dir0 = camera.position.clone().sub(controls.target).normalize();
+  const dir1 = new V3(...L.dir).normalize();
+  const span = Math.abs(Math.log(L.D) - Math.log(d0));
+  flight = { t: 0, dur: (1.0 + 0.3 * span) * (reducedMotion ? 0.5 : 1), d0, d1: L.D, dir0,
+    q: new THREE.Quaternion().setFromUnitVectors(dir0, dir1), e0: state.pkgExplode, e1: L.explode, span, idx };
+  controls.enabled = false;
+  if (!selected) showLevelInfo(idx);
+}
+function stepFlight(dt) {
+  const f = flight;
+  f.t = Math.min(1, f.t + dt / f.dur);
+  const e = easeInOut(f.t);
+  const d = Math.exp(lerp(Math.log(f.d0), Math.log(f.d1), e));
+  const dir = f.dir0.clone().applyQuaternion(new THREE.Quaternion().slerp(f.q, e));
+  state.pkgExplode = lerp(f.e0, f.e1, e);
+  updateExplode(); scene.updateMatrixWorld(true);
+  const T = focusAt(d);
+  controls.target.copy(T); camera.position.copy(T).addScaledVector(dir, d);
+  $('warp').style.opacity = reducedMotion ? 0 : (Math.sin(Math.PI * e) * clamp(f.span / 5, 0, 1) * 0.9).toFixed(3);
+  $('warp').style.transform = `scale(${1 + 0.25 * Math.sin(Math.PI * e)}) rotate(${e * 12}deg)`;
+  if (f.t >= 1) { flight = null; controls.enabled = true; $('warp').style.opacity = 0; syncSeparation(); }
+}
+
+/* =====================================================================
+   UI
+   ===================================================================== */
+let lvlNow = 0, lvlShown = -1, selected = null;
+const ladder = $('ladder');
+LEVELS.forEach((L, i) => {
+  const li = document.createElement('li');
+  li.innerHTML = `<button data-l="${i}"><span class="dot">${i + 1}</span><span><span class="nm">${L.name}</span><span class="sc">${L.scale}</span></span></button>`;
+  li.querySelector('button').onclick = () => flyTo(i);
+  ladder.appendChild(li);
+});
+$('btnDive').onclick = () => flyTo(lvlNow + 1);
+$('btnUp').onclick = () => flyTo(lvlNow - 1);
+
+const chips = $('metalChips');
+['m1', 'm2', 'm3', 'm4', 'm5'].forEach(k => {
+  const b = document.createElement('button'); b.textContent = k.toUpperCase(); b.className = 'on';
+  b.onclick = () => { toggles[k] = !toggles[k]; b.classList.toggle('on', toggles[k]); applyTags(); };
+  chips.appendChild(b);
+});
+document.querySelectorAll('input[data-t]').forEach(inp => {
+  inp.onchange = () => { toggles[inp.dataset.t] = inp.checked; applyTags(); };
+});
+
+function sepTarget() { return lvlNow <= 2 ? 'pkgExplode' : lvlNow <= 4 ? 'stackExplode' : 'finLift'; }
+function syncSeparation() {
+  const k = sepTarget();
+  $('sepLabel').textContent = k === 'pkgExplode' ? 'Package peel / explode' : k === 'stackExplode' ? 'Metal stack separation' : 'Lift gate + contacts';
+  $('sep').value = state[k]; $('sepVal').textContent = Math.round(state[k] * 100) + '%';
+}
+$('sep').oninput = (e) => { const k = sepTarget(); state[k] = +e.target.value; $('sepVal').textContent = Math.round(state[k] * 100) + '%'; };
+$('clk').oninput = (e) => { state.clockHz = +e.target.value; $('clkVal').textContent = state.clockHz.toFixed(1) + ' Hz'; };
+$('vg').oninput = (e) => { state.vg = +e.target.value; state.auto = false; $('btnAuto').classList.remove('on'); };
+$('btnAuto').onclick = () => { state.auto = !state.auto; $('btnAuto').classList.toggle('on', state.auto); };
+$('btnCut').onclick = () => { state.cutaway = !state.cutaway; $('btnCut').classList.toggle('on', state.cutaway); applyTags(); };
+$('btnXray').onclick = () => {
+  state.xray = !state.xray; $('btnXray').classList.toggle('on', state.xray);
+  for (const m of fin.gateMats) { m.userData.baseOpacity = state.xray ? 0.3 : 1; m.userData.baseTransparent = state.xray; m.depthWrite = !state.xray; }
+};
+document.querySelectorAll('[data-collapse]').forEach(b => b.onclick = () => { if (innerWidth <= 900) b.parentElement.classList.toggle('collapsed'); });
+if (innerWidth <= 900) { $('controls').classList.add('collapsed'); }
+
+let toastTimer = 0;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 1800); }
+
+// ---- info panel
+function renderInfo(info, eyebrow) {
+  $('infoLevel').textContent = eyebrow;
+  $('infoTitle').textContent = info.title;
+  $('infoKind').textContent = info.kind || '';
+  $('infoBody').textContent = info.body;
+  $('infoStats').innerHTML = Object.entries(info.stats || {}).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+  $('infoLive').innerHTML = info.live ? `<div class="live">${info.live()}</div>` : '';
+  const dive = info.diveTo ?? null;
+  $('infoDive').style.display = dive !== null && dive !== lvlNow ? '' : 'none';
+  $('infoDive').textContent = dive !== null ? `Dive to ${LEVELS[dive].name} ▼` : '';
+  $('infoDive').onclick = () => flyTo(dive);
+}
+function showLevelInfo(i) {
+  const L = LEVELS[i];
+  renderInfo({ title: L.name, kind: L.scale, body: L.blurb, stats: {}, diveTo: i < LEVELS.length - 1 ? i + 1 : null,
+    live: i === 5 ? liveTransistor : null }, `Level ${i + 1} of 6 · overview`);
+}
+function resolveInfo(obj, instanceId) { const inf = obj.userData.info; return typeof inf === 'function' ? inf(instanceId) : inf; }
+function select(hit) {
+  if (!hit) { selected = null; selBox.visible = false; showLevelInfo(lvlNow); return; }
+  selected = hit;
+  renderInfo(resolveInfo(hit.object, hit.instanceId), `Level ${lvlNow + 1} · ${LEVELS[lvlNow].name}`);
+}
+setInterval(() => {
+  if (selected) { const inf = resolveInfo(selected.object, selected.instanceId); if (inf.live) $('infoLive').innerHTML = `<div class="live">${inf.live()}</div>`; }
+  else if (lvlNow === 5) $('infoLive').innerHTML = `<div class="live">${liveTransistor()}</div>`;
+}, 150);
+
+// ---- selection outline
+const selBox = new THREE.Box3Helper(new THREE.Box3(), 0x38d6ff);
+selBox.material.depthTest = false; selBox.material.transparent = true; selBox.renderOrder = 10; selBox.visible = false; scene.add(selBox);
+const _bb = new THREE.Box3();
+function updateSelBox() {
+  if (!selected) return;
+  const o = selected.object;
+  const alpha = FADE[o.userData.fade].alpha;
+  if (alpha < 0.3 || !shown(o)) { selBox.visible = false; return; }
+  if (o.isInstancedMesh && selected.instanceId !== undefined) {
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+    o.getMatrixAt(selected.instanceId, _m4);
+    _bb.copy(o.geometry.boundingBox).applyMatrix4(_m4).applyMatrix4(o.matrixWorld);
+  } else _bb.setFromObject(o);
+  selBox.box.copy(_bb); selBox.visible = true;
+}
+
+// ---- picking
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+function shown(o) { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; }
+function pickAt(cx, cy) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const cands = PICK.filter(o => FADE[o.userData.fade].alpha > 0.5 && shown(o));
+  const hits = ray.intersectObjects(cands, false);
+  // Translucent insulation and base slabs are "low priority": prefer anything solid behind them.
+  return hits.find(h => !h.object.userData.low) || hits[0] || null;
+}
+let down = null, hoverPending = false, lastMove = null;
+const cvs = renderer.domElement;
+cvs.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY }; });
+cvs.addEventListener('pointerup', e => {
+  if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) { down = null; return; }
+  down = null; select(pickAt(e.clientX, e.clientY));
+});
+cvs.addEventListener('dblclick', e => {
+  const h = pickAt(e.clientX, e.clientY);
+  const dive = h ? resolveInfo(h.object, h.instanceId).diveTo : undefined;
+  flyTo(dive !== undefined && dive !== null && dive > lvlNow ? dive : lvlNow + 1);
+});
+cvs.addEventListener('pointermove', e => { lastMove = e; if (!hoverPending) { hoverPending = true; requestAnimationFrame(doHover); } });
+cvs.addEventListener('pointerleave', () => { $('hover').style.display = 'none'; });
+cvs.addEventListener('wheel', () => { $('hover').style.display = 'none'; }, { passive: true });
+function doHover() {
+  hoverPending = false;
+  const e = lastMove, hv = $('hover');
+  if (!e || flight || e.buttons) { hv.style.display = 'none'; return; }
+  const h = pickAt(e.clientX, e.clientY);
+  if (!h) { hv.style.display = 'none'; cvs.style.cursor = ''; return; }
+  const inf = resolveInfo(h.object, h.instanceId);
+  hv.innerHTML = `${inf.title}<small>${inf.kind || ''}</small>`;
+  hv.style.display = 'block'; hv.style.left = (e.clientX + 14) + 'px'; hv.style.top = (e.clientY + 14) + 'px';
+  cvs.style.cursor = 'pointer';
+}
+
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === ']' || e.key === 'PageDown') flyTo(lvlNow + 1);
+  else if (e.key === '[' || e.key === 'PageUp') flyTo(lvlNow - 1);
+  else if (e.key >= '1' && e.key <= '6') flyTo(+e.key - 1);
+  else if (e.key === 'Escape') select(null);
+  else if (e.key === 'r' || e.key === 'R') flyTo(lvlNow);
+});
+
+// ---- Id-Vg plot
+const iv = $('ivPlot');
+function drawIV() {
+  const dpr = Math.min(devicePixelRatio, 2), W = iv.clientWidth, H = iv.clientHeight;
+  if (iv.width !== W * dpr) { iv.width = W * dpr; iv.height = H * dpr; }
+  const g = iv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const pad = { l: 30, r: 8, t: 8, b: 16 };
+  const X = v => pad.l + (v / 0.8) * (W - pad.l - pad.r);
+  const Y = lg => pad.t + (1 - (lg + 12) / 8) * (H - pad.t - pad.b);
+  g.font = '9.5px "JetBrains Mono", monospace'; g.fillStyle = '#56627a';
+  for (const lg of [-12, -8, -4]) { g.fillText(`1e${lg}`, 1, Y(lg) + 3); g.strokeStyle = 'rgba(120,150,210,0.1)'; g.beginPath(); g.moveTo(pad.l, Y(lg)); g.lineTo(W - pad.r, Y(lg)); g.stroke(); }
+  g.fillText('0 V', X(0), H - 3); g.fillText('0.8 V', X(0.8) - 26, H - 3);
+  g.setLineDash([3, 3]); g.strokeStyle = 'rgba(255,181,71,0.6)'; g.beginPath(); g.moveTo(X(VT), pad.t); g.lineTo(X(VT), H - pad.b); g.stroke(); g.setLineDash([]);
+  g.fillStyle = 'rgba(255,181,71,0.8)'; g.fillText('VT', X(VT) + 3, pad.t + 9);
+  g.strokeStyle = '#38d6ff'; g.lineWidth = 1.6; g.beginPath();
+  for (let v = 0; v <= 0.8001; v += 0.01) { const y = Y(Math.log10(idOf(v))); v ? g.lineTo(X(v), y) : g.moveTo(X(v), y); } g.stroke();
+  const cx = X(state.vg), cy = Y(Math.log10(idOf(state.vg)));
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(cx, cy, 3.5, 0, 7); g.fill();
+}
+
+// ---- HUD
+function fmtLen(mm) {
+  const f = (v, u) => (v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(0) : v.toFixed(1)) + ' ' + u;
+  if (mm >= 1) return f(mm, 'mm'); if (mm >= 1e-3) return f(mm * 1e3, 'µm'); return f(mm * 1e6, 'nm');
+}
+function updateHud(d) {
+  const h = 2 * d * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  $('hudFov').textContent = fmtLen(h * camera.aspect);
+  $('hudZoom').textContent = '×' + Math.max(1, Math.round(LEVELS[0].D / d)).toLocaleString();
+  const mmPerPx = h / innerHeight, raw = 110 * mmPerPx;
+  const p = Math.pow(10, Math.floor(Math.log10(raw))), m = raw / p, nice = (m >= 5 ? 5 : m >= 2 ? 2 : 1) * p;
+  $('scaleBar').style.width = (nice / mmPerPx).toFixed(1) + 'px'; $('scaleLbl').textContent = fmtLen(nice);
+  $('hudLevel').textContent = LEVELS[lvlNow].name;
+}
+
+// ---- labels
+const _w = new V3();
+function updateLabels() {
+  for (const L of LABELS) {
+    const a = FADE[L.fade].alpha;
+    const show = toggles.labels && a > 0.55 && lvlNow >= L.levels[0] && lvlNow <= L.levels[1] && shown(L.o) && !flight;
+    if (!show) { L.el.style.display = 'none'; continue; }
+    L.o.getWorldPosition(_w).project(camera);
+    if (_w.z > 1 || Math.abs(_w.x) > 1.1 || Math.abs(_w.y) > 1.1) { L.el.style.display = 'none'; continue; }
+    L.el.style.display = 'block';
+    L.el.style.opacity = a.toFixed(2);
+    L.el.style.transform = `translate(${((_w.x + 1) / 2 * innerWidth).toFixed(1)}px, ${((1 - _w.y) / 2 * innerHeight).toFixed(1)}px) translate(-50%, calc(-100% - 8px))`;
+  }
+}
+
+/* =====================================================================
+   SIMULATION: clock, gate switching, cell activity
+   ===================================================================== */
+const hash = (a, b) => { let h = Math.imul(a ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(b + 0x632be5ab, 0xc2b2ae35); h ^= h >>> 15; return ((h >>> 0) % 1000) / 1000; };
+const cellFlash = new Float32Array(CELLS.length);
+const _c = new THREE.Color();
+function onClockEdge(cycle) {
+  for (const g of GATES) g.on = hash(g.key, cycle) > 0.5;
+  for (let i = 0; i < 70; i++) cellFlash[Math.floor(Math.random() * CELLS.length)] = 1;
+}
+function simulate(dt) {
+  state.clockPhase += dt * state.clockHz;
+  const cyc = Math.floor(state.clockPhase);
+  if (cyc !== state.cycle) { state.cycle = cyc; onClockEdge(cyc); }
+  const flowRate = state.clockHz > 0 ? 0.4 + state.clockHz / 2 : 0;
+
+  for (const g of GATES) { g.level += ((g.on ? 1 : 0) - g.level) * Math.min(1, dt * 10); g.mat.emissiveIntensity = g.level * 0.9; }
+
+  if (FADE.cells.alpha > 0) {
+    const cells = window.__cells;
+    for (let i = 0; i < CELLS.length; i++) {
+      if (cellFlash[i] <= 0) continue;
+      cellFlash[i] = Math.max(0, cellFlash[i] - dt * 2.2);
+      _c.copy(CELLS[i].base).lerp(new THREE.Color(0x9fefff), cellFlash[i] * 0.8); cells.setColorAt(i, _c);
+    }
+    cells.instanceColor.needsUpdate = true;
+  }
+
+  // Gate voltage: auto mode follows the clock with a finite rise time, so you see the subthreshold region too.
+  if (state.auto) {
+    const target = state.cycle % 2 ? VDD : 0;
+    state.vg += (target - state.vg) * Math.min(1, dt * 3.5);
+  }
+  if (document.activeElement !== $('vg')) $('vg').value = state.vg;
+  const id = idOf(state.vg), k = intensityOf(id), on = state.vg > VT;
+  $('vgVal').textContent = state.vg.toFixed(2) + ' V';
+  $('roState').textContent = on ? 'ON' : 'OFF'; $('roState').style.color = on ? 'var(--good)' : 'var(--muted)';
+  $('roId').textContent = fmtAmp(id);
+  $('roOut').textContent = state.vg > VDD / 2 ? '0' : '1';
+  for (const m of fin.gateMats) m.emissiveIntensity = (state.vg / 0.8) * 0.7;
+  fin.glowMat.userData.dyn = smooth((state.vg - VT + 0.08) / 0.3);
+  fin.flow.active = Math.max(2, Math.round(fin.flow.n * k * k));
+  fin.flow.rate = 0.15 + 0.85 * k;
+  drawIV();
+
+  for (const f of FLOWS) {
+    if (FADE[f.fade].alpha <= 0.004 || !toggles.flow) continue;
+    if (f !== fin.flow) f.rate = flowRate;
+    f.update(dt);
+  }
+  if (window.__reticle) { const s = 1 + 0.12 * Math.sin(performance.now() / 260); window.__reticle.scale.set(s, 1, s); }
+  if (window.__cellTarget) window.__cellTarget.material.userData.dyn = 0.55 + 0.45 * Math.sin(performance.now() / 260);
+}
+
+/* =====================================================================
+   MAIN LOOP
+   ===================================================================== */
+function resize() {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+}
+addEventListener('resize', resize);
+
+// initial view
+{
+  const L = LEVELS[0]; const T = L.focus();
+  controls.target.copy(T); camera.position.copy(T).addScaledVector(new V3(...L.dir).normalize(), L.D * 1.25);
+  controls.minDistance = LEVELS[5].D * 0.4; controls.maxDistance = LEVELS[0].D * 1.9;
+}
+applyTags(); updateExplode(); syncSeparation(); showLevelInfo(0);
+// A URL hash such as #4 opens the explorer at that level (1-6).
+const startLevel = clamp((parseInt(location.hash.slice(1), 10) || 1) - 1, 0, 5);
+setTimeout(() => flyTo(startLevel), 250);
+
+const clock = new THREE.Clock();
+function frame() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  simulate(dt);
+  if (flight) stepFlight(dt);
+  else {
+    controls.update();
+    updateExplode(); scene.updateMatrixWorld(true);
+    // Re-anchor: move target and camera together so the orbit centre follows the zoom depth.
+    const d = currentDistance();
+    const delta = focusAt(d).sub(controls.target);
+    controls.target.add(delta); camera.position.add(delta);
+  }
+  const d = currentDistance();
+  // Depth range scales with the zoom so every level gets full depth precision.
+  camera.near = d * 0.01; camera.far = d * 80; camera.updateProjectionMatrix();
+  updateFades(d);
+
+  const lf = levelFloat(d), li = clamp(Math.round(lf), 0, 5);
+  if (li !== lvlNow) {
+    lvlNow = li;
+    ladder.querySelectorAll('button').forEach((b, i) => b.classList.toggle('active', i === lvlNow));
+    if (!flight) syncSeparation();
+    select(null);
+  }
+  if (lvlShown !== lvlNow) { lvlShown = lvlNow; ladder.querySelectorAll('button').forEach((b, i) => b.classList.toggle('active', i === lvlNow)); }
+  $('btnUp').disabled = lvlNow === 0; $('btnDive').disabled = lvlNow === 5;
+  $('btnDive').textContent = lvlNow < 5 ? `Dive to ${LEVELS[lvlNow + 1].name} ▼` : 'Deepest scale';
+
+  updateSelBox(); updateHud(d); updateLabels();
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+frame();
+window.__app = { state, flyTo, LEVELS, FADE, camera, controls };
+</script>
+</body>
+</html>
