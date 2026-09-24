@@ -1,16 +1,16 @@
 # Interactive 3D Lab
 
-Eleven interactive Three.js explorers covering chips, AI, robotics, anatomy, energy, space and U.S. immigration law. Each one is a single self-contained HTML file.
+Eleven interactive Three.js explorers covering chips, quantum computing, AI, anatomy, energy, space and U.S. immigration law. Each one is a single self-contained HTML file.
 
 **Live site:** https://eshaanjain26.github.io/interactive-3d-lab/
 
 | Explorer | What it shows |
 |---|---|
 | [Chip Depth Explorer](https://eshaanjain26.github.io/interactive-3d-lab/chip-depth-explorer/) | Continuous zoom from a packaged processor down to an 18 nm FinFET gate, across six scales |
+| [Quantum Qubit Sandbox](https://eshaanjain26.github.io/interactive-3d-lab/quantum-qubit-sandbox/) | Two Bloch spheres with animated H, X, Y, Z, S, T and CNOT gates, live entanglement (concurrence), and measurement collapse |
 | [Attention Lens](https://eshaanjain26.github.io/interactive-3d-lab/attention-lens/) | A transformer block in 3D: embeddings, attention heads, residual stream |
 | [Neural Network Lab](https://eshaanjain26.github.io/interactive-3d-lab/neural-network-lab/) | Signals moving through a feedforward network, editable weights, animated backpropagation |
 | [Q-Learning Grid World](https://eshaanjain26.github.io/interactive-3d-lab/q-learning-grid-world/) | A tabular Q-learning agent trained live, with a Q-table view |
-| [Drone Swarm Boids](https://eshaanjain26.github.io/interactive-3d-lab/drone-swarm-boids/) | Reynolds flocking across up to 600 quadcopters, with click-placed beacons, hazards and obstacles, three camera modes and live swarm telemetry |
 | [EV Teardown Explorer](https://eshaanjain26.github.io/interactive-3d-lab/ev-teardown-explorer/) | A dual-motor electric sedan in exploded view, with component specs |
 | [Microgrid Flow](https://eshaanjain26.github.io/interactive-3d-lab/microgrid-flow/) | Smart-city microgrid supply and demand, shown live |
 | [Cardiac Flow Lab](https://eshaanjain26.github.io/interactive-3d-lab/cardiac-flow-lab/) | Four chambers, four valves, one cardiac cycle |

@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Quantum Qubit Sandbox</title>
+<meta name="description" content="Two-qubit Bloch sphere simulator: apply H, X, Y, Z, S, T and CNOT gates, watch entanglement form, and measure with animated collapse.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* One committed dark "lab instrument" world, so no light-theme blocks. */
+  :root {
+    color-scheme: dark;
+    --ground: #03050b;
+    --ground-2: #0a1122;
+    --panel: rgba(8, 12, 22, 0.84);
+    --panel-solid: #0a0f1c;
+    --line: rgba(140, 170, 230, 0.14);
+    --line-strong: rgba(140, 170, 230, 0.3);
+    --text: #e8eefa;
+    --muted: #8d99b3;
+    --faint: #5a6580;
+    --q0: #ffc45a;
+    --q1: #4ff0ff;
+    --ent: #b88cff;
+    --ax-x: #ff5d6c;
+    --ax-y: #52f59a;
+    --ax-z: #5b8cff;
+    --btn: rgba(255, 255, 255, 0.045);
+    --btn-hover: rgba(255, 255, 255, 0.1);
+    --radius: 12px;
+    --disp: "Space Grotesk", system-ui, sans-serif;
+    --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --accent: var(--q0);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body { background: radial-gradient(ellipse at 50% 40%, var(--ground-2) 0%, var(--ground) 65%); background-color: var(--ground);
+    color: var(--text); font-family: var(--sans); font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+  body[data-target="1"] { --accent: var(--q1); }
+
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; outline: none; touch-action: none; }
+  #labels { position: absolute; inset: 0; pointer-events: none; }
+  .lbl { font: 500 11px var(--mono); color: var(--muted); text-shadow: 0 0 6px #000, 0 0 2px #000; white-space: nowrap; }
+  .lbl.pole { color: #dce6ff; font-size: 12px; }
+  .lbl.x { color: var(--ax-x); } .lbl.y { color: var(--ax-y); }
+  .lbl.qname { font: 600 13px var(--disp); letter-spacing: 0.12em; color: var(--muted); }
+  .lbl.qname.sel { color: var(--text); }
+  #hint { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); color: var(--faint); font-size: 11.5px;
+    pointer-events: none; white-space: nowrap; }
+
+  #ui { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  .panel { pointer-events: auto; position: absolute; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+    overflow-y: auto; scrollbar-width: thin; scrollbar-color: #243152 transparent; padding: 14px; }
+  #controls { top: 16px; left: 16px; width: 288px; max-height: calc(100% - 32px); }
+  #readout { top: 16px; right: 16px; width: 352px; max-height: calc(100% - 32px); }
+
+  .brand { display: flex; gap: 10px; align-items: center; }
+  .brand svg { flex: none; }
+  .brand h1 { font-family: var(--disp); font-size: 17px; font-weight: 700; margin: 0; letter-spacing: 0.01em; }
+  .brand p { margin: 0; color: var(--muted); font-size: 11.5px; }
+  h2 { font-family: var(--disp); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--muted);
+    margin: 18px 0 8px; font-weight: 600; }
+  h2:first-child { margin-top: 0; }
+
+  button { font: inherit; color: var(--text); background: var(--btn); border: 1px solid var(--line); border-radius: 8px;
+    padding: 7px 9px; cursor: pointer; transition: background .15s, border-color .15s, color .15s, transform .08s; }
+  button:hover { background: var(--btn-hover); border-color: var(--line-strong); }
+  button:active { transform: translateY(1px); }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .seg button { display: flex; align-items: center; justify-content: center; gap: 7px; font-family: var(--disp); font-weight: 600; letter-spacing: 0.06em; }
+  .seg button .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .seg button[aria-pressed="true"][data-q="0"] { border-color: var(--q0); color: var(--q0); background: rgba(255, 196, 90, 0.08); }
+  .seg button[aria-pressed="true"][data-q="1"] { border-color: var(--q1); color: var(--q1); background: rgba(79, 240, 255, 0.07); }
+
+  .gates { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .gate { display: flex; flex-direction: column; align-items: flex-start; padding: 7px 9px 6px; text-align: left; }
+  .gate b { font: 600 17px var(--mono); line-height: 1.1; }
+  .gate span { font-size: 10.5px; color: var(--muted); }
+  .gate:hover b { color: var(--accent); }
+  .gate.flash { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .wide { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
+  .wide b { font: 600 14px var(--mono); }
+  .wide span { color: var(--muted); font-size: 11.5px; }
+  .measure { border-color: rgba(184, 140, 255, 0.4); }
+  .measure b { color: var(--ent); }
+  .measure:hover { background: rgba(184, 140, 255, 0.1); border-color: var(--ent); }
+  .row { display: flex; gap: 6px; margin-top: 6px; }
+  .row > * { flex: 1; }
+  .preset { font-size: 12px; padding: 6px 6px; }
+  .preset code { font-family: var(--mono); }
+
+  .speed { display: flex; align-items: center; gap: 10px; margin-top: 10px; color: var(--muted); font-size: 11.5px; }
+  .speed input { flex: 1; accent-color: var(--accent); }
+  .speed output { font-family: var(--mono); color: var(--text); width: 36px; text-align: right; }
+
+  #status { margin-top: 10px; min-height: 34px; font-size: 11.5px; color: var(--muted); border-left: 2px solid var(--line-strong); padding: 2px 0 2px 9px; }
+  #status b { color: var(--text); font-family: var(--mono); font-weight: 500; }
+
+  #circuit { position: relative; height: 70px; margin-top: 4px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; border: 1px solid var(--line); border-radius: 8px; background: rgba(0,0,0,0.25); }
+  #circuit .wires { position: relative; min-width: 100%; height: 100%; display: flex; padding-left: 34px; padding-right: 10px; }
+  #circuit .wire { position: absolute; left: 30px; right: 0; height: 1px; background: var(--line-strong); }
+  #circuit .wire.w0 { top: 20px; } #circuit .wire.w1 { top: 50px; }
+  #circuit .wl { position: absolute; left: 7px; font: 600 10px var(--mono); }
+  #circuit .wl.w0 { top: 13px; color: var(--q0); } #circuit .wl.w1 { top: 43px; color: var(--q1); }
+  .col { position: relative; flex: none; width: 30px; height: 100%; }
+  .col .g { position: absolute; left: 3px; width: 24px; height: 20px; border-radius: 4px; display: grid; place-items: center;
+    font: 600 11px var(--mono); background: #121a2e; border: 1px solid var(--line-strong); }
+  .col .g.s0 { top: 10px; } .col .g.s1 { top: 40px; }
+  .col .g.m { color: var(--ent); border-color: rgba(184,140,255,.5); font-size: 10px; }
+  .col .ctl { position: absolute; left: 11px; width: 8px; height: 8px; border-radius: 50%; background: var(--text); }
+  .col .ctl.s0 { top: 16px; } .col .ctl.s1 { top: 46px; }
+  .col .tgt { position: absolute; left: 6px; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--text);
+    font: 500 15px/15px var(--mono); text-align: center; color: var(--text); background: #0b1020; }
+  .col .tgt.s0 { top: 11px; } .col .tgt.s1 { top: 41px; }
+  .col .vl { position: absolute; left: 14.5px; top: 20px; height: 30px; width: 1.5px; background: var(--text); }
+  .empty-circ { position: absolute; left: 44px; top: 26px; color: var(--faint); font-size: 11px; }
+
+  .keys { margin-top: 14px; color: var(--faint); font-size: 11px; line-height: 1.7; }
+  kbd { font: 500 10.5px var(--mono); color: var(--muted); border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; }
+
+  /* Readout */
+  .qhead { display: flex; align-items: center; gap: 9px; }
+  .qhead .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  .qhead h2 { margin: 0; color: var(--text); font-size: 12px; }
+  .tag { margin-left: auto; font: 500 10.5px var(--mono); padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line-strong); color: var(--muted); }
+  .tag.pure { color: var(--ax-y); border-color: rgba(82,245,154,.4); }
+  .tag.mixed { color: var(--ent); border-color: rgba(184,140,255,.5); }
+  .eq { font: 500 16px/1.5 var(--mono); margin: 10px 0 2px; color: var(--text); min-height: 48px; word-break: break-word; }
+  .eq .amp-a { color: var(--accent); } .eq .amp-b { color: var(--accent); }
+  .eq sup { font-size: 0.66em; }
+  .eq-sub { font: 400 11.5px var(--mono); color: var(--muted); min-height: 18px; }
+  .eq.mixed { font-size: 13px; color: var(--muted); font-family: var(--sans); }
+  .eq.mixed b { color: var(--ent); font-family: var(--mono); font-weight: 500; }
+
+  .prow { display: grid; grid-template-columns: 52px 1fr 54px; align-items: center; gap: 8px; margin-top: 7px; font-family: var(--mono); font-size: 11.5px; }
+  .prow > span { color: var(--muted); }
+  .bar { height: 8px; border-radius: 99px; background: rgba(255,255,255,0.06); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  .prow output { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .coords { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 12px 0 0; }
+  .coords div { background: rgba(255,255,255,0.03); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+  .coords dt { font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.1em; }
+  .coords dd { margin: 1px 0 0; font: 500 13px var(--mono); font-variant-numeric: tabular-nums; }
+  .coords .cx dt { color: var(--ax-x); } .coords .cy dt { color: var(--ax-y); } .coords .cz dt { color: var(--ax-z); }
+
+  .joint { font: 500 13px/1.6 var(--mono); word-break: break-word; min-height: 22px; }
+  .joint sup { font-size: 0.7em; }
+  .ent { margin-top: 10px; }
+  .ent .top { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); }
+  .ent .top b { font-family: var(--mono); color: var(--ent); font-weight: 500; }
+  .ent .bar i { background: var(--ent); box-shadow: 0 0 12px var(--ent); }
+  .ent .bar { margin-top: 5px; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font: 400 11.5px var(--mono); font-variant-numeric: tabular-nums; }
+  th { text-align: left; font: 500 10px var(--sans); color: var(--faint); text-transform: uppercase; letter-spacing: 0.1em; padding: 0 0 5px; }
+  td { padding: 3px 0; border-top: 1px solid var(--line); }
+  td:first-child { color: var(--muted); width: 44px; }
+  td.amp { width: 128px; }
+  td .bar { height: 6px; }
+  td .bar i { background: linear-gradient(90deg, var(--q0), var(--q1)); box-shadow: none; }
+  td.pc { text-align: right; width: 50px; }
+
+  .shots-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .shots-head button { font: 500 12px var(--sans); text-transform: none; letter-spacing: 0; padding: 5px 10px; }
+  #hist { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; height: 104px; margin-top: 10px; align-items: end; }
+  .hb { position: relative; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+  .hb .cell { position: relative; width: 100%; height: 72px; }
+  .hb .fill { position: absolute; bottom: 0; left: 18%; right: 18%; height: 0; border-radius: 4px 4px 0 0;
+    background: linear-gradient(180deg, var(--ent), rgba(184,140,255,0.25)); transition: height .45s cubic-bezier(.2,.8,.2,1); }
+  .hb .exp { position: absolute; left: 8%; right: 8%; height: 0; bottom: 0; border-top: 1.5px dashed rgba(232,238,250,0.55); transition: height .3s; }
+  .hb .n { font: 500 10.5px var(--mono); color: var(--muted); height: 16px; }
+  .hb .k { font: 500 11px var(--mono); color: var(--text); margin-top: 3px; }
+  .legend { font-size: 10.5px; color: var(--faint); margin-top: 8px; }
+  .legend i { display: inline-block; width: 14px; border-top: 1.5px dashed rgba(232,238,250,0.55); vertical-align: middle; margin-right: 4px; }
+  .legend s { display: inline-block; width: 10px; height: 8px; background: var(--ent); border-radius: 2px; vertical-align: middle; margin: 0 4px 0 10px; text-decoration: none; }
+
+  #toast { position: fixed; left: 50%; top: 18px; transform: translate(-50%, -12px); opacity: 0; z-index: 9; pointer-events: none;
+    background: var(--panel-solid); border: 1px solid rgba(184,140,255,.5); color: var(--text); border-radius: 99px; padding: 7px 16px;
+    font: 500 12.5px var(--mono); box-shadow: 0 10px 30px rgba(0,0,0,.5), 0 0 24px rgba(184,140,255,.25); transition: opacity .25s, transform .25s; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (max-width: 1100px) {
+    #stage { bottom: 50%; bottom: 50dvh; }
+    #hint { display: none; }
+    #ui { top: 50%; top: 50dvh; overflow-y: auto; pointer-events: auto; background: var(--ground); border-top: 1px solid var(--line);
+      padding: 12px 16px calc(16px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+    #controls, #readout { position: static; width: auto; max-height: none; overflow: visible; backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; }
+    #toast { top: 10px; }
+  }
+  @media (max-width: 640px) {
+    #ui { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hb .fill, .hb .exp, #toast { transition: none; }
+  }
+</style>
+</head>
+<body data-target="0">
+<div id="stage" aria-label="Two Bloch spheres, one per qubit. Drag to orbit, click a sphere to select it.">
+  <div id="labels"></div>
+  <div id="hint">Drag to orbit · scroll to zoom · click a sphere to target it</div>
+</div>
+
+<div id="ui">
+  <section id="controls" class="panel" aria-label="Gate controls">
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
+        <circle cx="17" cy="17" r="14" fill="none" stroke="#5b8cff" stroke-opacity=".5"/>
+        <ellipse cx="17" cy="17" rx="14" ry="5" fill="none" stroke="#5b8cff" stroke-opacity=".35"/>
+        <line x1="17" y1="17" x2="25" y2="7" stroke="#ffc45a" stroke-width="2.2" stroke-linecap="round"/>
+        <circle cx="25" cy="7" r="2.6" fill="#ffc45a"/>
+      </svg>
+      <div><h1>Quantum Qubit Sandbox</h1><p>Two-qubit state-vector simulator</p></div>
+    </div>
+
+    <h2 style="margin-top:16px">Target qubit</h2>
+    <div class="seg" role="group" aria-label="Target qubit">
+      <button data-q="0" aria-pressed="true"><span class="dot" style="background:var(--q0)"></span>Q0</button>
+      <button data-q="1" aria-pressed="false"><span class="dot" style="background:var(--q1)"></span>Q1</button>
+    </div>
+
+    <h2>Single-qubit gates</h2>
+    <div class="gates">
+      <button class="gate" data-gate="H" title="Hadamard: π rotation about the (x+z)/√2 axis. |0⟩ → |+⟩"><b>H</b><span>Hadamard</span></button>
+      <button class="gate" data-gate="X" title="Pauli-X: π rotation about x. Bit flip |0⟩ ↔ |1⟩"><b>X</b><span>Pauli-X</span></button>
+      <button class="gate" data-gate="Y" title="Pauli-Y: π rotation about y. Bit and phase flip"><b>Y</b><span>Pauli-Y</span></button>
+      <button class="gate" data-gate="Z" title="Pauli-Z: π rotation about z. Phase flip |+⟩ ↔ |−⟩"><b>Z</b><span>Pauli-Z</span></button>
+      <button class="gate" data-gate="S" title="Phase S: π/2 rotation about z. |+⟩ → |+i⟩"><b>S</b><span>Phase</span></button>
+      <button class="gate" data-gate="T" title="T gate: π/4 rotation about z"><b>T</b><span>π/8</span></button>
+    </div>
+
+    <h2>Two-qubit gate</h2>
+    <button class="wide" id="cnotBtn" title="Flip the target when the control is |1⟩"><b>CNOT</b><span id="cnotLbl">Q1 controls → Q0</span></button>
+
+    <h2>Measurement</h2>
+    <button class="wide measure" id="measureBtn"><b>Measure State</b><span id="measureLbl">collapse Q0</span></button>
+    <button class="wide measure" id="measureBothBtn"><b>Measure both</b><span>collapse Q0, Q1</span></button>
+
+    <h2>Presets</h2>
+    <div class="row">
+      <button class="preset" id="resetBtn">Reset <code>|00⟩</code></button>
+      <button class="preset" id="bellBtn">Bell <code>Φ⁺</code></button>
+      <button class="preset" id="plusBtn"><code>|++⟩</code></button>
+    </div>
+    <div class="speed"><label for="speed">Animation speed</label><input id="speed" type="range" min="0.25" max="2" step="0.25" value="1"><output id="speedOut">1.0×</output></div>
+
+    <div id="status" aria-live="polite">Ready. Register is in <b>|00⟩</b>.</div>
+
+    <h2>Circuit</h2>
+    <div id="circuit"><div class="wires" id="wires"></div></div>
+
+    <div class="keys"><kbd>H</kbd> <kbd>X</kbd> <kbd>Y</kbd> <kbd>Z</kbd> <kbd>S</kbd> <kbd>T</kbd> gates · <kbd>C</kbd> CNOT · <kbd>M</kbd> measure · <kbd>B</kbd> both<br><kbd>1</kbd> <kbd>2</kbd> target · <kbd>R</kbd> reset · <kbd>E</kbd> Bell pair</div>
+  </section>
+
+  <section id="readout" class="panel" aria-label="State readout">
+    <div class="qhead"><span class="dot"></span><h2 id="rdTitle">Qubit Q0</h2><span class="tag pure" id="rdTag">pure</span></div>
+    <div class="eq" id="eqMain"></div>
+    <div class="eq-sub" id="eqSub"></div>
+
+    <div class="prow"><span>P(|0⟩)</span><div class="bar"><i id="p0bar"></i></div><output id="p0"></output></div>
+    <div class="prow"><span>P(|1⟩)</span><div class="bar"><i id="p1bar"></i></div><output id="p1"></output></div>
+
+    <dl class="coords">
+      <div><dt>θ polar</dt><dd id="cTheta"></dd></div>
+      <div><dt>φ azimuth</dt><dd id="cPhi"></dd></div>
+      <div><dt>|r| purity</dt><dd id="cR"></dd></div>
+      <div class="cx"><dt>x</dt><dd id="cX"></dd></div>
+      <div class="cy"><dt>y</dt><dd id="cY"></dd></div>
+      <div class="cz"><dt>z</dt><dd id="cZ"></dd></div>
+    </dl>
+
+    <h2>Two-qubit register |Ψ⟩</h2>
+    <div class="joint" id="eqJoint"></div>
+    <div class="ent">
+      <div class="top"><span id="entLbl">Product state</span><span>concurrence <b id="entVal">0.000</b></span></div>
+      <div class="bar"><i id="entBar"></i></div>
+    </div>
+    <table>
+      <thead><tr><th>basis</th><th>amplitude</th><th>probability</th><th></th></tr></thead>
+      <tbody id="ampBody"></tbody>
+    </table>
+
+    <h2 class="shots-head">Shots <button id="shotsBtn" title="Re-prepare the current state 512 times and measure both qubits">Run 512 shots</button></h2>
+    <div id="hist"></div>
+    <div class="legend"><i></i>theory <s></s>sampled · the live state is not disturbed</div>
+  </section>
+</div>
+
+<div id="toast" role="status" aria-live="assertive"></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+/* ================= Quantum math =================
+   Register |Ψ⟩ = Σ a_i |b0 b1⟩ with index i = 2·b0 + b1 (Q0 is the left ket digit). */
+const C = (re, im = 0) => ({ re, im });
+const cmul = (a, b) => C(a.re * b.re - a.im * b.im, a.re * b.im + a.im * b.re);
+const cadd = (a, b) => C(a.re + b.re, a.im + b.im);
+const conj = a => C(a.re, -a.im);
+const abs2 = a => a.re * a.re + a.im * a.im;
+const cexp = t => C(Math.cos(t), Math.sin(t));
+const ket00 = () => [C(1), C(0), C(0), C(0)];
+
+// e^{iγ}·R_n(θ). Each gate is written this way so that t∈[0,1] → e^{iγt}·R_n(θt) is a
+// continuous unitary path that lands exactly on the textbook matrix at t = 1.
+function rotation([nx, ny, nz], theta, gamma) {
+  const c = Math.cos(theta / 2), s = Math.sin(theta / 2), ph = cexp(gamma);
+  return [
+    [cmul(ph, C(c, -s * nz)), cmul(ph, C(-s * ny, -s * nx))],
+    [cmul(ph, C(s * ny, -s * nx)), cmul(ph, C(c, s * nz))],
+  ];
+}
+const PI = Math.PI, R2 = Math.SQRT1_2;
+const GATES = {
+  H: { name: 'Hadamard', axis: [R2, 0, R2], angle: PI, phase: PI / 2, axisTxt: '(x+z)/√2', angTxt: 'π' },
+  X: { name: 'Pauli-X', axis: [1, 0, 0], angle: PI, phase: PI / 2, axisTxt: 'x', angTxt: 'π' },
+  Y: { name: 'Pauli-Y', axis: [0, 1, 0], angle: PI, phase: PI / 2, axisTxt: 'y', angTxt: 'π' },
+  Z: { name: 'Pauli-Z', axis: [0, 0, 1], angle: PI, phase: PI / 2, axisTxt: 'z', angTxt: 'π' },
+  S: { name: 'Phase S', axis: [0, 0, 1], angle: PI / 2, phase: PI / 4, axisTxt: 'z', angTxt: 'π/2' },
+  T: { name: 'T', axis: [0, 0, 1], angle: PI / 4, phase: PI / 8, axisTxt: 'z', angTxt: 'π/4' },
+};
+const PAIRS = [[[0, 2], [1, 3]], [[0, 1], [2, 3]]];
+const bitOf = (i, q) => q === 0 ? (i >> 1) & 1 : i & 1;
+
+function apply1(psi, q, M, control = -1) {
+  const out = psi.slice();
+  for (const [i, j] of PAIRS[q]) {
+    if (control >= 0 && !bitOf(i, control)) continue;
+    const a = psi[i], b = psi[j];
+    out[i] = cadd(cmul(M[0][0], a), cmul(M[0][1], b));
+    out[j] = cadd(cmul(M[1][0], a), cmul(M[1][1], b));
+  }
+  return out;
+}
+
+// Reduced Bloch vector of one qubit: ρ = ½(I + r·σ), traced over the other.
+function bloch(psi, q) {
+  const zero = q === 0 ? [0, 1] : [0, 2], one = q === 0 ? [2, 3] : [1, 3];
+  const p0 = abs2(psi[zero[0]]) + abs2(psi[zero[1]]);
+  const p1 = abs2(psi[one[0]]) + abs2(psi[one[1]]);
+  const r01 = cadd(cmul(psi[zero[0]], conj(psi[one[0]])), cmul(psi[zero[1]], conj(psi[one[1]])));
+  return { x: 2 * r01.re, y: -2 * r01.im, z: p0 - p1, p0, p1 };
+}
+const concurrence = psi => 2 * Math.sqrt(abs2(cadd(cmul(psi[0], psi[3]), cmul(C(-1), cmul(psi[1], psi[2])))));
+
+function measure(psi, q) {
+  let p1 = 0;
+  psi.forEach((a, i) => { if (bitOf(i, q)) p1 += abs2(a); });
+  const outcome = Math.random() < p1 ? 1 : 0;
+  const p = outcome ? p1 : 1 - p1, k = 1 / Math.sqrt(p);
+  return { outcome, p, psi: psi.map((a, i) => bitOf(i, q) === outcome ? C(a.re * k, a.im * k) : C(0)) };
+}
+
+/* ================= Formatting ================= */
+const fmt = (n, d = 3) => { const v = Math.abs(n) < 0.5 * 10 ** -d ? 0 : n; return (v < 0 ? '−' : '') + Math.abs(v).toFixed(d); };
+function piFrac(phi) {
+  const v = phi / PI;
+  for (const d of [1, 2, 3, 4, 6, 8]) {
+    const n = Math.round(v * d);
+    if (Math.abs(v * d - n) < 2e-3) {
+      if (n === 0) return '0';
+      const g = gcd(Math.abs(n), d), nn = n / g, dd = d / g;
+      return (nn < 0 ? '−' : '') + (Math.abs(nn) === 1 ? '' : Math.abs(nn)) + 'π' + (dd > 1 ? '/' + dd : '');
+    }
+  }
+  return fmt(v, 2) + 'π';
+}
+function gcd(a, b) { return b ? gcd(b, a % b) : a; }
+function rect(z) {
+  const re = Math.abs(z.re) >= 5e-4, im = Math.abs(z.im) >= 5e-4;
+  if (!im) return fmt(z.re);
+  if (!re) return fmt(z.im) + 'i';
+  return `${fmt(z.re)} ${z.im < 0 ? '−' : '+'} ${fmt(Math.abs(z.im))}i`;
+}
+// Coefficient in polar form, sign folded out for φ = π so terms read "− 0.707|11⟩".
+function polarTerm(z, first, ket) {
+  const m = Math.sqrt(abs2(z));
+  let phi = Math.atan2(z.im, z.re), neg = false;
+  if (Math.abs(Math.abs(phi) - PI) < 2e-3) { neg = true; phi = 0; }
+  const mag = Math.abs(m - 1) < 5e-4 ? '' : fmt(m);
+  const ph = Math.abs(phi) < 2e-3 ? '' : `${mag ? '·' : ''}e<sup>i${piFrac(phi)}</sup>`;
+  const sign = first ? (neg ? '−' : '') : (neg ? ' − ' : ' + ');
+  return `${sign}${mag}${ph}${ket}`;
+}
+function phaseNormalized(psi) {
+  const lead = psi.find(a => abs2(a) > 1e-8);
+  if (!lead) return psi;
+  const m = Math.sqrt(abs2(lead)), g = C(lead.re / m, -lead.im / m);
+  return psi.map(a => cmul(a, g));
+}
+const KETS = ['|00⟩', '|01⟩', '|10⟩', '|11⟩'];
+
+/* ================= Scene ================= */
+const stage = document.getElementById('stage');
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+stage.prepend(renderer.domElement);
+
+const labelRenderer = new CSS2DRenderer({ element: document.getElementById('labels') });
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x03050b, 0.018);
+const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 200);
+const CAM_DIR = new THREE.Vector3(0.3, 0.26, 1).normalize();
+camera.position.copy(CAM_DIR).multiplyScalar(10);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 4;
+controls.maxDistance = 22;
+controls.enablePan = false;
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.8, 0.5, 0.22);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+scene.add(new THREE.AmbientLight(0x8899cc, 0.5));
+const key = new THREE.PointLight(0x9fbaff, 30, 30);
+key.position.set(3, 5, 4);
+scene.add(key);
+
+function glowTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'), grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.25, 'rgba(255,255,255,0.7)');
+  grd.addColorStop(0.6, 'rgba(255,255,255,0.12)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const GLOW = glowTexture();
+
+// Starfield + floor grid
+{
+  const n = 900, pos = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    const v = new THREE.Vector3().randomDirection().multiplyScalar(40 + Math.random() * 50);
+    pos.set([v.x, v.y, v.z], i * 3);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0x6f7fa8, size: 1.4, sizeAttenuation: false, transparent: true, opacity: 0.6, fog: false })));
+  const grid = new THREE.PolarGridHelper(6, 12, 6, 96, 0x2a3a66, 0x1a2544);
+  grid.position.y = -1.62;
+  grid.material.transparent = true; grid.material.opacity = 0.35;
+  scene.add(grid);
+}
+
+const AX = { x: new THREE.Color('#ff5d6c'), y: new THREE.Color('#52f59a'), z: new THREE.Color('#5b8cff') };
+const QCOL = [new THREE.Color('#ffc45a'), new THREE.Color('#4ff0ff')];
+const ENT = new THREE.Color('#b88cff');
+const UP = new THREE.Vector3(0, 1, 0);
+// Physics (x, y, z) → three (y, z, x): z is up, x points toward the default camera, right-handed.
+const toThree = v => new THREE.Vector3(v.y, v.z, v.x);
+
+const fresnelVert = `varying vec3 vN; varying vec3 vV;
+  void main(){ vec4 mv = modelViewMatrix * vec4(position,1.); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`;
+const fresnelFrag = `uniform vec3 uColor; uniform float uPower; uniform float uIntensity; uniform float uBase; varying vec3 vN; varying vec3 vV;
+  void main(){ float f = pow(1. - abs(dot(vN, vV)), uPower); gl_FragColor = vec4(uColor * (f * uIntensity + uBase), 1.); }`;
+
+function makeLabel(html, cls, pos, parent) {
+  const el = document.createElement('div'); el.className = 'lbl ' + cls; el.innerHTML = html;
+  const o = new CSS2DObject(el); o.position.copy(pos); parent.add(o); return el;
+}
+
+function circle(radius, seg, color, opacity) {
+  const pts = [];
+  for (let i = 0; i <= seg; i++) { const a = (i / seg) * PI * 2; pts.push(new THREE.Vector3(Math.cos(a) * radius, 0, Math.sin(a) * radius)); }
+  return new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthWrite: false }));
+}
+
+// Two-vertex dashed line updated in place; setFromPoints/computeLineDistances would allocate new GPU buffers every frame.
+function segment(mat) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+  g.setAttribute('lineDistance', new THREE.BufferAttribute(new Float32Array(2), 1));
+  const l = new THREE.Line(g, mat); l.frustumCulled = false; return l;
+}
+function setSegment(line, a, b) {
+  const g = line.geometry;
+  g.attributes.position.setXYZ(0, a.x, a.y, a.z); g.attributes.position.setXYZ(1, b.x, b.y, b.z);
+  g.attributes.lineDistance.setX(1, a.distanceTo(b));
+  g.attributes.position.needsUpdate = g.attributes.lineDistance.needsUpdate = true;
+}
+
+const TRAIL_N = 140;
+function buildQubit(i) {
+  const group = new THREE.Group();
+  group.position.x = i === 0 ? -1.75 : 1.75;
+  scene.add(group);
+
+  const shell = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 48), new THREE.ShaderMaterial({
+    vertexShader: fresnelVert, fragmentShader: fresnelFrag, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    uniforms: { uColor: { value: new THREE.Color('#4a78ff') }, uPower: { value: 3.2 }, uIntensity: { value: 0.5 }, uBase: { value: 0.018 } },
+  }));
+  shell.userData.qubit = i;
+  group.add(shell);
+
+  const wire = new THREE.Group();
+  for (let lat = -60; lat <= 60; lat += 30) {
+    const r = Math.cos(lat * PI / 180), c = circle(r, 96, lat === 0 ? 0x8fb0ff : 0x3d5cab, lat === 0 ? 0.55 : 0.22);
+    c.position.y = Math.sin(lat * PI / 180); wire.add(c);
+  }
+  for (let lon = 0; lon < 180; lon += 30) {
+    const c = circle(1, 96, 0x3d5cab, 0.22); c.rotation.z = PI / 2; c.rotation.y = lon * PI / 180; wire.add(c);
+  }
+  group.add(wire);
+
+  const axisDefs = [['x', new THREE.Vector3(0, 0, 1)], ['y', new THREE.Vector3(1, 0, 0)], ['z', new THREE.Vector3(0, 1, 0)]];
+  for (const [k, d] of axisDefs) {
+    const col = AX[k].clone();
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([d.clone().multiplyScalar(-1.28), d.clone().multiplyScalar(1.28)]),
+      new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.75 }));
+    group.add(line);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.1, 12), new THREE.MeshBasicMaterial({ color: col }));
+    tip.position.copy(d).multiplyScalar(1.3); tip.quaternion.setFromUnitVectors(UP, d); group.add(tip);
+  }
+  for (const s of [1, -1]) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 8), new THREE.MeshBasicMaterial({ color: 0xdce6ff }));
+    m.position.y = s; group.add(m);
+  }
+  makeLabel('|0⟩', 'pole', new THREE.Vector3(0, 1.48, 0), group);
+  makeLabel('|1⟩', 'pole', new THREE.Vector3(0, -1.45, 0), group);
+  makeLabel('x&nbsp;|+⟩', 'x', new THREE.Vector3(0, 0, 1.48), group);
+  makeLabel('y&nbsp;|+i⟩', 'y', new THREE.Vector3(1.5, 0, 0), group);
+  const nameEl = makeLabel('Q' + i, 'qname', new THREE.Vector3(0, -1.9, 0), group);
+
+  const qc = QCOL[i];
+  const hot = qc.clone().multiplyScalar(2.2);
+  const arrow = new THREE.Group();
+  const shaftGeo = new THREE.CylinderGeometry(0.024, 0.024, 1, 16); shaftGeo.translate(0, 0.5, 0);
+  const shaft = new THREE.Mesh(shaftGeo, new THREE.MeshBasicMaterial({ color: hot }));
+  const haloGeo = new THREE.CylinderGeometry(0.06, 0.06, 1, 16, 1, true); haloGeo.translate(0, 0.5, 0);
+  const halo = new THREE.Mesh(haloGeo, new THREE.MeshBasicMaterial({ color: qc, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const headGeo = new THREE.ConeGeometry(0.075, 1, 24); headGeo.translate(0, 0.5, 0);
+  const head = new THREE.Mesh(headGeo, new THREE.MeshBasicMaterial({ color: hot }));
+  arrow.add(shaft, halo, head);
+  group.add(arrow);
+
+  const tipGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: GLOW, color: qc, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+  group.add(tipGlow);
+
+  const orb = new THREE.Sprite(new THREE.SpriteMaterial({ map: GLOW, color: ENT, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 }));
+  group.add(orb);
+
+  const dropMat = new THREE.LineDashedMaterial({ color: qc, dashSize: 0.05, gapSize: 0.04, transparent: true, opacity: 0.55 });
+  const drop = segment(dropMat), foot = segment(dropMat);
+  group.add(drop, foot);
+
+  const tPos = new Float32Array(TRAIL_N * 3), tCol = new Float32Array(TRAIL_N * 3);
+  const tGeo = new THREE.BufferGeometry();
+  tGeo.setAttribute('position', new THREE.BufferAttribute(tPos, 3));
+  tGeo.setAttribute('color', new THREE.BufferAttribute(tCol, 3));
+  tGeo.setDrawRange(0, 0);
+  const trail = new THREE.Line(tGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  trail.frustumCulled = false;
+  group.add(trail);
+
+  const axisLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -1.5, 0), new THREE.Vector3(0, 1.5, 0)]),
+    new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 0.08, gapSize: 0.05, transparent: true, opacity: 0 }));
+  axisLine.computeLineDistances();
+  group.add(axisLine);
+
+  const ring = new THREE.Mesh(new THREE.RingGeometry(1.08, 1.15, 128), new THREE.MeshBasicMaterial({ color: qc, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false }));
+  ring.rotation.x = -PI / 2; ring.position.y = -1.6;
+  group.add(ring);
+
+  return { i, group, shell, arrow, shaft, halo, head, tipGlow, orb, drop, foot, trail, tPos, tCol, trailPts: [], axisLine, ring, nameEl, color: qc };
+}
+const Q = [buildQubit(0), buildQubit(1)];
+
+// Entanglement braid between the two register origins, brightness = concurrence.
+const LINK_N = 160;
+const link = (() => {
+  const pos = new Float32Array(LINK_N * 3), col = new Float32Array(LINK_N * 3), u = new Float32Array(LINK_N);
+  for (let k = 0; k < LINK_N; k++) u[k] = Math.random();
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.075, map: GLOW, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  pts.frustumCulled = false;
+  scene.add(pts);
+  return { pos, col, u, g };
+})();
+
+// Measurement particles + shockwave rings
+const PMAX = 1200;
+const parts = (() => {
+  const pos = new Float32Array(PMAX * 3), col = new Float32Array(PMAX * 3);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.085, map: GLOW, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  pts.frustumCulled = false;
+  scene.add(pts);
+  return { pos, col, g, vel: new Float32Array(PMAX * 3), base: new Float32Array(PMAX * 3), life: new Float32Array(PMAX), max: new Float32Array(PMAX), cursor: 0 };
+})();
+function burst(origin, color, n, speed = 1) {
+  if (reduced) n = Math.round(n * 0.3);
+  const d = new THREE.Vector3();
+  for (let k = 0; k < n; k++) {
+    const i = parts.cursor++ % PMAX;
+    d.randomDirection().multiplyScalar((0.5 + Math.random() * 1.9) * speed);
+    parts.pos.set([origin.x, origin.y, origin.z], i * 3);
+    parts.vel.set([d.x, d.y, d.z], i * 3);
+    const white = Math.random() < 0.25;
+    const c = white ? new THREE.Color(1.6, 1.6, 1.8) : color.clone().multiplyScalar(1.4 + Math.random());
+    parts.base.set([c.r, c.g, c.b], i * 3);
+    parts.life[i] = parts.max[i] = 0.6 + Math.random() * 1.0;
+  }
+}
+const shocks = [];
+function shockwave(parent, local, dir, color) {
+  const m = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 96), new THREE.MeshBasicMaterial({ color: color.clone().multiplyScalar(1.6), transparent: true, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
+  m.position.copy(local);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+  m.scale.setScalar(0.01);
+  parent.add(m);
+  shocks.push({ m, t: 0 });
+}
+
+/* ================= Simulation state + op queue ================= */
+const sim = { psi: ket00(), target: 0, speed: 1, history: [] };
+const queue = [];
+let current = null;
+let shots = null;
+const ease = t => t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+const easeOut = t => 1 - (1 - t) ** 3;
+
+function enqueue(op) { if (queue.length < 16) queue.push(op); }
+
+function startOp(op) {
+  current = op;
+  op.t = 0;
+  op.psi0 = sim.psi;
+  const base = { gate: 1.0, cnot: 1.25, measure: 0.9, reset: 0.7 }[op.kind];
+  op.dur = base / sim.speed * (reduced ? 0.3 : 1);
+  if (op.kind === 'measure' || op.kind === 'reset') {
+    let psi = op.psi0;
+    op.results = [];
+    if (op.kind === 'measure') {
+      for (const q of op.qubits) { const r = measure(psi, q); psi = r.psi; op.results.push({ q, outcome: r.outcome, p: r.p }); }
+    } else psi = ket00();
+    op.psi1 = psi;
+    op.from = [bloch(op.psi0, 0), bloch(op.psi0, 1)];
+    op.to = [bloch(psi, 0), bloch(psi, 1)];
+    op.c0 = concurrence(op.psi0);
+    op.c1 = concurrence(psi);
+    op.jit = [new THREE.Vector3(), new THREE.Vector3()];
+  }
+  setStatus(op);
+}
+
+function stepOp(op, dt) {
+  op.t = Math.min(1, op.t + dt / op.dur);
+  const e = ease(op.t);
+  if (op.kind === 'gate') {
+    const g = GATES[op.gate];
+    sim.psi = apply1(op.psi0, op.q, rotation(g.axis, g.angle * e, g.phase * e));
+  } else if (op.kind === 'cnot') {
+    // Controlled e^{iπt/2}·Rx(πt): equals CNOT at t = 1 and is unitary throughout.
+    sim.psi = apply1(op.psi0, op.q, rotation([1, 0, 0], PI * e, PI / 2 * e), op.c);
+  }
+  if (op.t >= 1) finishOp(op);
+}
+
+function finishOp(op) {
+  if (op.kind === 'gate') {
+    const g = GATES[op.gate];
+    sim.psi = clean(apply1(op.psi0, op.q, rotation(g.axis, g.angle, g.phase)));
+    sim.history.push({ kind: 'gate', gate: op.gate, q: op.q });
+  } else if (op.kind === 'cnot') {
+    sim.psi = clean(apply1(op.psi0, op.q, rotation([1, 0, 0], PI, PI / 2), op.c));
+    sim.history.push({ kind: 'cnot', c: op.c, q: op.q });
+  } else if (op.kind === 'measure') {
+    sim.psi = op.psi1;
+    sim.history.push({ kind: 'measure', results: op.results });
+    collapseFx(op);
+  } else if (op.kind === 'reset') {
+    sim.psi = op.psi1;
+    sim.history = [];
+    Q.forEach(q => { q.trailPts.length = 0; });
+  }
+  shots = null;
+  current = null;
+  setStatus(null, op);
+  renderCircuit();
+  renderHist();
+}
+const clean = psi => psi.map(a => C(Math.abs(a.re) < 1e-12 ? 0 : a.re, Math.abs(a.im) < 1e-12 ? 0 : a.im));
+
+function collapseFx(op) {
+  const measured = new Set(op.results.map(r => r.q));
+  const spooky = op.c0 > 0.02;
+  [0, 1].forEach(qi => {
+    if (!measured.has(qi) && !spooky) return;
+    const v = toThree(op.to[qi]);
+    if (v.length() < 0.5) return;
+    const world = Q[qi].group.localToWorld(v.clone());
+    const col = measured.has(qi) ? Q[qi].color : ENT;
+    burst(world, col, measured.has(qi) ? 220 : 150, measured.has(qi) ? 1 : 0.8);
+    shockwave(Q[qi].group, v, v.clone().normalize(), col);
+  });
+  const txt = op.results.map(r => `Q${r.q} → |${r.outcome}⟩ (p ${(r.p * 100).toFixed(1)}%)`).join(' · ');
+  const extra = spooky && op.results.length === 1 ? ` · Q${1 - op.results[0].q} collapsed with it` : '';
+  toast(txt + extra);
+}
+
+function displayVectors() {
+  if (current && (current.kind === 'measure' || current.kind === 'reset')) {
+    const t = current.t, split = current.kind === 'measure' ? 0.42 : 0;
+    const k = t < split ? 0 : easeOut((t - split) / (1 - split));
+    const vs = [0, 1].map(i => {
+      const a = current.from[i], b = current.to[i];
+      const v = { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, z: a.z + (b.z - a.z) * k };
+      if (t < split) {
+        const amp = 0.07 * (t / split);
+        v.x += (Math.random() - 0.5) * amp; v.y += (Math.random() - 0.5) * amp; v.z += (Math.random() - 0.5) * amp;
+      }
+      return v;
+    });
+    return { vs, c: current.c0 + (current.c1 - current.c0) * k };
+  }
+  return { vs: [bloch(sim.psi, 0), bloch(sim.psi, 1)], c: concurrence(sim.psi) };
+}
+
+/* ================= Visual updates ================= */
+const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3();
+function updateQubit(q, v, time) {
+  const p = toThree(v), L = Math.min(1, p.length());
+  const show = L > 0.03;
+  q.arrow.visible = q.tipGlow.visible = show;
+  if (show) {
+    const dir = p.clone().divideScalar(p.length());
+    q.arrow.quaternion.setFromUnitVectors(UP, dir);
+    const headLen = Math.min(0.2, L * 0.45), shaftLen = Math.max(0.001, L - headLen), w = Math.min(1, headLen / 0.2);
+    q.shaft.scale.set(1, shaftLen, 1);
+    q.halo.scale.set(1, shaftLen, 1);
+    q.head.position.y = shaftLen;
+    q.head.scale.set(w, headLen, w);
+    q.tipGlow.position.copy(dir).multiplyScalar(L);
+    const s = 0.34 + 0.12 * Math.sin(time * 3.2);
+    q.tipGlow.scale.setScalar(s * (0.4 + 0.6 * L));
+  }
+  const mix = 1 - L;
+  q.orb.material.opacity = Math.min(1, mix * 1.4);
+  q.orb.scale.setScalar(0.12 + 0.55 * mix * (1 + 0.12 * Math.sin(time * 4)));
+
+  const tip = p.clone().setLength(L);
+  const r = Math.hypot(tip.x, tip.z);
+  q.drop.visible = q.foot.visible = show && r > 0.02 && Math.abs(tip.y) > 0.02;
+  if (q.drop.visible) {
+    tmpA.set(tip.x, 0, tip.z);
+    setSegment(q.drop, tip, tmpA);
+    setSegment(q.foot, tmpB.set(0, 0, 0), tmpA);
+  }
+
+  const pts = q.trailPts, last = pts[pts.length - 1];
+  if (show && (!last || last.distanceTo(tip) > 0.008)) { pts.push(tip.clone()); if (pts.length > TRAIL_N) pts.shift(); }
+  const n = pts.length;
+  for (let k = 0; k < n; k++) {
+    const f = (k / Math.max(1, n - 1)) ** 1.6;
+    q.tPos.set([pts[k].x, pts[k].y, pts[k].z], k * 3);
+    q.tCol.set([q.color.r * f, q.color.g * f, q.color.b * f], k * 3);
+  }
+  q.trail.geometry.setDrawRange(0, n);
+  q.trail.geometry.attributes.position.needsUpdate = true;
+  q.trail.geometry.attributes.color.needsUpdate = true;
+
+  // Rotation-axis hint while a gate acts on this qubit.
+  let axisOp = 0;
+  if (current && current.q === q.i && (current.kind === 'gate' || current.kind === 'cnot')) {
+    const ax = current.kind === 'gate' ? GATES[current.gate].axis : [1, 0, 0];
+    q.axisLine.quaternion.setFromUnitVectors(UP, toThree({ x: ax[0], y: ax[1], z: ax[2] }).normalize());
+    axisOp = Math.sin(PI * current.t) * 0.85;
+  }
+  q.axisLine.material.opacity = axisOp;
+
+  const sel = q.i === sim.target;
+  q.ring.material.opacity += ((sel ? 0.85 : 0.14) - q.ring.material.opacity) * 0.15;
+  q.shell.material.uniforms.uColor.value.lerp(sel ? q.color : new THREE.Color('#4a78ff'), 0.08);
+  q.shell.material.uniforms.uIntensity.value = sel ? 0.36 : 0.5;
+}
+
+function updateLink(c, dt, time) {
+  const x0 = Q[0].group.position.x, x1 = Q[1].group.position.x;
+  const bright = Math.min(1, c) ** 0.8;
+  for (let k = 0; k < LINK_N; k++) {
+    link.u[k] = (link.u[k] + dt * (0.18 + 0.1 * (k % 3) / 2)) % 1;
+    const u = link.u[k], env = Math.sin(u * PI), strand = k % 2 ? PI : 0, a = u * PI * 5 + strand + time * 1.6;
+    link.pos.set([x0 + (x1 - x0) * u, Math.sin(a) * 0.16 * env, Math.cos(a) * 0.16 * env], k * 3);
+    const f = bright * env * 1.6;
+    link.col.set([ENT.r * f, ENT.g * f, ENT.b * f], k * 3);
+  }
+  link.g.attributes.position.needsUpdate = true;
+  link.g.attributes.color.needsUpdate = true;
+}
+
+function updateParticles(dt) {
+  const drag = Math.exp(-2.4 * dt);
+  for (let i = 0; i < PMAX; i++) {
+    if (parts.life[i] <= 0) { parts.col[i * 3] = parts.col[i * 3 + 1] = parts.col[i * 3 + 2] = 0; continue; }
+    parts.life[i] -= dt;
+    const f = Math.max(0, parts.life[i] / parts.max[i]) ** 2;
+    for (let a = 0; a < 3; a++) {
+      parts.vel[i * 3 + a] *= drag;
+      parts.pos[i * 3 + a] += parts.vel[i * 3 + a] * dt;
+      parts.col[i * 3 + a] = parts.base[i * 3 + a] * f;
+    }
+  }
+  parts.g.attributes.position.needsUpdate = true;
+  parts.g.attributes.color.needsUpdate = true;
+  for (let k = shocks.length - 1; k >= 0; k--) {
+    const s = shocks[k];
+    s.t += dt / 0.8;
+    s.m.scale.setScalar(0.05 + easeOut(Math.min(1, s.t)) * 0.75);
+    s.m.material.opacity = Math.max(0, 1 - s.t);
+    if (s.t >= 1) { s.m.parent.remove(s.m); s.m.geometry.dispose(); s.m.material.dispose(); shocks.splice(k, 1); }
+  }
+}
+
+/* ================= Readout DOM ================= */
+const $ = id => document.getElementById(id);
+const el = {
+  title: $('rdTitle'), tag: $('rdTag'), eq: $('eqMain'), sub: $('eqSub'), p0: $('p0'), p1: $('p1'), p0bar: $('p0bar'), p1bar: $('p1bar'),
+  th: $('cTheta'), ph: $('cPhi'), r: $('cR'), x: $('cX'), y: $('cY'), z: $('cZ'),
+  joint: $('eqJoint'), entLbl: $('entLbl'), entVal: $('entVal'), entBar: $('entBar'), amp: $('ampBody'),
+};
+const ampRows = KETS.map(k => {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${k}</td><td class="amp"></td><td><div class="bar"><i></i></div></td><td class="pc"></td>`;
+  el.amp.appendChild(tr);
+  return { amp: tr.children[1], bar: tr.querySelector('i'), pc: tr.children[3] };
+});
+
+function updateReadout() {
+  const q = sim.target, b = bloch(sim.psi, q);
+  const r = Math.hypot(b.x, b.y, b.z), pure = r > 0.995;
+  el.title.textContent = `Qubit Q${q}`;
+  el.tag.textContent = pure ? 'pure' : 'mixed · entangled';
+  el.tag.className = 'tag ' + (pure ? 'pure' : 'mixed');
+
+  const theta = r > 1e-6 ? Math.acos(Math.max(-1, Math.min(1, b.z / r))) : NaN;
+  const phiDefined = Math.hypot(b.x, b.y) > 1e-4;
+  const phi = phiDefined ? Math.atan2(b.y, b.x) : 0;
+
+  if (pure) {
+    const a = Math.cos(theta / 2), bm = Math.sin(theta / 2);
+    const beta = C(bm * Math.cos(phi), bm * Math.sin(phi));
+    const bPolar = bm < 5e-4 ? '0' : `${fmt(bm)}${phiDefined && Math.abs(phi) > 2e-3 ? `·e<sup>i${piFrac(phi)}</sup>` : ''}`;
+    el.eq.className = 'eq';
+    el.eq.innerHTML = `|ψ<sub>${q}</sub>⟩ = <span class="amp-a">${fmt(a)}</span>|0⟩ + <span class="amp-b">${bPolar}</span>|1⟩`;
+    el.sub.textContent = `α = ${fmt(a)}   β = ${rect(beta)}   (global phase removed)`;
+  } else {
+    el.eq.className = 'eq mixed';
+    el.eq.innerHTML = `Q${q} is entangled with Q${1 - q}, so it has no state vector α|0⟩ + β|1⟩ of its own. Its reduced state is mixed: ρ = ½(I + r·σ), <b>|r| = ${fmt(r)}</b>.`;
+    el.sub.textContent = 'The arrow shortens toward the center as entanglement grows.';
+  }
+  el.p0.textContent = (b.p0 * 100).toFixed(1) + '%';
+  el.p1.textContent = (b.p1 * 100).toFixed(1) + '%';
+  el.p0bar.style.width = (b.p0 * 100) + '%';
+  el.p1bar.style.width = (b.p1 * 100) + '%';
+  el.th.textContent = isNaN(theta) ? '—' : (theta * 180 / PI).toFixed(1) + '°';
+  el.ph.textContent = phiDefined ? (phi * 180 / PI).toFixed(1) + '°' : '—';
+  el.r.textContent = fmt(r);
+  el.x.textContent = fmt(b.x); el.y.textContent = fmt(b.y); el.z.textContent = fmt(b.z);
+
+  const np = phaseNormalized(sim.psi);
+  let first = true, s = '';
+  np.forEach((a, i) => { if (abs2(a) > 1e-6) { s += polarTerm(a, first, KETS[i]); first = false; } });
+  el.joint.innerHTML = s;
+  const c = concurrence(sim.psi);
+  el.entVal.textContent = fmt(c);
+  el.entBar.style.width = Math.min(100, c * 100) + '%';
+  el.entLbl.textContent = c < 0.005 ? 'Product state' : c > 0.995 ? 'Maximally entangled' : 'Partially entangled';
+  np.forEach((a, i) => {
+    const p = abs2(a);
+    ampRows[i].amp.textContent = rect(a);
+    ampRows[i].bar.style.width = (p * 100) + '%';
+    ampRows[i].pc.textContent = (p * 100).toFixed(1) + '%';
+  });
+}
+
+/* ================= Shots histogram ================= */
+const hist = $('hist');
+const histBars = KETS.map(k => {
+  const d = document.createElement('div'); d.className = 'hb';
+  d.innerHTML = `<div class="n"></div><div class="cell"><div class="fill"></div><div class="exp"></div></div><div class="k">${k}</div>`;
+  hist.appendChild(d);
+  return { n: d.querySelector('.n'), fill: d.querySelector('.fill'), exp: d.querySelector('.exp') };
+});
+function renderHist() {
+  const probs = sim.psi.map(abs2);
+  histBars.forEach((h, i) => {
+    h.exp.style.height = (probs[i] * 100) + '%';
+    h.fill.style.height = shots ? (shots.counts[i] / shots.n * 100) + '%' : '0%';
+    h.n.textContent = shots ? shots.counts[i] : '';
+  });
+}
+function runShots() {
+  const probs = sim.psi.map(abs2), n = 512, counts = [0, 0, 0, 0];
+  for (let s = 0; s < n; s++) {
+    let u = Math.random(), i = 0;
+    while (i < 3 && u >= probs[i]) { u -= probs[i]; i++; }
+    counts[i]++;
+  }
+  shots = { n, counts };
+  renderHist();
+}
+
+/* ================= Circuit strip ================= */
+const wires = $('wires');
+function renderCircuit() {
+  let html = '<div class="wire w0"></div><div class="wire w1"></div><span class="wl w0">Q0</span><span class="wl w1">Q1</span>';
+  if (!sim.history.length) html += '<span class="empty-circ">No gates yet</span>';
+  for (const h of sim.history) {
+    if (h.kind === 'gate') html += `<div class="col"><div class="g s${h.q}">${h.gate}</div></div>`;
+    else if (h.kind === 'cnot') html += `<div class="col"><div class="vl"></div><div class="ctl s${h.c}"></div><div class="tgt s${h.q}">+</div></div>`;
+    else html += `<div class="col">${h.results.map(r => `<div class="g m s${r.q}" title="Measured |${r.outcome}⟩">M${r.outcome}</div>`).join('')}</div>`;
+  }
+  wires.innerHTML = html;
+  const box = $('circuit'); box.scrollLeft = box.scrollWidth;
+}
+
+/* ================= Status + toast ================= */
+const statusEl = $('status');
+function setStatus(op, done) {
+  if (op) {
+    if (op.kind === 'gate') { const g = GATES[op.gate]; statusEl.innerHTML = `Applying <b>${op.gate}</b> to Q${op.q}: ${g.angTxt} rotation about <b>${g.axisTxt}</b>.`; }
+    else if (op.kind === 'cnot') statusEl.innerHTML = `Applying <b>CNOT</b>: Q${op.c} controls, Q${op.q} rotates π about <b>x</b> in the |1⟩ branch.`;
+    else if (op.kind === 'measure') statusEl.innerHTML = `Measuring <b>${op.qubits.map(q => 'Q' + q).join(', ')}</b> in the z basis…`;
+    else statusEl.innerHTML = 'Resetting to <b>|00⟩</b>…';
+    return;
+  }
+  if (queue.length) return;
+  const c = concurrence(sim.psi);
+  if (done && done.kind === 'measure') statusEl.innerHTML = `Collapsed: ${done.results.map(r => `<b>Q${r.q} = |${r.outcome}⟩</b>`).join(', ')}.`;
+  else statusEl.innerHTML = c > 0.005 ? `Qubits share <b>C = ${fmt(c)}</b> of entanglement. Measure one and watch the other.` : 'Ready. Qubits are independent (product state).';
+}
+let toastTimer;
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+/* ================= Controls ================= */
+const segBtns = document.querySelectorAll('.seg button');
+function setTarget(q) {
+  sim.target = q;
+  document.body.dataset.target = q;
+  segBtns.forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.q === q)));
+  $('cnotLbl').textContent = `Q${1 - q} controls → Q${q}`;
+  $('measureLbl').textContent = `collapse Q${q}`;
+  Q.forEach(x => x.nameEl.classList.toggle('sel', x.i === q));
+  updateReadout();
+}
+segBtns.forEach(b => b.addEventListener('click', () => setTarget(+b.dataset.q)));
+
+function gate(g) {
+  enqueue({ kind: 'gate', gate: g, q: sim.target });
+  const b = document.querySelector(`[data-gate="${g}"]`);
+  b.classList.add('flash'); setTimeout(() => b.classList.remove('flash'), 220);
+}
+document.querySelectorAll('.gate').forEach(b => b.addEventListener('click', () => gate(b.dataset.gate)));
+const cnot = () => enqueue({ kind: 'cnot', c: 1 - sim.target, q: sim.target });
+const measureSel = () => enqueue({ kind: 'measure', qubits: [sim.target] });
+const measureBoth = () => enqueue({ kind: 'measure', qubits: [0, 1] });
+const reset = () => { queue.length = 0; enqueue({ kind: 'reset' }); };
+const bell = () => { reset(); enqueue({ kind: 'gate', gate: 'H', q: 0 }); enqueue({ kind: 'cnot', c: 0, q: 1 }); };
+const plusPlus = () => { reset(); enqueue({ kind: 'gate', gate: 'H', q: 0 }); enqueue({ kind: 'gate', gate: 'H', q: 1 }); };
+$('cnotBtn').addEventListener('click', cnot);
+$('measureBtn').addEventListener('click', measureSel);
+$('measureBothBtn').addEventListener('click', measureBoth);
+$('resetBtn').addEventListener('click', reset);
+$('bellBtn').addEventListener('click', bell);
+$('plusBtn').addEventListener('click', plusPlus);
+$('shotsBtn').addEventListener('click', runShots);
+$('speed').addEventListener('input', e => { sim.speed = +e.target.value; $('speedOut').textContent = sim.speed.toFixed(1) + '×'; });
+
+addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey || e.target.tagName === 'INPUT') return;
+  const k = e.key.toLowerCase();
+  if ('hxyzst'.includes(k) && k.length === 1) gate(k.toUpperCase());
+  else if (k === 'c') cnot();
+  else if (k === 'm') measureSel();
+  else if (k === 'b') measureBoth();
+  else if (k === 'r') reset();
+  else if (k === 'e') bell();
+  else if (k === '1' || k === '2') setTarget(+k - 1);
+  else return;
+  e.preventDefault();
+});
+
+// Click a sphere to target it (ignore drags used for orbiting).
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let downAt = null;
+renderer.domElement.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObjects(Q.map(q => q.shell))[0];
+  if (hit) setTarget(hit.object.userData.qubit);
+});
+
+/* ================= Layout ================= */
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h);
+  composer.setSize(w, h);
+  composer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  labelRenderer.setSize(w, h);
+  camera.aspect = w / h;
+  // Fit both spheres into the width left between the side panels.
+  const desktop = innerWidth > 1100;
+  const left = desktop ? $('controls').offsetWidth + 32 : 0, right = desktop ? $('readout').offsetWidth + 32 : 0;
+  const freeFrac = (w - left - right) / w;
+  // Center the render in the gap between the panels, not the full window.
+  if (desktop) camera.setViewOffset(w, h, (right - left) / 2, 0, w, h); else camera.clearViewOffset();
+  const tanH = Math.tan(camera.fov * PI / 360);
+  const dist = Math.max(6.2 / (2 * tanH * camera.aspect * freeFrac), 4.6 / (2 * tanH));
+  camera.position.setLength(Math.min(controls.maxDistance, dist));
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+
+/* ================= Loop ================= */
+const clock = new THREE.Clock();
+let time = 0;
+function frame() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  time += dt;
+  const was = !!current;
+  if (!current && queue.length) startOp(queue.shift());
+  if (current) stepOp(current, dt);
+  const { vs, c } = displayVectors();
+  updateQubit(Q[0], vs[0], time);
+  updateQubit(Q[1], vs[1], time);
+  updateLink(c, dt, time);
+  updateParticles(dt);
+  if (current || was) updateReadout();
+  controls.update();
+  composer.render();
+  labelRenderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+setTarget(0);
+renderCircuit();
+renderHist();
+resize();
+frame();
+</script>
+</body>
+</html>
