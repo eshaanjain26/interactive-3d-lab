@@ -1,0 +1,2135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EB-1 Adjudication Lab</title>
+<meta name="description" content="EB-1 Masterclass: a 360-degree 3D lab covering the EB-1A lifecycle, the ten evidentiary criteria, USCIS two-step adjudication and AAO review.">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.1.13/dist/index.global.js"></script>
+<style>
+  :root {
+    --bg: #04060c;
+    --glass: rgba(10, 16, 30, 0.66);
+    --glass-strong: rgba(9, 14, 27, 0.9);
+    --line: rgba(120, 190, 255, 0.14);
+    --line-strong: rgba(120, 200, 255, 0.32);
+    --text: #e4ecf8;
+    --muted: #8b9cb8;
+    --dim: #5d6d88;
+    --cyan: #22d3ee;
+    --cyan-soft: rgba(34, 211, 238, 0.14);
+    --amber: #fbbf24;
+    --amber-soft: rgba(251, 191, 36, 0.14);
+    --ok: #34d399;
+    --rfe: #fbbf24;
+    --noid: #fb923c;
+    --deny: #f43f5e;
+    --violet: #a78bfa;
+    --f-ui: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --f-display: "Space Grotesk", Inter, system-ui, sans-serif;
+    --f-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+    --hud-h: 58px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--f-ui); -webkit-font-smoothing: antialiased; }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  #fatal { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); }
+
+  .glass { background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%); box-shadow: 0 20px 50px -20px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.04); }
+  .mono { font-family: var(--f-mono); }
+  .display { font-family: var(--f-display); }
+  .eyebrow { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--cyan); }
+  .muted { color: var(--muted); }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  button:focus-visible, input:focus-visible, summary:focus-visible, select:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; top: 10px; left: 10px; right: 10px; height: var(--hud-h); border-radius: 14px; display: flex; align-items: center; gap: 12px; padding: 0 10px 0 14px; z-index: 30; }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .brand-mark { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: linear-gradient(135deg, rgba(34,211,238,.25), rgba(251,191,36,.2)); border: 1px solid var(--line-strong); flex: none; }
+  .brand-title { font-family: var(--f-display); font-weight: 600; font-size: 14.5px; line-height: 1.15; white-space: nowrap; }
+  .brand-sub { font-family: var(--f-mono); font-size: 10px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+  #zone-nav { display: flex; gap: 4px; margin: 0 auto; overflow-x: auto; scrollbar-width: none; }
+  #zone-nav::-webkit-scrollbar { display: none; }
+  .zbtn { display: flex; align-items: center; gap: 7px; padding: 8px 11px; border-radius: 10px; border: 1px solid transparent; background: transparent; font-size: 12.5px; font-weight: 500; color: var(--muted); white-space: nowrap; transition: color .15s, background .15s, border-color .15s; }
+  .zbtn .zn { font-family: var(--f-mono); font-size: 10px; color: var(--dim); }
+  .zbtn:hover { color: var(--text); background: rgba(255,255,255,.04); }
+  .zbtn[aria-current="true"] { color: var(--text); background: var(--cyan-soft); border-color: rgba(34,211,238,.35); }
+  .zbtn[aria-current="true"] .zn { color: var(--cyan); }
+  .zbtn svg { width: 15px; height: 15px; }
+  .hud-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+  .icon-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; min-width: 36px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,.03); font-size: 12.5px; color: var(--text); transition: border-color .15s, background .15s; }
+  .icon-btn:hover { border-color: var(--line-strong); background: rgba(255,255,255,.06); }
+  .icon-btn svg { width: 16px; height: 16px; }
+  .icon-btn.primary { background: linear-gradient(135deg, rgba(34,211,238,.22), rgba(34,211,238,.08)); border-color: rgba(34,211,238,.4); }
+  #search-wrap { position: relative; }
+  #search { width: 210px; height: 36px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0,0,0,.25); color: var(--text); padding: 0 34px 0 32px; font-size: 12.5px; }
+  #search::placeholder { color: var(--dim); }
+  #search-wrap > svg { position: absolute; left: 10px; top: 10px; width: 15px; height: 15px; color: var(--muted); pointer-events: none; }
+  .kbd { position: absolute; right: 8px; top: 9px; font-family: var(--f-mono); font-size: 10px; color: var(--dim); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; }
+  #search-results { position: absolute; top: 44px; right: 0; width: 340px; max-height: 60vh; overflow: auto; border-radius: 12px; padding: 6px; display: none; }
+  #search-results.open { display: block; }
+  .sr-item { display: flex; gap: 10px; width: 100%; text-align: left; padding: 8px 10px; border-radius: 8px; border: 0; background: transparent; }
+  .sr-item:hover, .sr-item.active { background: var(--cyan-soft); }
+  .sr-kind { font-family: var(--f-mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: .1em; color: var(--cyan); min-width: 64px; padding-top: 2px; }
+  .sr-title { font-size: 13px; }
+  .sr-sub { font-size: 11.5px; color: var(--muted); }
+
+  /* ---------- Console (left) ---------- */
+  #console { position: fixed; top: calc(var(--hud-h) + 20px); left: 10px; bottom: 10px; width: 340px; border-radius: 16px; z-index: 20; display: flex; flex-direction: column; overflow: hidden; }
+  #console-head { padding: 14px 16px 10px; border-bottom: 1px solid var(--line); display: flex; align-items: flex-start; gap: 10px; }
+  #console-head h2 { margin: 3px 0 0; font-family: var(--f-display); font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+  #console-toggle { display: none; margin-left: auto; }
+  #console-body { padding: 14px 16px 18px; overflow-y: auto; flex: 1; scrollbar-width: thin; scrollbar-color: rgba(120,190,255,.25) transparent; }
+  .c-sec { margin-bottom: 18px; }
+  .c-sec > h3 { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; display: flex; align-items: center; gap: 6px; }
+  .c-sec > h3 svg { width: 13px; height: 13px; color: var(--cyan); }
+  .c-sec p { font-size: 13px; line-height: 1.55; color: #c3cfe2; margin: 0 0 8px; }
+  .zone-card { display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; padding: 11px 12px; margin-bottom: 7px; border-radius: 11px; border: 1px solid var(--line); background: rgba(255,255,255,.02); transition: border-color .15s, background .15s; }
+  .zone-card:hover { border-color: rgba(34,211,238,.45); background: var(--cyan-soft); }
+  .zone-card .zc-ico { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: rgba(34,211,238,.1); color: var(--cyan); flex: none; }
+  .zone-card .zc-ico svg { width: 17px; height: 17px; }
+  .zone-card b { font-size: 13px; font-weight: 600; display: block; }
+  .zone-card span { font-size: 12px; color: var(--muted); line-height: 1.45; }
+  .row-btn { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 8px 10px; border-radius: 9px; border: 1px solid transparent; background: transparent; font-size: 13px; transition: background .15s, border-color .15s; }
+  .row-btn:hover { background: rgba(255,255,255,.04); border-color: var(--line); }
+  .row-btn.active { background: var(--cyan-soft); border-color: rgba(34,211,238,.35); }
+  .row-btn .num { font-family: var(--f-mono); font-size: 11px; color: var(--cyan); min-width: 26px; }
+  .row-btn .grow { flex: 1; min-width: 0; }
+  .row-btn .sub { display: block; font-size: 11.5px; color: var(--muted); }
+  .wbar { display: flex; gap: 2px; }
+  .wbar i { width: 5px; height: 12px; border-radius: 2px; background: rgba(255,255,255,.08); }
+  .wbar i.on { background: var(--amber); box-shadow: 0 0 6px rgba(251,191,36,.6); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,.03); font-size: 12.5px; font-weight: 500; transition: border-color .15s, background .15s, transform .1s; }
+  .btn:hover { border-color: var(--line-strong); background: rgba(255,255,255,.06); }
+  .btn:active { transform: translateY(1px); }
+  .btn svg { width: 15px; height: 15px; }
+  .btn.cyan { border-color: rgba(34,211,238,.45); background: var(--cyan-soft); }
+  .btn.amber { border-color: rgba(251,191,36,.45); background: var(--amber-soft); }
+  .btn.full { width: 100%; }
+  .readout { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat { padding: 10px 11px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0,0,0,.2); }
+  .stat .k { font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .stat .v { font-family: var(--f-display); font-size: 20px; font-weight: 600; margin-top: 2px; }
+  .stat .v small { font-size: 12px; color: var(--muted); font-weight: 500; }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; background: transparent; }
+  input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: linear-gradient(90deg, var(--cyan) var(--p, 50%), rgba(255,255,255,.1) var(--p, 50%)); }
+  input[type=range]::-moz-range-track { height: 4px; border-radius: 4px; background: rgba(255,255,255,.1); }
+  input[type=range]::-moz-range-progress { height: 4px; border-radius: 4px; background: var(--cyan); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #e9fbff; border: 3px solid var(--cyan); margin-top: -6px; box-shadow: 0 0 12px rgba(34,211,238,.7); }
+  input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #e9fbff; border: 3px solid var(--cyan); box-shadow: 0 0 12px rgba(34,211,238,.7); }
+  .txt-input { width: 100%; height: 36px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0,0,0,.25); color: var(--text); padding: 0 12px; font-size: 13px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,.03); font-size: 12px; color: var(--muted); transition: all .15s; }
+  .chip .cn { font-family: var(--f-mono); font-size: 10px; }
+  .chip[aria-pressed="true"] { color: #fff7e0; border-color: rgba(251,191,36,.6); background: var(--amber-soft); box-shadow: 0 0 12px -4px rgba(251,191,36,.7); }
+  .toggle-row { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0,0,0,.15); font-size: 12.5px; }
+  .switch { position: relative; width: 36px; height: 20px; border-radius: 20px; background: rgba(255,255,255,.12); border: 0; flex: none; transition: background .15s; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #cfe0f5; transition: transform .15s; }
+  .switch[aria-checked="true"] { background: var(--amber); }
+  .switch[aria-checked="true"]::after { transform: translateX(16px); background: #231a02; }
+  .slider-row { display: grid; grid-template-columns: 1fr 26px; align-items: center; column-gap: 8px; margin-bottom: 4px; }
+  .slider-row label { grid-column: 1 / -1; font-size: 12px; color: #c3cfe2; display: flex; justify-content: space-between; }
+  .slider-row output { font-family: var(--f-mono); font-size: 12px; color: var(--cyan); text-align: right; }
+  .outcomes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .ob { justify-content: flex-start; }
+  .ob .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .verdict { padding: 11px 12px; border-radius: 11px; border: 1px solid var(--line); background: rgba(0,0,0,.2); font-size: 12.5px; line-height: 1.5; }
+  .verdict b { font-family: var(--f-display); font-size: 15px; }
+  .balance { position: relative; height: 8px; border-radius: 8px; background: linear-gradient(90deg, var(--deny), var(--noid) 30%, var(--rfe) 55%, var(--ok)); margin: 10px 0 4px; }
+  .balance i { position: absolute; top: -5px; width: 4px; height: 18px; border-radius: 3px; background: #fff; box-shadow: 0 0 10px #fff; transform: translateX(-2px); transition: left .3s; }
+  .note { font-size: 11.5px; line-height: 1.5; color: var(--dim); }
+  .legend-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #c3cfe2; margin-bottom: 5px; }
+  .legend-row i { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+  svg.chart { width: 100%; height: auto; display: block; }
+
+  /* ---------- Drawer (right) ---------- */
+  #drawer { position: fixed; top: calc(var(--hud-h) + 20px); right: 10px; bottom: 10px; width: 470px; max-width: calc(100vw - 20px); border-radius: 16px; z-index: 25; display: flex; flex-direction: column; overflow: hidden; transform: translateX(calc(100% + 30px)); transition: transform .45s cubic-bezier(.2,.8,.2,1); background: var(--glass-strong); }
+  #drawer.open { transform: none; }
+  #drawer-head { padding: 16px 18px 12px; border-bottom: 1px solid var(--line); position: relative; }
+  #drawer-head::before { content: ""; position: absolute; left: 0; top: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--accent, var(--cyan)), transparent); }
+  #drawer-title { font-family: var(--f-display); font-size: 21px; font-weight: 600; letter-spacing: -.01em; margin: 4px 36px 4px 0; line-height: 1.2; }
+  #drawer-sub { font-size: 12.5px; color: var(--muted); margin: 0; line-height: 1.5; }
+  #drawer-close { position: absolute; top: 12px; right: 12px; }
+  #drawer-actions { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  #drawer-tabs { display: flex; gap: 2px; padding: 8px 12px 0; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+  .tab { display: flex; align-items: center; gap: 6px; padding: 9px 11px 10px; border: 0; background: transparent; font-size: 12.5px; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+  .tab svg { width: 14px; height: 14px; }
+  .tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent, var(--cyan)); }
+  #drawer-body { padding: 16px 18px 28px; overflow-y: auto; flex: 1; font-size: 13.5px; line-height: 1.62; color: #cfd9ea; scrollbar-width: thin; scrollbar-color: rgba(120,190,255,.25) transparent; }
+  #drawer-body h4 { font-family: var(--f-display); font-size: 14.5px; font-weight: 600; color: var(--text); margin: 18px 0 6px; }
+  #drawer-body h4:first-child { margin-top: 0; }
+  #drawer-body p { margin: 0 0 10px; }
+  #drawer-body ul, #drawer-body ol { margin: 0 0 10px; padding-left: 18px; list-style: disc; }
+  #drawer-body ol { list-style: decimal; }
+  #drawer-body li { margin-bottom: 5px; }
+  #drawer-body li::marker { color: var(--accent, var(--cyan)); }
+  #drawer-body strong { color: var(--text); font-weight: 600; }
+  .quote { border-left: 2px solid var(--accent, var(--cyan)); padding: 8px 12px; background: rgba(255,255,255,.03); border-radius: 0 8px 8px 0; font-size: 13px; color: #dfe8f6; margin: 0 0 12px; }
+  .cite { font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
+  .tagline { display: inline-flex; align-items: center; gap: 6px; font-family: var(--f-mono); font-size: 10.5px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); margin: 0 4px 4px 0; }
+  details.acc { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; background: rgba(0,0,0,.18); }
+  details.acc > summary { cursor: pointer; list-style: none; padding: 10px 12px; font-weight: 600; font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 8px; }
+  details.acc > summary::-webkit-details-marker { display: none; }
+  details.acc > summary::before { content: "›"; font-family: var(--f-mono); color: var(--accent, var(--cyan)); transition: transform .2s; display: inline-block; width: 10px; }
+  details.acc[open] > summary::before { transform: rotate(90deg); }
+  details.acc > div { padding: 0 12px 10px 30px; }
+  .checklist { list-style: none; padding: 0 !important; }
+  .checklist li { display: flex; gap: 9px; align-items: flex-start; }
+  .checklist input { margin-top: 4px; accent-color: var(--amber); flex: none; }
+  .checklist label { cursor: pointer; }
+  .meter { margin: 6px 0 12px; }
+  .meter .bar { height: 10px; border-radius: 6px; background: rgba(255,255,255,.07); overflow: hidden; }
+  .meter .bar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--cyan), var(--amber)); }
+  .meter .lbl { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  table.dt { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 12px; }
+  table.dt th, table.dt td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.dt th { font-family: var(--f-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+  .depth-note { font-family: var(--f-mono); font-size: 10.5px; color: var(--dim); border: 1px dashed var(--line); border-radius: 8px; padding: 7px 10px; margin-top: 10px; }
+  .step { display: grid; grid-template-columns: 26px 1fr; gap: 10px; margin-bottom: 10px; }
+  .step .n { width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; font-family: var(--f-mono); font-size: 11px; background: rgba(255,255,255,.05); border: 1px solid var(--line); color: var(--accent, var(--cyan)); }
+
+  /* ---------- Depth dial ---------- */
+  #dial { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 22; border-radius: 16px; padding: 8px 14px 8px 8px; display: flex; align-items: center; gap: 12px; }
+  #dial svg.gauge { width: 58px; height: 58px; flex: none; }
+  #dial .dl-name { font-family: var(--f-display); font-size: 14px; font-weight: 600; }
+  #dial .dl-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+  #dial .dl-btn { width: 26px; height: 26px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.04); display: grid; place-items: center; font-family: var(--f-mono); font-size: 14px; }
+  #dial .dl-btn:hover { border-color: var(--line-strong); }
+  #dial input[type=range] { width: 120px; }
+
+  /* ---------- Tooltip, caption, toast ---------- */
+  #tooltip { position: fixed; z-index: 40; pointer-events: none; max-width: 280px; padding: 10px 12px; border-radius: 11px; opacity: 0; transform: translateY(4px); transition: opacity .12s, transform .12s; }
+  #tooltip.show { opacity: 1; transform: none; }
+  #tooltip .tt-k { font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--cyan); }
+  #tooltip .tt-t { font-weight: 600; font-size: 13.5px; margin: 2px 0 3px; }
+  #tooltip .tt-s { font-size: 12px; color: var(--muted); line-height: 1.45; }
+  #tooltip .tt-h { font-family: var(--f-mono); font-size: 10px; color: var(--amber); margin-top: 6px; }
+  #caption { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 23; max-width: min(640px, calc(100vw - 32px)); padding: 12px 16px; border-radius: 14px; display: none; align-items: center; gap: 14px; }
+  #caption.show { display: flex; }
+  #caption .cap-t { font-size: 13.5px; line-height: 1.5; }
+  #caption .cap-k { font-family: var(--f-mono); font-size: 10px; color: var(--amber); letter-spacing: .12em; text-transform: uppercase; }
+  #toast { position: fixed; top: calc(var(--hud-h) + 26px); left: 50%; transform: translate(-50%, -12px); z-index: 35; padding: 10px 16px; border-radius: 12px; opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s; display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  #toast .dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  /* ---------- Help modal ---------- */
+  #help { position: fixed; inset: 0; z-index: 50; display: none; place-items: center; background: rgba(2,4,9,.6); padding: 16px; }
+  #help.open { display: grid; }
+  #help .card { width: min(560px, 100%); max-height: calc(100vh - 32px); overflow: auto; border-radius: 18px; padding: 22px; background: var(--glass-strong); }
+  #help h2 { font-family: var(--f-display); margin: 4px 0 10px; font-size: 22px; }
+  #help ul { padding-left: 18px; font-size: 13.5px; line-height: 1.6; color: #cfd9ea; }
+  #help kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line-strong); border-radius: 5px; padding: 1px 5px; color: var(--text); }
+
+  #loading { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: var(--bg); transition: opacity .6s; }
+  #loading.done { opacity: 0; pointer-events: none; }
+  #loading .ring { width: 54px; height: 54px; border-radius: 50%; border: 2px solid rgba(34,211,238,.15); border-top-color: var(--cyan); animation: spin 1s linear infinite; margin: 0 auto 14px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 1180px) {
+    .zbtn .zl { display: none; }
+    #search { width: 160px; }
+  }
+  @media (max-width: 900px) {
+    :root { --hud-h: 52px; }
+    #hud { top: 8px; left: 8px; right: 8px; gap: 8px; padding: 0 8px 0 10px; }
+    .brand { display: none; }
+    #zone-nav { margin: 0; flex: 1; }
+    .zbtn { padding: 7px 8px; }
+    #search-wrap { display: none; }
+    #search-wrap.mobile-open { display: block; position: fixed; top: calc(var(--hud-h) + 16px); left: 8px; right: 8px; z-index: 31; }
+    #search-wrap.mobile-open #search { width: 100%; }
+    #search-wrap.mobile-open #search-results { width: 100%; }
+    #btn-search-m { display: inline-flex !important; }
+    .hud-actions .lbl { display: none; }
+    #console { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; height: 54px; transition: height .35s cubic-bezier(.2,.8,.2,1); }
+    #console.expanded { height: min(58vh, 520px); }
+    #console-head { padding: 9px 12px; border-bottom: 0; align-items: center; }
+    #console-head h2 { font-size: 15px; margin: 0; }
+    #console-head .eyebrow { display: none; }
+    #console-toggle { display: inline-flex; }
+    #drawer { top: calc(var(--hud-h) + 16px); right: 8px; left: 8px; bottom: 8px; width: auto; }
+    #dial { left: auto; right: 8px; transform: none; bottom: auto; top: calc(var(--hud-h) + 14px); padding: 4px 6px 4px 4px; gap: 6px; border-radius: 12px; }
+    #dial svg.gauge { width: 34px; height: 34px; }
+    #dial .eyebrow, #dial .dl-name { display: none; }
+    #dial .dl-row { margin-top: 0; }
+    #dial .dl-row input { display: none; }
+    .zbtn .zn { display: none; }
+    .zbtn { padding: 8px 9px; }
+    #caption { bottom: 72px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #drawer, #console, .zbtn, .btn { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div id="loading"><div><div class="ring"></div><div class="eyebrow" style="text-align:center">Assembling the lab</div></div></div>
+<div id="stage" aria-label="3D scene of the EB-1A process"></div>
+
+<header id="hud" class="glass">
+  <div class="brand">
+    <div class="brand-mark"><i data-lucide="landmark" style="width:16px;height:16px;color:var(--cyan)"></i></div>
+    <div>
+      <div class="brand-title">EB-1 Masterclass</div>
+      <div class="brand-sub">360° Architecture &amp; Adjudication Lab</div>
+    </div>
+  </div>
+  <nav id="zone-nav" aria-label="Zones"></nav>
+  <div class="hud-actions">
+    <div id="search-wrap">
+      <i data-lucide="search"></i>
+      <input id="search" type="search" placeholder="Search criteria, cases, steps…" autocomplete="off" aria-label="Search the lab" aria-controls="search-results">
+      <span class="kbd">/</span>
+      <div id="search-results" class="glass" role="listbox"></div>
+    </div>
+    <button id="btn-search-m" class="icon-btn" style="display:none" aria-label="Search"><i data-lucide="search"></i></button>
+    <button id="btn-tour" class="icon-btn primary" aria-label="Start cinematic tour"><i data-lucide="clapperboard"></i><span class="lbl">Tour</span></button>
+    <button id="btn-help" class="icon-btn" aria-label="Help and shortcuts"><i data-lucide="circle-help"></i></button>
+  </div>
+</header>
+
+<aside id="console" class="glass" aria-label="Zone console">
+  <div id="console-head">
+    <div>
+      <div class="eyebrow" id="console-kicker">Mission console</div>
+      <h2 id="console-title">Overview</h2>
+    </div>
+    <button id="console-toggle" class="icon-btn" aria-label="Expand console" aria-expanded="false"><i data-lucide="sliders-horizontal"></i></button>
+  </div>
+  <div id="console-body"></div>
+</aside>
+
+<aside id="drawer" class="glass" role="dialog" aria-modal="false" aria-labelledby="drawer-title">
+  <div id="drawer-head">
+    <div class="eyebrow" id="drawer-kicker"></div>
+    <h2 id="drawer-title"></h2>
+    <p id="drawer-sub"></p>
+    <div id="drawer-actions"></div>
+    <button id="drawer-close" class="icon-btn" aria-label="Close panel"><i data-lucide="x"></i></button>
+  </div>
+  <div id="drawer-tabs" role="tablist"></div>
+  <div id="drawer-body" role="tabpanel"></div>
+</aside>
+
+<div id="dial" class="glass" aria-label="Complexity and depth dial">
+  <svg class="gauge" viewBox="0 0 60 60" aria-hidden="true">
+    <circle cx="30" cy="30" r="24" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="5" stroke-dasharray="113 151" transform="rotate(135 30 30)" stroke-linecap="round"/>
+    <circle id="dial-arc" cx="30" cy="30" r="24" fill="none" stroke="url(#dg)" stroke-width="5" stroke-dasharray="0 151" transform="rotate(135 30 30)" stroke-linecap="round"/>
+    <defs><linearGradient id="dg" x1="0" x2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#fbbf24"/></linearGradient></defs>
+    <text id="dial-num" x="30" y="35" text-anchor="middle" fill="#e4ecf8" font-family="Space Grotesk, sans-serif" font-size="16" font-weight="600">3</text>
+  </svg>
+  <div>
+    <div class="eyebrow">Complexity &amp; depth</div>
+    <div class="dl-name" id="dial-name">Strategist</div>
+    <div class="dl-row">
+      <button class="dl-btn" id="dial-minus" aria-label="Decrease depth">−</button>
+      <input id="dial-range" type="range" min="1" max="5" step="1" value="3" aria-label="Depth level">
+      <button class="dl-btn" id="dial-plus" aria-label="Increase depth">+</button>
+    </div>
+  </div>
+</div>
+
+<div id="tooltip" class="glass" role="tooltip"></div>
+<div id="caption" class="glass" aria-live="polite">
+  <div><div class="cap-k" id="cap-k"></div><div class="cap-t" id="cap-t"></div></div>
+  <button id="cap-stop" class="icon-btn" aria-label="Stop tour"><i data-lucide="x"></i></button>
+</div>
+<div id="toast" class="glass" aria-live="polite"></div>
+
+<div id="help" role="dialog" aria-modal="true" aria-labelledby="help-title">
+  <div class="card glass">
+    <div class="eyebrow">How to use the lab</div>
+    <h2 id="help-title">Navigating the 360° lab</h2>
+    <ul>
+      <li><strong>Orbit</strong> by dragging, <strong>pan</strong> with right-drag or two fingers, <strong>zoom</strong> with the wheel or a pinch.</li>
+      <li><strong>Hover</strong> any glowing structure for a quick read. <strong>Click</strong> it to open the analysis drawer with tabs for strategy, evidence and data.</li>
+      <li>In Zone 2, clicking a pillar <strong>peels</strong> it into three layers: what the criterion is, what evidence goes in, and how much it weighs. Click a peeled layer to jump to that tab.</li>
+      <li>In Zone 3, toggle criteria at the funnel rim, set the final-merits sliders, then <strong>run an adjudication</strong> or force an outcome to open its recovery playbook.</li>
+      <li>The <strong>Complexity &amp; Depth dial</strong> scales scene density and reveals deeper legal detail in every drawer.</li>
+      <li>Keys: <kbd>1</kbd>–<kbd>5</kbd> jump between zones, <kbd>/</kbd> searches, <kbd>T</kbd> starts the tour, <kbd>Esc</kbd> closes panels.</li>
+    </ul>
+    <p class="note" style="margin-top:12px">Educational material, not legal advice. It summarizes the statute (INA 203(b)(1)(A)), the regulation (8 CFR 204.5(h)), the USCIS Policy Manual (Vol. 6, Part F, Ch. 2) and published decisions. Weights, workloads and the adjudication model are illustrative teaching devices, not statistics or predictions. Fees and processing times change; confirm them on uscis.gov before filing.</p>
+    <div style="margin-top:14px;text-align:right"><button class="btn cyan" id="help-close">Enter the lab</button></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.453.0/dist/umd/lucide.min.js"></script>
+<script>
+(() => {
+'use strict';
+
+if (!window.THREE || !THREE.OrbitControls) {
+  document.getElementById('loading').remove();
+  document.getElementById('stage').innerHTML = '<div id="fatal">Three.js did not load. Check your connection and reload the page.</div>';
+  return;
+}
+
+/* Minimal stand-in so the lab still works if GSAP fails to load. */
+const G = window.gsap || {
+  to(target, v) { for (const k in v) if (!['duration', 'ease', 'onUpdate', 'onComplete', 'delay', 'overwrite'].includes(k)) target[k] = v[k]; v.onUpdate && v.onUpdate(); v.onComplete && v.onComplete(); },
+  killTweensOf() {}, delayedCall(d, f) { return setTimeout(f, d * 1000); }
+};
+const icons = () => { if (window.lucide) window.lucide.createIcons(); };
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* =====================================================================
+   1. CONTENT
+   Sources: INA 203(b)(1)(A); 8 CFR 204.5(h); 8 CFR 103.2, 103.3, 103.5;
+   USCIS Policy Manual Vol. 6, Part F, Ch. 2; Kazarian v. USCIS and
+   published administrative decisions. Weights and workload curves are
+   teaching devices, labelled as such in the UI.
+   ===================================================================== */
+
+/* ---- small HTML builders for drawer content ---- */
+const H = {
+  sec: (title, body, depth = 1) => `<div data-depth="${depth}"><h4>${title}</h4>${body}</div>`,
+  p: t => `<p>${t}</p>`,
+  ul: items => `<ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>`,
+  ol: items => `<ol>${items.map(i => `<li>${i}</li>`).join('')}</ol>`,
+  quote: (t, c) => `<div class="quote">${t}${c ? `<div class="cite" style="margin-top:6px">${c}</div>` : ''}</div>`,
+  acc: (title, body, open = false, depth = 1) => `<details class="acc" data-depth="${depth}" ${open ? 'open' : ''}><summary>${title}</summary><div>${body}</div></details>`,
+  check: (id, items) => `<ul class="checklist">${items.map((t, i) => `<li><input type="checkbox" id="${id}-${i}"><label for="${id}-${i}">${t}</label></li>`).join('')}</ul>`,
+  meter: (label, v, max, right) => `<div class="meter"><div class="lbl"><span>${label}</span><span class="mono">${right || `${v} / ${max}`}</span></div><div class="bar"><i style="width:${(v / max) * 100}%"></i></div></div>`,
+  steps: items => items.map((t, i) => `<div class="step"><div class="n">${i + 1}</div><div>${t}</div></div>`).join(''),
+  tags: items => `<div style="margin-bottom:10px">${items.map(t => `<span class="tagline">${t}</span>`).join('')}</div>`,
+  table: (head, rows) => `<table class="dt"><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`,
+};
+
+/* ---- Zone 2: the ten criteria ---- */
+const CRITERIA = [
+  { n: 'I', name: 'Awards', full: 'Nationally or internationally recognized prizes or awards', icon: 'trophy', weight: 4,
+    reg: 'Documentation of the alien\'s receipt of lesser nationally or internationally recognized prizes or awards for excellence in the field of endeavor.',
+    cfr: '8 CFR 204.5(h)(3)(i)',
+    threshold: ['The prize must be recognized at the national or international level, not only inside one employer, school or city.', 'It must reward <strong>excellence in the field</strong>, not participation, attendance, funding or length of service.', 'Officers look at the selection criteria, how many people competed and won, the standing of the body that grants it, and whether the award itself is recognized beyond the recipients.', 'USCIS\'s October 2024 Policy Manual update confirmed that a team award can count when the petitioner is one of the named recipients.'],
+    checklist: ['Award certificate or official notification naming you', 'Published selection criteria and description of the judging process', 'Number of nominees or applicants versus number of recipients', 'List of past recipients showing the stature of the award', 'Proof the award is recognized nationally or internationally (coverage, issuer reputation)', 'Certified English translation of any foreign-language document'],
+    opps: ['Industry awards from national professional bodies with independent juries', 'Best paper or best demo awards at selective, internationally recognized venues, supported by acceptance-rate data', 'Competitive fellowships or grants awarded for excellence, framed carefully so they read as recognition rather than funding', 'Innovation or product awards judged by independent expert panels'],
+    pitfalls: ['Internal company awards such as "employee of the year" rarely show national recognition', 'Student-only or early-career-only awards can suggest you were competing outside the top of the field', 'Pay-to-enter or vanity awards with no disclosed selection process', 'Submitting the certificate without anything about how selective the award is'],
+    weightWhy: 'A selective award speaks directly to acclaim, so officers tend to carry it into the final merits. Its weight moves with prestige: a selective international prize counts for far more than a niche regional one.',
+    tags: 'prize medal honor recognition' },
+  { n: 'II', name: 'Membership', full: 'Membership in associations requiring outstanding achievement', icon: 'users', weight: 3,
+    reg: 'Documentation of the alien\'s membership in associations in the field for which classification is sought, which require outstanding achievements of their members, as judged by recognized national or international experts in their disciplines or fields.',
+    cfr: '8 CFR 204.5(h)(3)(ii)',
+    threshold: ['Outstanding achievement must be an actual <strong>condition of admission</strong>. Dues, a degree, years of experience or a recommendation alone do not qualify.', 'Admission must be decided by recognized national or international experts.', 'The association must be in your field.', 'The October 2024 Policy Manual update confirmed that past memberships can count.'],
+    checklist: ['Membership certificate or admission letter', 'Bylaws or official membership criteria showing outstanding achievement is required', 'Evidence about who reviews applications and their standing as experts', 'Acceptance rates or number of members, where published', 'Proof the association is in your field'],
+    opps: ['Fellow grades of major professional societies', 'National academies of science, engineering or medicine', 'Invitation-only bodies with peer nomination and expert review', 'Juried artist or performer societies with competitive admission'],
+    pitfalls: ['Paid or open memberships, however prestigious the society', 'Senior grades based mostly on years of experience are often found not to require outstanding achievement', 'Honor societies based on grades or class rank', 'Membership in a body because of your employer'],
+    weightWhy: 'Genuinely selective bodies such as fellow grades or national academies are strong final-merits evidence. Most memberships petitioners present fail the "outstanding achievements" test, so the average weight is moderate.',
+    tags: 'association society fellow academy' },
+  { n: 'III', name: 'Published Material', full: 'Published material about you in major media', icon: 'newspaper', weight: 4,
+    reg: 'Published material about the alien in professional or major trade publications or other major media, relating to the alien\'s work in the field for which classification is sought. Such evidence shall include the title, date, and author of the material, and any necessary translation.',
+    cfr: '8 CFR 204.5(h)(3)(iii)',
+    threshold: ['The material must be <strong>about you</strong> and your work. A quote in passing or a story about your employer is usually not enough.', 'The outlet must be a professional or major trade publication or other major media. Circulation, readership or audience data carries this.', 'The regulation requires the title, date and author of each piece.', 'Foreign-language material needs a certified translation.'],
+    checklist: ['Complete copy of each article, with URL and capture date for online pieces', 'Title, date and author clearly shown', 'Circulation, readership or traffic data for each outlet, from an independent source', 'Description of the outlet\'s audience and standing in the field', 'Certified translation where needed'],
+    opps: ['Trade press features that profile your work', 'Interviews in national outlets or major industry media', 'Coverage of your research by established science or technology media', 'Broadcast or podcast features with documented audience figures'],
+    pitfalls: ['Press releases written by your employer or university', 'Sponsored or paid placements', 'Articles you wrote yourself (those belong under criterion VI)', 'No circulation data, which leaves "major media" unproven'],
+    weightWhy: 'Independent coverage in major media is close to a direct measure of acclaim, which is why it weighs heavily. Weight scales with the outlet\'s reach and with how much of the piece is about you.',
+    tags: 'press media coverage article interview' },
+  { n: 'IV', name: 'Judging', full: 'Judging the work of others', icon: 'gavel', weight: 3,
+    reg: 'Evidence of the alien\'s participation, either individually or on a panel, as a judge of the work of others in the same or an allied field of specification for which classification is sought.',
+    cfr: '8 CFR 204.5(h)(3)(iv)',
+    threshold: ['You must show you <strong>actually judged</strong>. An invitation, or sitting in a reviewer pool, is not the same as completing reviews.', 'The work judged must be in the same or an allied field.', 'Judging can be individual (a peer review) or on a panel (a program committee or jury).'],
+    checklist: ['Review invitations paired with confirmation that you completed them', 'Editor or chair letters, or verified reviewer records from the publisher or platform', 'Program committee listings with your name', 'Competition or grant panel appointment letters and scoring evidence', 'Evidence of the venue\'s standing (acceptance rates, rankings)'],
+    opps: ['Peer review for recognized journals and conferences', 'Program committee, area chair or editorial board roles', 'Grant review panels', 'Judging selective hackathons, startup or design competitions', 'Serving as an external thesis examiner'],
+    pitfalls: ['Invitation emails with no proof you completed the review', 'Judging outside your field', 'Judging student or local events, which may meet the plain language but adds little to the final merits'],
+    weightWhy: 'Often the easiest criterion to meet, so on its own it carries modest weight. It gains weight when the venue is elite, the reviewing is sustained over years, or you were chosen as an area chair or editor.',
+    tags: 'peer review reviewer jury panel committee' },
+  { n: 'V', name: 'Original Contributions', full: 'Original contributions of major significance', icon: 'sparkles', weight: 5,
+    reg: 'Evidence of the alien\'s original scientific, scholarly, artistic, athletic, or business-related contributions of major significance in the field.',
+    cfr: '8 CFR 204.5(h)(3)(v)',
+    threshold: ['Two separate tests: the contribution must be <strong>original</strong>, and it must be of <strong>major significance to the field</strong>.', 'Significance means impact beyond your employer or immediate collaborators: adoption, citation, licensing, standards, industry practice.', 'Letters help explain significance, but officers expect objective evidence behind them.'],
+    checklist: ['Detailed expert letters that say what you did, why it was original, and name specific downstream impact', 'Citation analysis compared against field baselines', 'Evidence of adoption by other organizations (users, integrations, forks, licensing deals)', 'Patents plus evidence of licensing or commercial use', 'Revenue, user or deployment figures tied to the contribution', 'Independent coverage or recognition of the contribution itself'],
+    opps: ['Open-source work adopted widely across organizations', 'Methods that others cite and build on', 'Product or process innovations that changed industry practice', 'Work incorporated into standards, guidelines or curricula'],
+    pitfalls: ['Letters that praise in general terms without specifics. Under Matter of Caron International, letters are advisory and can be discounted', 'Treating a patent as proof of significance. A patent shows originality, not impact', 'Impact confined to one employer or one project', 'Relying only on letters from colleagues and supervisors'],
+    weightWhy: 'Usually the heaviest criterion in the final merits. A contribution of major significance to the field comes close to the definition of standing at the top, and it frames the rest of the record.',
+    tags: 'impact innovation adoption citations patents letters' },
+  { n: 'VI', name: 'Scholarly Articles', full: 'Authorship of scholarly articles', icon: 'book-open', weight: 3,
+    reg: 'Evidence of the alien\'s authorship of scholarly articles in the field, in professional or major trade publications or other major media.',
+    cfr: '8 CFR 204.5(h)(3)(vi)',
+    threshold: ['For academic work, a scholarly article is generally peer reviewed and cites other work.', 'For non-academic fields, the article should be written for learned readers in a professional or major trade publication or major media.', 'You must be an author, and the article must be in your field.'],
+    checklist: ['Copies of the articles with your authorship shown', 'Information on each venue: peer review, impact factor or h5-index, acceptance rate', 'Citation records from an established index', 'Circulation data for trade publications', 'Evidence that others rely on the articles (citations in reviews, textbooks, standards)'],
+    opps: ['Peer-reviewed journal and conference papers', 'Invited articles in major trade publications', 'Chapters in books from recognized publishers'],
+    pitfalls: ['Posts on self-publishing platforms with no editorial review', 'Preprints alone, without publication or other signs of reception', 'Unclear authorship or author order with no explanation'],
+    weightWhy: 'Authorship alone is common among researchers, so it weighs moderately. Citations, venue selectivity and evidence that others build on the work can raise it a lot in the final merits.',
+    tags: 'papers publications journal conference citations' },
+  { n: 'VII', name: 'Display', full: 'Display of work at artistic exhibitions or showcases', icon: 'image', weight: 2,
+    reg: 'Evidence of the display of the alien\'s work in the field at artistic exhibitions or showcases.',
+    cfr: '8 CFR 204.5(h)(3)(vii)',
+    threshold: ['Written for artistic work: the petitioner\'s own work must have been displayed at an artistic exhibition or showcase.', 'For non-artistic fields this criterion usually does not apply directly. Petitioners argue analogous showcases through comparable evidence under 8 CFR 204.5(h)(4), explaining why the listed criterion does not readily fit the occupation.'],
+    checklist: ['Exhibition catalogs, programs or festival listings naming you', 'Invitations or acceptance letters from the venue', 'Photographs of the installation', 'Reviews and coverage of the exhibition', 'Evidence of the venue\'s standing and selectivity'],
+    opps: ['Juried exhibitions and major festivals', 'Solo or group shows at established museums and galleries', 'For technical fields: selective showcases argued as comparable evidence, with a clear explanation'],
+    pitfalls: ['Filing conference talks directly under this criterion, which is usually rejected', 'Pay-to-exhibit venues', 'Group shows where your work cannot be identified'],
+    weightWhy: 'Weight depends on venue. A solo show at a major museum is strong; group shows at minor venues add little. For non-artists the criterion usually does not apply at all.',
+    tags: 'exhibition gallery showcase art festival' },
+  { n: 'VIII', name: 'Critical Role', full: 'Leading or critical role for distinguished organizations', icon: 'crown', weight: 4,
+    reg: 'Evidence that the alien has performed in a leading or critical role for organizations or establishments that have a distinguished reputation.',
+    cfr: '8 CFR 204.5(h)(3)(viii)',
+    threshold: ['Two parts. The <strong>role</strong>: leading (shown by title and place in the hierarchy) or critical (your contribution mattered to the outcome of the organization or a division of it).', 'The <strong>organization</strong>: it must have a distinguished reputation, meaning marked by eminence, distinction or excellence.', 'A critical role in a division can count; the reputation looked at is usually the organization\'s.'],
+    checklist: ['Detailed letters from senior leaders describing your role, scope, decisions and results', 'Organizational charts showing where the role sits', 'Evidence of the organization\'s reputation: rankings, awards, press, market position', 'Metrics that tie outcomes to your work', 'Contracts, titles and appointment records'],
+    opps: ['Founding or leadership roles at recognized companies or labs', 'Technical lead on a flagship product or program', 'Board, advisory or committee roles at distinguished institutions'],
+    pitfalls: ['A title with no evidence of impact', 'A famous employer with nothing showing your role mattered to it', 'Startups without independent evidence of a distinguished reputation'],
+    weightWhy: 'Strong because it ties your individual work to organizational outcomes. It weighs most when the organization is well known and the letter names measurable results you drove.',
+    tags: 'leadership lead founder executive role organization' },
+  { n: 'IX', name: 'High Salary', full: 'High salary or remuneration relative to the field', icon: 'banknote', weight: 3,
+    reg: 'Evidence that the alien has commanded a high salary or other significantly high remuneration for services, in relation to others in the field.',
+    cfr: '8 CFR 204.5(h)(3)(ix)',
+    threshold: ['Pay must be high compared with <strong>others in your field</strong>, not with the general workforce.', 'Comparisons should match occupation and, where relevant, geography.', 'Pay earned abroad is compared with data for that country.'],
+    checklist: ['W-2s, tax returns, pay statements or contracts', 'Offer letters showing total compensation, including bonus and equity', 'Objective wage data for the same occupation and area (government surveys, reputable industry surveys)', 'Currency conversion and country data for foreign pay'],
+    opps: ['Total compensation that includes equity, set against the 90th percentile or above', 'Government prevailing-wage levels for the matching occupation code'],
+    pitfalls: ['Comparing against all workers rather than your field', 'Relying on self-reported, crowd-sourced data alone', 'Mismatched occupation codes or regions'],
+    weightWhy: 'Useful corroboration that the market places you at the top, but officers treat it as a proxy. It carries more weight when your pay clears the top percentiles by a clear margin.',
+    tags: 'salary compensation pay remuneration equity' },
+  { n: 'X', name: 'Commercial Success', full: 'Commercial success in the performing arts', icon: 'ticket', weight: 3,
+    reg: 'Evidence of commercial successes in the performing arts, as shown by box office receipts or record, cassette, compact disk, or video sales.',
+    cfr: '8 CFR 204.5(h)(3)(x)',
+    threshold: ['Limited to the <strong>performing arts</strong>.', 'Must show commercial success, measured by volume of receipts or sales, not just that the work was sold.', 'Petitioners commonly present digital sales and streaming data alongside the formats the regulation lists.'],
+    checklist: ['Box office receipts from reliable reporting sources', 'Sales and streaming data from recognized tracking services', 'Chart positions and industry certifications', 'Contracts or royalty statements showing revenue'],
+    opps: ['Chart placements and certifications', 'Sold-out tours or runs at major venues', 'Streaming performance compared with peers'],
+    pitfalls: ['Using it outside the performing arts, where it does not apply', 'Raw streaming counts with no context or comparison'],
+    weightWhy: 'For performing artists, audited commercial success is persuasive because it is objective. Outside the performing arts it does not apply, so it rarely appears in a technical petition.',
+    tags: 'box office sales streaming music film performing' },
+];
+
+/* ---- Zone 1: lifecycle milestones and illustrative workload ---- */
+const WORK = [20, 32, 42, 52, 62, 76, 88, 95, 40, 22, 70, 86, 48, 30, 58, 64, 38, 26, 22, 18, 16, 14, 12, 10, 10];
+const PHASES = [
+  { id: 'm1', from: 0, to: 4, at: 2 },
+  { id: 'm2', from: 4, to: 7.5, at: 5.5 },
+  { id: 'm3', from: 7.5, to: 9.5, at: 8 },
+  { id: 'm4', from: 9.5, to: 13, at: 11 },
+  { id: 'm5', from: 13, to: 24, at: 15.5 },
+];
+const workAt = m => { const i = Math.floor(clamp(m, 0, 24)), f = m - i; return lerp(WORK[i], WORK[Math.min(24, i + 1)], f); };
+const phaseAt = m => PHASES.find(p => m < p.to) || PHASES[4];
+
+function workChart(fromM = 0, toM = 24, cur = null) {
+  const W = 300, Hh = 96, n = toM - fromM + 1, bw = W / n;
+  let bars = '';
+  for (let i = 0; i < n; i++) {
+    const m = fromM + i, v = WORK[m], h = (v / 100) * (Hh - 22);
+    const on = cur != null && Math.round(cur) === m;
+    const col = v > 75 ? '#fbbf24' : v > 45 ? '#67e8f9' : '#2b86a3';
+    bars += `<rect x="${i * bw + 1}" y="${Hh - 16 - h}" width="${bw - 2}" height="${h}" rx="1.5" fill="${col}" opacity="${cur == null || on ? 1 : 0.55}"${on ? ' stroke="#fff" stroke-width="1"' : ''}/>`;
+    if (m % 3 === 0) bars += `<text x="${i * bw + bw / 2}" y="${Hh - 3}" text-anchor="middle" font-size="9" fill="#8b9cb8" font-family="JetBrains Mono, monospace">${m}</text>`;
+  }
+  return `<svg class="chart" viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Illustrative workload by month">${bars}</svg>`;
+}
+
+const MILESTONES = {
+  m1: { n: '01', title: 'Profile Building & Strategy', months: 'Months 0–4', icon: 'compass',
+    sub: 'Audit the record against the statute, define the field, and decide which criteria to build before anything is filed.',
+    overview: () =>
+      H.quote('An alien has extraordinary ability if "the alien has extraordinary ability in the sciences, arts, education, business, or athletics which has been demonstrated by sustained national or international acclaim and whose achievements have been recognized in the field through extensive documentation."', 'INA 203(b)(1)(A)(i)') +
+      H.p('EB-1A is a <strong>self-petition</strong>. No employer sponsor, job offer or labor certification is required, but you still have to show you will continue working in your area of expertise and that your entry will substantially benefit the United States prospectively.') +
+      H.sec('What this phase produces', H.ul(['A written definition of your field, specific enough to be credible and broad enough that it is not contrived', 'A gap audit of all ten criteria, scored for current strength', 'A target list of four or five criteria, giving a buffer above the three-criterion minimum', 'A plan for final-merits evidence, since meeting three criteria alone does not win the case'])) +
+      H.sec('Eligibility is fixed at filing', H.p('Under <em>Matter of Katigbak</em>, eligibility is judged as of the filing date. Achievements that arrive after filing cannot rescue the petition, so the timing of the filing is itself a strategic decision.'), 2),
+    strategy: () =>
+      H.sec('Field definition', H.p('Officers compare you with others in your field. Define it too narrowly and it looks engineered to make you stand out; define it too broadly and the top of the field moves out of reach. Anchor it in how peers, publications and employers describe the work.')) +
+      H.sec('Criteria portfolio', H.ul(['Lead with the criteria that carry the most weight in the final merits: original contributions, published material about you, and a leading or critical role', 'Add easier criteria such as judging as a floor, not as the argument', 'Aim for evidence that reinforces itself: the same contribution can appear in press coverage, citations and expert letters'])) +
+      H.acc('Recommender map', H.ul(['Independent experts who know your work only through its impact carry the most weight', 'Dependent letters from collaborators explain the details but should be corroborated', 'Cover several institutions and, ideally, several countries to show international reach']), false, 2) +
+      H.acc('Parallel strategy', H.p('Many petitioners prepare an EB-2 National Interest Waiver alongside EB-1A. The standards differ, and a strong NIW record can be a practical backstop if the EB-1A final-merits bar looks uncertain.'), false, 3) +
+      H.acc('Common early mistakes', H.ul(['Counting on achievements that have not happened yet', 'Collecting volume instead of quality: <em>Matter of Chawathe</em> weighs evidence by quality, not quantity', 'Leaving translation, circulation data and selection-criteria requests until the last month']), false, 3),
+    evidence: () =>
+      H.p('Start an evidence ledger on day one. For every item, record the criterion it serves, its date, its source, whether it is independent, and what corroborates it.') +
+      H.check('m1', ['CV with a dated list of achievements', 'Scored gap audit of all ten criteria', 'Written field definition with supporting sources', 'Shortlist of 8–12 potential recommenders, marked independent or dependent', 'Evidence requests sent (award criteria, circulation data, reviewer records)', 'Filing-date decision recorded, with its reasoning']),
+    data: () => H.sec('Illustrative workload, months 0–8', workChart(0, 8)),
+  },
+  m2: { n: '02', title: 'Evidence Dossier Assembly', months: 'Months 4–7', icon: 'layers',
+    sub: 'Turn raw evidence into an argued petition: exhibits, expert letters, translations, and a brief that argues both steps of the review.',
+    overview: () =>
+      H.p('The dossier is a legal argument with exhibits attached, not a pile of documents. A typical package holds Form I-140, the filing fee, a petition letter or brief, an exhibit index, a CV, evidence tabbed by criterion, expert letters, and proof that you will continue working in your field.') +
+      H.quote('Such evidence shall include ... clear evidence that the alien is coming to the United States to continue work in the area of expertise. Such evidence may include letter(s) from prospective employer(s), evidence of prearranged commitments such as contracts, or a statement from the beneficiary detailing plans on how he or she intends to continue his or her work in the United States.', '8 CFR 204.5(h)(5)') +
+      H.sec('Argue both steps', H.p('After <em>Kazarian</em>, officers first count criteria and then weigh the whole record. The brief should prove each criterion on its plain language, then argue separately that the record as a whole shows sustained acclaim and a place in the small percentage at the very top.'), 2),
+    strategy: () =>
+      H.sec('Expert letters', H.ul(['Specific beats superlative: name the contribution, explain why it was new, and cite who adopted it and what changed', 'Back every claim in a letter with an exhibit', 'Letters are advisory under <em>Matter of Caron International</em>; an officer can give less weight to letters that conflict with the record or add nothing to it'])) +
+      H.sec('Comparable evidence', H.p('Under 8 CFR 204.5(h)(4), if a criterion does not readily apply to your occupation, you may submit comparable evidence. Explain why the listed criterion does not fit before presenting the substitute; comparable evidence is not a way to replace a criterion you simply cannot meet.'), 2) +
+      H.acc('Brief architecture', H.ol(['Introduction and field definition', 'Legal standard: statute, regulation, Kazarian two-step, preponderance of the evidence', 'Criterion-by-criterion analysis with exhibit citations', 'Final-merits argument: sustained acclaim, top of the field, independent corroboration', 'Continuing work and prospective benefit to the United States', 'Conclusion and exhibit index']), true, 2) +
+      H.acc('Translation rule', H.p('Any foreign-language document must come with a full English translation and the translator\'s certification that they are competent to translate and that the translation is complete and accurate (8 CFR 103.2(b)(3)).'), false, 3),
+    evidence: () => H.check('m2', ['Form I-140, signed, with the current fee', 'Petition letter or legal brief', 'Exhibit index with tabs by criterion', 'Evidence for each target criterion, with corroboration', 'Five to eight expert letters, mostly independent (common practice, not a rule)', 'Evidence of continuing work under 8 CFR 204.5(h)(5)', 'Certified translations', 'Passport biographic page and immigration documents', 'If filing concurrently: Form I-485 package and supporting forms']),
+    data: () => H.sec('Illustrative workload, months 3–8', workChart(3, 9)),
+  },
+  m3: { n: '03', title: 'USCIS Filing & Initial Adjudication', months: 'Months 7–9', icon: 'file-text',
+    sub: 'File Form I-140, lock in the priority date, choose premium processing, and wait for the officer\'s first decision.',
+    overview: () =>
+      H.p('The receipt notice establishes your <strong>priority date</strong>, which is your place in line under the visa bulletin once the petition is approved. An officer then reviews the record and issues one of four actions: approval, a Request for Evidence (RFE), a Notice of Intent to Deny (NOID), or a denial.') +
+      H.sec('Premium processing', H.p('With Form I-907, USCIS commits to take action within 15 business days for EB-1A petitions. "Action" includes an RFE, so premium processing buys speed, not approval. Once an RFE response is received, a new premium clock starts.')) +
+      H.sec('Concurrent filing', H.p('If your priority date is current under the chart USCIS designates for that month, you can file Form I-485 with the I-140 or while it is pending. Applicants chargeable to countries with EB-1 backlogs, notably India and China, may wait after approval.'), 2),
+    strategy: () =>
+      H.ul(['Check the visa bulletin for your country of chargeability before choosing concurrent filing', 'Premium processing makes most sense when timing matters for status, travel or a job change', 'Keep an exact copy of everything filed. An RFE response or appeal is built against that record', 'Track the case online and keep USCIS addresses current so notices arrive on time']) +
+      H.acc('Where officers focus first', H.ul(['Does each claimed criterion meet its plain language?', 'Is the field defined consistently throughout the record?', 'Do letters line up with the documents?', 'Is there proof of continuing work in the field?']), false, 2),
+    evidence: () =>
+      H.table(['Item', 'Detail (confirm on uscis.gov)'], [
+        ['Form I-140 fee', '$715 under the April 2024 fee rule'],
+        ['Asylum Program Fee', 'Charged with I-140 under the 2024 rule; amount depends on petitioner type'],
+        ['Premium processing (I-907)', '$2,805 from February 2024; action within 15 business days'],
+        ['Priority date', 'The date USCIS receives a properly filed I-140'],
+      ]) + H.p('<span class="note">Fees are adjusted periodically. Use the USCIS fee calculator and Form G-1055 for current amounts.</span>'),
+    data: () => H.sec('Illustrative workload, months 6–10', workChart(6, 11)),
+  },
+  m4: { n: '04', title: 'Branching Paths: Approval, RFE, NOID, Denial', months: 'Months 8–13', icon: 'git-branch',
+    sub: 'The officer\'s first action sends the case down one of four branches, each with its own clock and playbook.',
+    overview: () =>
+      H.table(['Outcome', 'What it means', 'Clock'], [
+        ['<span style="color:var(--ok)">Approval</span>', 'I-140 approved; move to I-485 or consular processing', 'Visa bulletin'],
+        ['<span style="color:var(--rfe)">RFE</span>', 'Officer needs more evidence on named issues', 'Set in the notice; regulation allows up to 12 weeks'],
+        ['<span style="color:var(--noid)">NOID</span>', 'Officer intends to deny unless rebutted', 'Up to 30 days by regulation'],
+        ['<span style="color:var(--deny)">Denial</span>', 'Petition denied with written reasons', '30 days to appeal or move (33 if mailed)'],
+      ]) +
+      H.p('Click the colored branch nodes on the highway, or the outcome pedestals in Zone 3, to open each playbook.'),
+    strategy: () =>
+      H.ul(['Read an RFE or NOID for what it concedes as well as what it challenges. Conceded criteria stay conceded unless the officer later explains otherwise', 'Respond once, completely: 8 CFR 103.2(b)(11) requires all requested material to be submitted together', 'Start drafting the denial fallback during a NOID response, not after']) +
+      H.acc('Deadline mechanics', H.p('Under 8 CFR 103.2(b)(8)(iv), the maximum response period is 12 weeks for an RFE and 30 days for a NOID, and additional time is not granted. Missing the deadline leads to denial as abandoned or on the existing record (8 CFR 103.2(b)(13)).'), false, 2),
+    evidence: () => H.p('Each branch has a dedicated playbook. Open them from here:') +
+      `<div class="grid2">${['approval', 'rfe', 'noid', 'denial'].map(o => `<button class="btn full" data-open="out-${o}"><span class="dot" style="width:9px;height:9px;border-radius:50%;background:${OUT_COLORS[o]}"></span>${OUTCOMES[o].title}</button>`).join('')}</div>`,
+    data: () => H.sec('Illustrative workload, months 8–14', workChart(8, 14)),
+  },
+  m5: { n: '05', title: 'AAO Appeal & Review Layer', months: 'Months 13–18+', icon: 'landmark',
+    sub: 'After a denial: appeal to the Administrative Appeals Office, file a motion, refile, or go to federal court.',
+    overview: () =>
+      H.p('An appeal starts with Form I-290B, filed within 30 days of the decision (33 days if it was mailed). The office that denied the petition gets a first look and can approve it; otherwise it forwards the record to the AAO, which reviews the case <strong>de novo</strong>.') +
+      H.p('Zone 4 models this appellate layer in detail. Fly there with the button above or press <span class="mono">5</span>.'),
+    strategy: () =>
+      H.ul(['Appeal when the director misread the law or the record you already filed', 'File a motion to reopen when you have new facts that existed at filing but were not in the record', 'Refile a new petition when the record itself was thin; you can do this while an appeal is pending', 'Federal court review under the Administrative Procedure Act is available after a final agency decision']),
+    evidence: () => H.check('m5', ['Decision date and service method noted; deadline calendared', 'Form I-290B with fee ($800 under the 2024 fee rule)', 'Brief mapping each error to the record', 'Decision on whether to submit a brief with the form or within 30 days to the AAO', 'Parallel refiling plan, if the record needs strengthening']),
+    data: () => H.sec('Illustrative workload, months 12–24', workChart(12, 24)),
+  },
+};
+
+/* ---- Outcomes ---- */
+const OUT_COLORS = { approval: '#34d399', rfe: '#fbbf24', noid: '#fb923c', denial: '#f43f5e' };
+const OUTCOMES = {
+  approval: { title: 'Approval', icon: 'circle-check', sub: 'The I-140 is approved. The green card itself comes next, through adjustment of status or consular processing.',
+    tabs: {
+      Playbook: () => H.steps([
+        '<strong>Save the approval notice</strong> (Form I-797) and a complete copy of the filed petition.',
+        '<strong>In the United States?</strong> If your priority date is current, file Form I-485 (or it is already pending). Consider work and travel authorization with Forms I-765 and I-131.',
+        '<strong>Abroad?</strong> The case moves to the National Visa Center, then Form DS-260 and a consular interview.',
+        '<strong>Backlogged country?</strong> The approval preserves your priority date. Watch the monthly visa bulletin until it is current.',
+        '<strong>Family:</strong> a spouse and unmarried children under 21 can obtain status as derivatives.',
+      ]),
+      'Why it worked': () => H.ul(['The criteria were met on their plain language at Step 1', 'The final-merits argument connected the evidence into one story of sustained acclaim', 'Independent, specific corroboration made the letters credible']) +
+        H.acc('Keep in mind', H.p('An approved I-140 does not grant status by itself. Maintain lawful status while the green card stage is pending, and keep evidence of continuing work in your field.'), false, 2),
+    } },
+  rfe: { title: 'Request for Evidence', icon: 'circle-alert', sub: 'The officer found gaps and asks for specific evidence. A well-built response turns many RFEs into approvals.',
+    tabs: {
+      Playbook: () => H.steps([
+        '<strong>Parse the notice.</strong> Build a table of every issue raised, sorted into Step 1 (a criterion) and Step 2 (final merits). Note which criteria the officer accepted.',
+        '<strong>Keep to the filing date.</strong> New evidence must show you were eligible when you filed (<em>Katigbak</em>), and you cannot change the basis of the petition (<em>Izummi</em>).',
+        '<strong>Answer every point.</strong> Unanswered issues read as concessions.',
+        '<strong>Upgrade the evidence, not the adjectives.</strong> Replace general praise with objective proof: circulation data, citation baselines, adoption metrics, selection statistics.',
+        '<strong>Consider a fallback criterion</strong> if one of your three is weak, so Step 1 does not rest on it.',
+        '<strong>Submit everything at once</strong> before the deadline (8 CFR 103.2(b)(11)). No extensions are granted.',
+      ]),
+      'Response template': () => H.ol(['Cover letter with receipt number and exhibit index', 'Issue table: each RFE point, your response, and the exhibit that proves it', 'Point-by-point rebuttal, criterion by criterion', 'Renewed final-merits argument tying the record together', 'New exhibits, labelled to continue the original numbering', 'Updated expert letters that answer the officer\'s specific doubts']) +
+        H.acc('Sample opening paragraph', H.quote('The petitioner respectfully submits this response to the Request for Evidence dated [date]. The Request accepts that the petitioner meets the criteria at 8 CFR 204.5(h)(3)(iv) and (vi). This response addresses the remaining criteria at (iii) and (v), then shows that the record as a whole establishes sustained international acclaim under the final merits determination described in Kazarian v. USCIS.'), false, 2),
+      'Common triggers': () => H.table(['Trigger', 'Fix'], [
+        ['Letters praise but give no specifics', 'New letters naming adoption, users and measurable change'],
+        ['Press is not "about" the petitioner', 'Show the substance of the coverage; add circulation data'],
+        ['Judging lacks proof of completion', 'Editor confirmations, verified reviewer records'],
+        ['Salary compared with the wrong group', 'Occupation- and region-matched survey data'],
+        ['Final merits: acclaim not sustained', 'A timeline showing recognition over several years'],
+      ]),
+    } },
+  noid: { title: 'Notice of Intent to Deny', icon: 'triangle-alert', sub: 'The officer plans to deny unless the record changes. The response window is short and the bar is high.',
+    tabs: {
+      Playbook: () => H.steps([
+        '<strong>Calendar the deadline now.</strong> The regulation allows at most 30 days, with no extension.',
+        '<strong>Rebut each stated ground</strong> with evidence and law. A NOID sets out the officer\'s reasoning; answer it directly.',
+        '<strong>Address any derogatory information.</strong> If the officer relies on information you had not seen, 8 CFR 103.2(b)(16)(i) entitles you to be told and to respond.',
+        '<strong>Prepare the fallback in parallel:</strong> a draft I-290B brief and a refiling plan.',
+      ]),
+      'NOID vs RFE': () => H.table(['', 'RFE', 'NOID'], [['Signal', 'Evidence is missing', 'Officer leans toward denial'], ['Maximum time', '12 weeks', '30 days'], ['Typical content', 'List of evidence types', 'Stated grounds for denial']]) +
+        H.acc('Why a NOID can be good news', H.p('A NOID states the officer\'s reasoning before the decision is final. That is a chance to correct misreadings of the record that would otherwise surface only on appeal.'), false, 2),
+    } },
+  denial: { title: 'Denial', icon: 'octagon-x', sub: 'A written decision with reasons. You have 30 days (33 if mailed) to appeal or file a motion, and you can refile at any time.',
+    tabs: {
+      'Options matrix': () => H.table(['Route', 'Use it when', 'Where'], [
+        ['Appeal (I-290B)', 'The director got the law or the existing record wrong', 'AAO, after initial field review'],
+        ['Motion to reopen', 'New facts, backed by documents, that bear on eligibility at filing', 'The office that made the latest decision'],
+        ['Motion to reconsider', 'The decision misapplied law or policy to the record as it stood', 'The office that made the latest decision'],
+        ['Refile', 'The record needs to be rebuilt or eligibility has grown since', 'New I-140, new priority date'],
+        ['Federal court', 'After a final agency decision, to challenge it under the APA', 'U.S. District Court'],
+      ]) + H.p('Zone 4 walks through each route. Fly there with the button above.'),
+      'Decision logic': () => H.steps(['Was the officer wrong on the record you filed? Lean toward an appeal or a motion to reconsider.', 'Is there strong evidence that existed at filing but was not submitted? Consider a motion to reopen, bearing in mind <em>Soriano</em> if an RFE had already asked for it.', 'Was the record simply thin? Refiling with stronger evidence is often faster than an appeal.', 'Are several routes viable? Refiling and appealing can run at the same time.']),
+    } },
+};
+
+/* ---- Zone 3: final-merits factors ---- */
+const FACTORS = [
+  { key: 'sustained', name: 'Sustained acclaim', short: 'Sustained', body: 'Acclaim has to be sustained, not a single peak. Officers look for recognition spread across several years, up to the time of filing.' },
+  { key: 'reach', name: 'National / international reach', short: 'Reach', body: 'Recognition should extend beyond your employer, city or school. International citations, press and invitations are strong signals.' },
+  { key: 'indep', name: 'Independent corroboration', short: 'Independence', body: 'Evidence from people and institutions with no stake in your success. Independent letters and third-party data carry the most weight.' },
+  { key: 'top', name: 'Top-of-field comparison', short: 'Top of field', body: 'The regulation defines extraordinary ability as a level of expertise showing you are "one of that small percentage who have risen to the very top of the field of endeavor" (8 CFR 204.5(h)(2)). Comparative data makes this concrete.' },
+  { key: 'impact', name: 'Impact on the field', short: 'Impact', body: 'Evidence that the field changed because of your work: adoption, citations, standards, industry practice.' },
+  { key: 'quality', name: 'Evidence quality', short: 'Quality', body: 'Under Matter of Chawathe, the truth is found by the quality of the evidence, not its quantity. Consistent, well-documented, primary-source evidence wins.' },
+  { key: 'continue', name: 'Continuing work & U.S. benefit', short: 'Continuity', body: 'You must show you will continue work in your area of expertise (8 CFR 204.5(h)(5)) and that your entry will substantially benefit the United States prospectively (INA 203(b)(1)(A)(iii)).' },
+];
+
+/* ---- Zone 3: the two filters ---- */
+const ADJ = {
+  step1: { title: 'Step 1 · The Threshold Filter', kicker: 'Zone 3 · Kazarian step one', icon: 'filter', sub: 'Does the evidence satisfy a one-time major award, or at least three of the ten regulatory criteria?',
+    tabs: {
+      Overview: () => H.quote('A petition for an alien of extraordinary ability must be accompanied by evidence that the alien has sustained national or international acclaim ... Such evidence shall include evidence of a one-time achievement (that is, a major, internationally recognized award), or at least three of the following ...', '8 CFR 204.5(h)(3)') +
+        H.p('At Step 1 the officer asks a narrow question: does each piece of evidence meet the <strong>plain language</strong> of the criterion it is offered under? In <em>Kazarian v. USCIS</em>, the Ninth Circuit held that officers should not import extra requirements at this stage; the broader weighing belongs to Step 2.') +
+        H.sec('The one-time achievement path', H.p('A major, internationally recognized award replaces the three-criterion count. The Policy Manual points to prizes of the stature of a Nobel Prize, Pulitzer Prize, Academy Award or Olympic medal. In the funnel, this is the golden bypass channel.'), 2),
+      'Filter mechanics': () => H.steps(['Each claimed criterion enters the funnel through its own chute on the rim.', 'Evidence that fails a criterion\'s plain language drops out; the criterion does not count.', 'If three or more criteria survive, or the one-time award path is lit, the gate turns green and evidence flows to Step 2.', 'If fewer than three survive, the petition fails at the threshold, and the officer does not need to reach the final merits.']) +
+        H.acc('Comparable evidence', H.p('If a criterion does not readily apply to your occupation, 8 CFR 204.5(h)(4) lets you offer comparable evidence. It fills a structural gap; it is not a way around a criterion you cannot meet.'), false, 3),
+    } },
+  step2: { title: 'Step 2 · Final Merits Determination', kicker: 'Zone 3 · Kazarian step two', icon: 'scale', sub: 'Weighing the totality of the evidence: sustained acclaim, and a place among the small percentage at the very top of the field.',
+    tabs: {
+      Overview: () => H.p('Having found that three criteria are met, the officer weighs all the evidence together and asks whether it shows, by a <strong>preponderance of the evidence</strong>, that:') +
+        H.ul(['you have sustained national or international acclaim;', 'you are one of the small percentage who have risen to the very top of your field; and', 'your achievements have been recognized in the field through extensive documentation.']) +
+        H.p('The balance scale models this. The left pan holds evidence of acclaim; the right holds gaps and doubts. The matrix behind it shows the seven factors that tip it.'),
+      Factors: () => FACTORS.map(f => H.acc(f.name, H.p(f.body), false, 1)).join(''),
+      'Standard of proof': () => H.quote('Except where a different standard is specified by law, a petitioner or applicant in administrative immigration proceedings must prove by a preponderance of evidence that he or she is eligible for the benefit sought ... the "truth" is to be determined not by the quantity of evidence alone but by its quality.', 'Matter of Chawathe, 25 I&N Dec. 369 (AAO 2010)') +
+        H.p('"Preponderance" means more likely than not. It is not proof beyond doubt, and an officer should not demand it; but every claim still needs credible support.'),
+    } },
+};
+
+/* ---- Zone 4: AAO ---- */
+const AAO = {
+  'aao-filing': { title: 'Jurisdiction & Filing Gate', icon: 'timer', sub: 'The first filter: is the appeal timely, properly filed, and within the AAO\'s jurisdiction?',
+    body: () => H.ul(['File Form I-290B within <strong>30 days</strong> of service of the decision, or <strong>33 days</strong> if the decision was mailed (8 CFR 103.3(a)(2)(i), 103.8(b))', 'The fee under the 2024 fee rule is $800', 'Denials of I-140 petitions fall within the AAO\'s appellate jurisdiction', 'The form lets you attach a brief, or tell the AAO you will send a brief directly within 30 days of filing']) +
+      H.acc('Untimely appeals', H.p('An untimely appeal is rejected. If it meets the requirements of a motion to reopen or reconsider, the office that made the decision may treat it as a motion (8 CFR 103.3(a)(2)(v)(B)(2)).'), false, 3) },
+  'aao-field': { title: 'Initial Field Review', icon: 'rotate-ccw', sub: 'Before the AAO sees it, the office that denied the petition reviews the appeal.',
+    body: () => H.p('The reviewing official has <strong>45 days</strong> to decide whether favorable action is warranted. If so, the office can treat the appeal as a motion and approve the petition. If not, it forwards the appeal and the record to the AAO (8 CFR 103.3(a)(2)(iii)–(iv)).') +
+      H.acc('Practical effect', H.p('Write the brief so the director can grant it quickly: lead with the clearest error and cite the exhibit that proves it.'), false, 2) },
+  'aao-record': { title: 'Record Limits', icon: 'file-search', sub: 'What the AAO will and will not consider when it reviews the record.',
+    body: () => H.p('The AAO can consider new evidence submitted on appeal in many cases. The important exception: if an RFE already put you on notice of a deficiency and you did not submit the evidence then, the AAO will not consider it for the first time on appeal.') +
+      H.quote('Where ... the petitioner was put on notice of the required evidence and given a reasonable opportunity to provide it for the record before the denial, we will not accept evidence offered for the first time on appeal.', 'Matter of Soriano, 19 I&N Dec. 764 (BIA 1988); Matter of Obaigbena, 19 I&N Dec. 533 (BIA 1988)') +
+      H.acc('Takeaway', H.p('The RFE response is effectively your last chance to build the record. Treat it as the record the AAO will read.'), false, 2) },
+  'aao-denovo': { title: 'De Novo Review', icon: 'shield-check', sub: 'The AAO takes a fresh look at the law, the facts and any discretionary judgment.',
+    body: () => H.quote('The AAO exercises de novo review of all issues of fact, law, policy, and discretion.', 'Matter of Christo\'s, Inc., 26 I&N Dec. 537 (AAO 2015)') +
+      H.ul(['The AAO is not bound by the director\'s findings, in either direction', 'It can agree with the result for different reasons, or identify grounds of ineligibility the director missed', 'It can remand the case to the director for further action']) +
+      H.acc('De novo vs. abuse of discretion', H.p('The AAO does not ask whether the director abused discretion; it decides the question again. "Abuse of discretion" and "arbitrary and capricious" are the standards a <strong>federal court</strong> applies when it reviews the agency\'s final decision under the Administrative Procedure Act (5 U.S.C. 706).'), true, 2) },
+  'aao-burden': { title: 'Burden & Standard of Proof', icon: 'scale', sub: 'The petitioner carries the burden throughout, measured by a preponderance of the evidence.',
+    body: () => H.p('Under INA 291, the burden of proof stays with the petitioner. The standard is a preponderance of the evidence: eligibility must be more likely than not (<em>Matter of Chawathe</em>).') +
+      H.ul(['Eligibility must exist at the time of filing (<em>Matter of Katigbak</em>)', 'The petition cannot be materially changed to make it approvable (<em>Matter of Izummi</em>)', 'Expert opinions are advisory and weighed against the rest of the record (<em>Matter of Caron International</em>)']) },
+  'aao-precedent': { title: 'Precedent Filter', icon: 'book-marked', sub: 'Which decisions bind officers, and which only persuade.',
+    body: () => H.table(['Type', 'Binding?', 'Notes'], [
+      ['Precedent decisions', 'Yes, on USCIS officers', 'Designated and published in Administrative Decisions under Immigration and Nationality Laws (I&N Dec.)'],
+      ['Adopted decisions', 'Yes, on USCIS officers', 'AAO decisions adopted by USCIS as policy guidance'],
+      ['Non-precedent AAO decisions', 'No', 'Show how the AAO reasons; persuasive at most'],
+      ['Federal circuit decisions', 'In that circuit', 'Kazarian binds in the Ninth Circuit; USCIS adopted its two-step framework nationwide through policy'],
+    ]) + H.p('The orbiting tablets are the decisions most cited in EB-1A cases. Click one to read it.') },
+};
+const PATHS = {
+  'path-appeal': { title: 'Appeal to the AAO', short: 'Appeal', icon: 'landmark', sub: 'Form I-290B: ask the AAO to review the denial de novo.',
+    body: () => H.steps(['Calendar 30 days from the decision (33 if mailed).', 'File Form I-290B with the fee.', 'The office that denied the petition has 45 days for initial field review.', 'The AAO reviews de novo and dismisses, sustains, or remands.', 'If dismissed, you may file a motion with the AAO or seek review in federal court.']) +
+      H.acc('Best for', H.p('Clear legal error on a complete record: an officer who imposed extra requirements at Step 1, ignored evidence, or misread a criterion.'), true) },
+  'path-reopen': { title: 'Motion to Reopen', short: 'Reopen', icon: 'file-search', sub: 'New facts, supported by affidavits or documents (8 CFR 103.5(a)(2)).',
+    body: () => H.p('A motion to reopen must state new facts to be proved and be supported by affidavits or other documentary evidence. It goes to the office that made the latest decision and generally must be filed within 30 days.') +
+      H.acc('Watch out', H.ul(['The new facts must still show eligibility at the original filing date', 'Evidence an RFE already asked for, but that you did not submit, is a weak basis']), true) },
+  'path-reconsider': { title: 'Motion to Reconsider', short: 'Reconsider', icon: 'rotate-ccw', sub: 'The decision misapplied law or policy to the record as it stood (8 CFR 103.5(a)(3)).',
+    body: () => H.p('A motion to reconsider must show the decision was based on an incorrect application of law or policy, and that it was incorrect based on the evidence in the record at the time of the decision. No new evidence is added.') +
+      H.acc('Best for', H.p('Focused legal errors that the deciding office can fix quickly.'), true) },
+  'path-refile': { title: 'Refile a New Petition', short: 'Refile', icon: 'rotate-ccw', sub: 'A new I-140 with a stronger record and a new priority date.',
+    body: () => H.p('There is no bar on filing a new EB-1A petition after a denial. A refiling can include achievements earned since the first filing and can run alongside an appeal.') +
+      H.ul(['New filing fee and a new priority date', 'Fix the weaknesses the denial identified, and expect the new officer to read the prior decision', 'Premium processing can make refiling faster than an appeal']) },
+  'path-court': { title: 'Federal Court Review', short: 'Court', icon: 'gavel', sub: 'Challenge a final agency decision under the Administrative Procedure Act.',
+    body: () => H.p('A federal district court reviews whether the decision was "arbitrary, capricious, an abuse of discretion, or otherwise not in accordance with law" (5 U.S.C. 706(2)(A)). Review is generally limited to the administrative record, and the usual remedy is sending the case back to USCIS.') +
+      H.acc('Exhaustion', H.p('Under <em>Darby v. Cisneros</em> (1993), an APA plaintiff need not use an optional administrative appeal first unless a statute or regulation requires it and makes the decision inoperative in the meantime. Many practitioners still use the AAO first to build the record.'), false, 3) +
+      H.acc('Kazarian itself came from here', H.p('<em>Kazarian v. USCIS</em> was a federal court case. Its two-step framework was then adopted by USCIS policy, which is how court review can shape adjudication nationwide.'), false, 2) },
+};
+const PRECEDENTS = [
+  { id: 'kazarian', short: 'Kazarian', title: 'Kazarian v. USCIS', cite: '596 F.3d 1115 (9th Cir. 2010)', body: 'The Ninth Circuit held that USCIS had imposed requirements beyond the regulation when evaluating individual criteria. The court described a two-part review: first count the criteria met on their plain language, then consider the evidence as a whole in a final merits determination.', use: 'The foundation of the two-step framework. USCIS adopted it in policy guidance in 2010, and it now structures every EB-1A decision.' },
+  { id: 'chawathe', short: 'Chawathe', title: 'Matter of Chawathe', cite: '25 I&N Dec. 369 (AAO 2010)', body: 'Petitioners must prove eligibility by a preponderance of the evidence. The truth is determined by the quality of the evidence, not its quantity; if the evidence shows a claim is "probably true," the petitioner has met the standard.', use: 'Cited to hold officers to the right standard of proof, and to remind petitioners that volume does not substitute for quality.' },
+  { id: 'price', short: 'Price', title: 'Matter of Price', cite: '20 I&N Dec. 953 (Assoc. Comm\'r 1994)', body: 'An early precedent applying the extraordinary ability standard to a professional athlete. It measured the petitioner against peers in the field using objective rankings and earnings.', use: 'Shows how "top of the field" can be argued with comparative data instead of adjectives.' },
+  { id: 'christos', short: 'Christo\'s', title: 'Matter of Christo\'s, Inc.', cite: '26 I&N Dec. 537 (AAO 2015)', body: 'Confirms that the AAO reviews issues of fact, law, policy and discretion de novo.', use: 'Cited for the standard of appellate review. The AAO decides the question again; it is not limited to the grounds the director gave.' },
+  { id: 'katigbak', short: 'Katigbak', title: 'Matter of Katigbak', cite: '14 I&N Dec. 45 (Reg\'l Comm\'r 1971)', body: 'A petitioner must establish eligibility at the time of filing. A petition cannot be approved on the basis of facts that arose later.', use: 'Limits what an RFE response or appeal can add. New evidence has to prove eligibility as of the filing date.' },
+  { id: 'izummi', short: 'Izummi', title: 'Matter of Izummi', cite: '22 I&N Dec. 169 (Assoc. Comm\'r 1998)', body: 'A petitioner may not make material changes to a petition to make a deficient petition conform to the requirements.', use: 'Blocks redefining the field or the basis of the claim after filing.' },
+  { id: 'soriano', short: 'Soriano', title: 'Matter of Soriano', cite: '19 I&N Dec. 764 (BIA 1988)', body: 'Where a petitioner was put on notice of a deficiency and given a reasonable opportunity to address it before the decision, evidence submitted for the first time on appeal will not be considered.', use: 'Makes the RFE response the last real chance to build the record.' },
+  { id: 'caron', short: 'Caron', title: 'Matter of Caron International', cite: '19 I&N Dec. 791 (Comm\'r 1988)', body: 'Expert opinion testimony is advisory. USCIS may reject or give less weight to an opinion that conflicts with other information or is in any way questionable.', use: 'The reason expert letters must be specific and corroborated by independent evidence.' },
+];
+
+/* =====================================================================
+   2. ITEM REGISTRY
+   Everything clickable in 3D or searchable in the HUD is an item with
+   tabs. Drawer content is generated on demand so it reflects state.
+   ===================================================================== */
+const ITEMS = new Map();
+function addItem(id, it) { it.id = id; ITEMS.set(id, it); return it; }
+
+CRITERIA.forEach((c, i) => {
+  addItem(`crit-${i}`, {
+    kind: 'Criterion', zone: 'decagon', title: `${c.n} · ${c.name}`, kicker: `Zone 2 · ${c.cfr}`, sub: c.full, icon: c.icon, accent: '#fbbf24',
+    tip: c.full, search: `${c.name} ${c.full} ${c.tags} criterion ${c.n}`,
+    tabs: [
+      { key: 'inside', label: 'What\'s inside', icon: 'layers', html: () => H.quote(c.reg, c.cfr) + H.sec('Baseline threshold', H.ul(c.threshold)) + H.acc('How it plays in Step 2', H.p(c.weightWhy), false, 3) },
+      { key: 'checklist', label: 'Checklist', icon: 'list-checks', html: () => H.sec('Evidence checklist', H.check(`ck${i}`, c.checklist)) + H.sec('Strategic opportunities', H.ul(c.opps), 2) },
+      { key: 'weight', label: 'Weighting', icon: 'gauge', html: () => H.meter('Persuasive weight index', c.weight, 5) + H.p(c.weightWhy) +
+        H.sec('How the index works', H.p('The index is a teaching device, not an official USCIS measure. It rates how directly strong evidence under this criterion speaks to the Step 2 questions: sustained acclaim and a place at the very top of the field.'), 2) +
+        H.sec('All ten, compared', `<div>${CRITERIA.map(o => H.meter(`${o.n} · ${o.name}`, o.weight, 5)).join('')}</div>`, 3) },
+      { key: 'pitfalls', label: 'Pitfalls', icon: 'triangle-alert', html: () => H.ul(c.pitfalls) },
+    ],
+  });
+});
+Object.entries(MILESTONES).forEach(([id, m]) => addItem(id, {
+  kind: 'Milestone', zone: 'timeline', title: m.title, kicker: `Zone 1 · Milestone ${m.n} · ${m.months}`, sub: m.sub, icon: m.icon, accent: '#22d3ee',
+  tip: `${m.months}. ${m.sub}`, search: `${m.title} ${m.months} timeline lifecycle`,
+  tabs: [
+    { key: 'overview', label: 'Overview', icon: 'info', html: m.overview },
+    { key: 'strategy', label: 'Strategy', icon: 'target', html: m.strategy },
+    { key: 'evidence', label: 'Evidence', icon: 'list-checks', html: m.evidence },
+    { key: 'data', label: 'Data', icon: 'chart-column', html: () => m.data() + H.p('<span class="note">Workload index is illustrative (0–100), not measured data. Real timelines depend on the case and on current USCIS processing times.</span>') },
+  ],
+  actions: id === 'm5' ? [{ label: 'Fly to Zone 4', icon: 'navigation', run: () => setZone('aao') }] : null,
+}));
+Object.entries(OUTCOMES).forEach(([k, o]) => addItem(`out-${k}`, {
+  kind: 'Outcome', zone: 'adjud', title: o.title, kicker: 'Zone 3 · Outcome simulation hub', sub: o.sub, icon: o.icon, accent: OUT_COLORS[k],
+  tip: o.sub, search: `${o.title} ${k} outcome playbook response`,
+  tabs: Object.entries(o.tabs).map(([label, html], i) => ({ key: `t${i}`, label, icon: i ? 'file-text' : 'list-checks', html })),
+  actions: [{ label: 'Simulate in Zone 3', icon: 'zap', run: () => { setZone('adjud'); simulate(k); } }].concat(k === 'denial' ? [{ label: 'Fly to Zone 4', icon: 'navigation', run: () => setZone('aao') }] : []),
+}));
+Object.entries(ADJ).forEach(([k, a]) => addItem(k, {
+  kind: 'Engine', zone: 'adjud', title: a.title, kicker: a.kicker, sub: a.sub, icon: a.icon, accent: '#22d3ee', tip: a.sub, search: `${a.title} kazarian two-step`,
+  tabs: Object.entries(a.tabs).map(([label, html], i) => ({ key: `t${i}`, label, icon: ['info', 'sliders-horizontal', 'scale'][i] || 'info', html })),
+}));
+FACTORS.forEach((f, i) => addItem(`factor-${i}`, {
+  kind: 'Factor', zone: 'adjud', title: f.name, kicker: 'Zone 3 · Final-merits matrix', sub: 'One of the seven factors that tip the Step 2 balance in this model.', icon: 'sliders-horizontal', accent: '#22d3ee',
+  tip: f.body, search: `${f.name} final merits factor`,
+  tabs: [{ key: 'o', label: 'Factor', icon: 'info', html: () => H.p(f.body) + H.meter('Your current setting', S.factors[i], 5) + H.p('<span class="note">Adjust it with the sliders in the Zone 3 console.</span>') }],
+}));
+Object.entries(AAO).forEach(([k, a]) => addItem(k, {
+  kind: 'AAO filter', zone: 'aao', title: a.title, kicker: 'Zone 4 · AAO review layer', sub: a.sub, icon: a.icon, accent: '#a78bfa', tip: a.sub, search: `${a.title} aao appeal`,
+  tabs: [{ key: 'o', label: 'Analysis', icon: 'info', html: a.body }],
+}));
+Object.entries(PATHS).forEach(([k, a]) => addItem(k, {
+  kind: 'Route', zone: 'aao', title: a.title, kicker: 'Zone 4 · Post-denial routes', sub: a.sub, icon: a.icon, accent: '#a78bfa', tip: a.sub, search: `${a.title} ${a.short} motion appeal`,
+  tabs: [{ key: 'o', label: 'Route', icon: 'route', html: a.body }],
+}));
+PRECEDENTS.forEach(p => addItem(`prec-${p.id}`, {
+  kind: 'Precedent', zone: 'aao', title: p.title, kicker: `Zone 4 · ${p.cite}`, sub: p.body, icon: 'book-marked', accent: '#fbbf24', tip: p.cite, search: `${p.title} ${p.cite} precedent case`,
+  tabs: [
+    { key: 'h', label: 'Holding', icon: 'book-marked', html: () => H.quote(p.body, `${p.title}, ${p.cite}`) },
+    { key: 'u', label: 'How it\'s used', icon: 'target', html: () => H.p(p.use) },
+  ],
+}));
+
+/* =====================================================================
+   3. STATE
+   ===================================================================== */
+const S = {
+  zone: 'overview', month: 7, playing: false,
+  claimed: new Set([2, 3, 4, 7]), oneTime: false, factors: [3, 3, 3, 3, 3, 3, 3],
+  depth: 3, peeled: -1, outcome: null, openId: null, critQuery: '', critSort: 'statute',
+};
+function model() {
+  const count = S.claimed.size, pass = count >= 3 || S.oneTime;
+  const mean = S.factors.reduce((a, b) => a + b, 0) / S.factors.length;
+  const score = clamp((mean - 1) / 4 + (S.oneTime ? 0.12 : 0) + (count >= 5 ? 0.04 : 0), 0, 1);
+  let outcome;
+  if (!pass) outcome = count === 2 ? 'rfe' : 'denial';
+  else if (score >= 0.72) outcome = 'approval';
+  else if (score >= 0.5) outcome = 'rfe';
+  else if (score >= 0.33) outcome = 'noid';
+  else outcome = 'denial';
+  return { count, pass, score, outcome };
+}
+const DEPTH_NAMES = ['Essentials', 'Practitioner', 'Strategist', 'Adjudicator', 'Appellate'];
+
+/* =====================================================================
+   4. SCENE
+   ===================================================================== */
+const stage = $('#stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x04060c);
+scene.fog = new THREE.FogExp2(0x04060c, 0.0036);
+const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 2400);
+camera.position.set(0, 110, 210);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.minDistance = 6;
+controls.maxDistance = 340;
+controls.maxPolarAngle = Math.PI * 0.495;
+controls.target.set(0, 8, -10);
+
+scene.add(new THREE.HemisphereLight(0x8fb8ff, 0x0a0f1c, 0.55));
+scene.add(new THREE.AmbientLight(0x223047, 0.5));
+const sun = new THREE.DirectionalLight(0xdfeaff, 0.7);
+sun.position.set(40, 120, 80);
+scene.add(sun);
+
+/* ---- texture + material helpers ---- */
+function glowTexture(inner = 'rgba(255,255,255,1)', outer = 'rgba(255,255,255,0)') {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d'), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gr.addColorStop(0, inner); gr.addColorStop(0.25, 'rgba(255,255,255,.45)'); gr.addColorStop(1, outer);
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
+}
+const GLOW = glowTexture();
+function halo(color, size = 6, opacity = 0.85) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: GLOW, color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false }));
+  s.scale.set(size, size, 1); return s;
+}
+function mat(color, emissive = 0.5, opts = {}) {
+  return new THREE.MeshStandardMaterial(Object.assign({ color, emissive: color, emissiveIntensity: emissive, metalness: 0.35, roughness: 0.4 }, opts));
+}
+const LABELS = [];
+function label(text, { color = '#e4ecf8', size = 1.6, tier = 1, sub = null, accent = '#22d3ee', bg = 'rgba(6,10,20,0.78)' } = {}) {
+  const c = document.createElement('canvas'), g = c.getContext('2d');
+  const fs = 44, subFs = 30, padX = 26, padY = 18;
+  g.font = `600 ${fs}px "Space Grotesk", Inter, sans-serif`;
+  let w = g.measureText(text).width;
+  if (sub) { g.font = `500 ${subFs}px "JetBrains Mono", monospace`; w = Math.max(w, g.measureText(sub).width); }
+  const cw = Math.ceil(w + padX * 2 + 10), ch = Math.ceil(fs + padY * 2 + (sub ? subFs + 8 : 0));
+  c.width = cw; c.height = ch;
+  g.fillStyle = bg; g.strokeStyle = accent; g.lineWidth = 3;
+  const r = 16;
+  g.beginPath(); g.moveTo(r, 1.5); g.lineTo(cw - r, 1.5); g.quadraticCurveTo(cw - 1.5, 1.5, cw - 1.5, r); g.lineTo(cw - 1.5, ch - r); g.quadraticCurveTo(cw - 1.5, ch - 1.5, cw - r, ch - 1.5); g.lineTo(r, ch - 1.5); g.quadraticCurveTo(1.5, ch - 1.5, 1.5, ch - r); g.lineTo(1.5, r); g.quadraticCurveTo(1.5, 1.5, r, 1.5); g.closePath();
+  g.fill(); g.globalAlpha = 0.55; g.stroke(); g.globalAlpha = 1;
+  g.fillStyle = accent; g.fillRect(10, padY, 4, fs);
+  g.fillStyle = color; g.textBaseline = 'top';
+  g.font = `600 ${fs}px "Space Grotesk", Inter, sans-serif`; g.fillText(text, padX + 6, padY - 2);
+  if (sub) { g.font = `500 ${subFs}px "JetBrains Mono", monospace`; g.fillStyle = '#8b9cb8'; g.fillText(sub, padX + 6, padY + fs + 6); }
+  const tex = new THREE.CanvasTexture(c); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 4;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: true }));
+  const hWorld = size * (ch / (fs + padY * 2));
+  sp.scale.set(hWorld * cw / ch, hWorld, 1);
+  sp.renderOrder = 10;
+  sp.userData.tier = tier;
+  LABELS.push(sp);
+  return sp;
+}
+
+/* ---- picking registry ---- */
+const pickables = [];
+function pickable(obj, itemId, extra = {}) {
+  obj.userData.itemId = itemId;
+  Object.assign(obj.userData, extra);
+  obj.traverse(o => { if (o.isMesh) { o.userData.pickRoot = obj; if (o.material && o.material.emissiveIntensity != null) o.userData.baseEI = o.material.emissiveIntensity; pickables.push(o); } });
+  return obj;
+}
+
+/* focus presets for items */
+const FOCUS = {};
+function addFocus(id, worldPos, offset = [0, 6, 16]) {
+  FOCUS[id] = { target: worldPos.clone(), pos: worldPos.clone().add(new THREE.Vector3(...offset)) };
+}
+
+/* ---- zone anchors + camera presets ---- */
+const ZONES = {
+  overview: { n: 0, name: 'Overview', long: '360° Overview', icon: 'orbit', pos: [0, 105, 175], target: [0, 10, -12] },
+  timeline: { n: 1, name: 'Lifecycle', long: 'Zone 1 · Lifecycle Highway', icon: 'route', pos: [-70, 42, 70], target: [-68, 5, -2] },
+  decagon: { n: 2, name: 'Criteria', long: 'Zone 2 · 10 Criteria Decagon', icon: 'hexagon', pos: [0, 34, 52], target: [0, 5, 0] },
+  adjud: { n: 3, name: 'Adjudication', long: 'Zone 3 · Two-Step Engine', icon: 'scale', pos: [80, 34, 68], target: [80, 10, 0] },
+  aao: { n: 4, name: 'AAO', long: 'Zone 4 · AAO Review Layer', icon: 'landmark', pos: [22, 58, -8], target: [20, 36, -62] },
+};
+
+/* ---- environment: stars, grid, zone pads ---- */
+const STAR_MAX = 2400;
+const stars = (() => {
+  const g = new THREE.BufferGeometry(), p = new Float32Array(STAR_MAX * 3);
+  for (let i = 0; i < STAR_MAX; i++) {
+    const r = 500 + Math.random() * 500, th = Math.random() * Math.PI * 2, ph = Math.acos(Math.random() * 1.6 - 0.6);
+    p[i * 3] = r * Math.sin(ph) * Math.cos(th); p[i * 3 + 1] = r * Math.cos(ph); p[i * 3 + 2] = r * Math.sin(ph) * Math.sin(th);
+  }
+  g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ color: 0x9fc3ff, size: 1.6, sizeAttenuation: true, transparent: true, opacity: 0.75, fog: false }));
+  scene.add(pts); return pts;
+})();
+const grid = new THREE.GridHelper(700, 140, 0x1a3350, 0x0d1a2c);
+grid.material.transparent = true; grid.material.opacity = 0.45; grid.position.y = -0.6;
+scene.add(grid);
+const decor = new THREE.Group(); scene.add(decor);   // depth >= 4 ornaments
+
+const PAD_LABELS = [];   // big zone titles: shown only in the overview shot
+function zonePad(x, z, r, color, title, sub) {
+  const g = new THREE.Group(); g.position.set(x, -0.5, z);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.25, r, 96), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
+  ring.rotation.x = -Math.PI / 2; g.add(ring);
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(r, 96), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.035, side: THREE.DoubleSide, depthWrite: false }));
+  disc.rotation.x = -Math.PI / 2; g.add(disc);
+  for (let k = 1; k <= 3; k++) {
+    const o = new THREE.Mesh(new THREE.RingGeometry(r + k * 5, r + k * 5 + 0.08, 128), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.18 / k, side: THREE.DoubleSide }));
+    o.rotation.x = -Math.PI / 2; o.position.set(x, -0.45, z); decor.add(o);
+  }
+  const t = label(title, { size: 2.6, sub, accent: '#' + new THREE.Color(color).getHexString() });
+  t.position.set(0, 0.8, r + 2.5); g.add(t); PAD_LABELS.push(t);
+  scene.add(g); return g;
+}
+zonePad(-68, 0, 40, 0x22d3ee, 'ZONE 1 · LIFECYCLE HIGHWAY', 'Month 0 → Month 18+');
+zonePad(0, 0, 25, 0xfbbf24, 'ZONE 2 · 10 CRITERIA DECAGON', '8 CFR 204.5(h)(3)(i)–(x)');
+zonePad(78, 2, 34, 0x34d399, 'ZONE 3 · TWO-STEP ADJUDICATION ENGINE', 'Threshold filter → final merits');
+
+/* =====================================================================
+   5. ZONE 1 — LIFECYCLE HIGHWAY
+   ===================================================================== */
+const Z1 = {};
+(() => {
+  const pts = [[-104, 1, 26], [-96, 1.5, 10], [-86, 2.5, 16], [-77, 3, 4], [-70, 3.5, -10], [-60, 4, -4], [-52, 5, 10], [-43, 6.5, 6], [-37, 9, -8], [-33, 12, -20], [-30, 15, -30]].map(p => new THREE.Vector3(...p));
+  const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.4);
+  Z1.curve = curve;
+  const SEG = 480, RAD = 12;
+  const tubeGeo = new THREE.TubeGeometry(curve, SEG, 0.42, RAD, false);
+  const tube = new THREE.Mesh(tubeGeo, mat(0x0e7490, 0.45, { transparent: true, opacity: 0.55 }));
+  scene.add(tube);
+  pickable(tube, null, { kind: 'Lifecycle highway', title: 'Lifecycle highway', tip: 'Click anywhere on the path to move the month scrubber there.', onClick: hit => { setMonth(nearestMonth(hit.point)); if (S.zone !== 'timeline') setZone('timeline'); } });
+  const prog = new THREE.Mesh(tubeGeo, new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.95 }));
+  prog.scale.setScalar(1); prog.renderOrder = 2;
+  const progGeo = new THREE.TubeGeometry(curve, SEG, 0.5, RAD, false);
+  prog.geometry = progGeo;
+  scene.add(prog);
+  Z1.prog = prog; Z1.SEG = SEG; Z1.RAD = RAD;
+  // outer rails
+  const railPts = curve.getSpacedPoints(300);
+  [-1.6, 1.6].forEach(off => {
+    const rp = railPts.map((p, i) => {
+      const tng = curve.getTangentAt(i / 300); const nrm = new THREE.Vector3(-tng.z, 0, tng.x).normalize();
+      return p.clone().addScaledVector(nrm, off).add(new THREE.Vector3(0, -0.2, 0));
+    });
+    const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(rp), new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.35 }));
+    scene.add(l);
+  });
+
+  // workload columns
+  Z1.cols = [];
+  for (let m = 0; m <= 24; m++) {
+    const u = m / 24, p = curve.getPointAt(u), tng = curve.getTangentAt(u);
+    const nrm = new THREE.Vector3(-tng.z, 0, tng.x).normalize();
+    const h = (WORK[m] / 100) * 9 + 0.2;
+    const col = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1, 0.9), mat(0x22d3ee, 0.4, { transparent: true, opacity: 0.8 }));
+    col.scale.y = h; col.position.copy(p).addScaledVector(nrm, 3.4); col.position.y = h / 2 - 0.4;
+    scene.add(col); Z1.cols.push(col);
+    if (m % 3 === 0) {
+      const t = label(`M${m}`, { size: 0.9, tier: 2, accent: '#22d3ee' });
+      t.position.copy(p).addScaledVector(nrm, -3.2); t.position.y = p.y + 0.4; scene.add(t);
+    }
+    // stem from path to ground
+    if (m % 2 === 0) {
+      const stem = new THREE.Line(new THREE.BufferGeometry().setFromPoints([p.clone().setY(-0.5), p.clone().setY(p.y - 0.4)]), new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.18 }));
+      scene.add(stem);
+    }
+  }
+
+  // pod
+  const pod = new THREE.Group();
+  pod.add(new THREE.Mesh(new THREE.SphereGeometry(0.75, 24, 16), mat(0xfff4d0, 1.4)));
+  pod.add(halo(0xfbbf24, 6.5, 0.9));
+  const podLight = new THREE.PointLight(0xfbbf24, 1.6, 22); pod.add(podLight);
+  scene.add(pod); Z1.pod = pod;
+
+  // milestones
+  Z1.nodes = {};
+  PHASES.forEach((ph, i) => {
+    const m = MILESTONES[ph.id], u = ph.at / 24, p = curve.getPointAt(u);
+    const g = new THREE.Group(); g.position.copy(p).add(new THREE.Vector3(0, 4.2, 0));
+    const core = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5, 1), mat(0x22d3ee, 0.9, { flatShading: true }));
+    const shell = new THREE.Mesh(new THREE.IcosahedronGeometry(2.3, 1), new THREE.MeshBasicMaterial({ color: 0x67e8f9, wireframe: true, transparent: true, opacity: 0.25 }));
+    g.add(core, shell, halo(0x22d3ee, 9, 0.55));
+    const stem = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -4.2, 0), new THREE.Vector3(0, -1.5, 0)]), new THREE.LineBasicMaterial({ color: 0x67e8f9, transparent: true, opacity: 0.5 }));
+    g.add(stem);
+    const lb = label(`${m.n} · ${m.title}`, { size: 1.5, sub: m.months, accent: '#22d3ee' });
+    lb.position.set(0, 3.8, 0); g.add(lb);
+    scene.add(g);
+    pickable(g, ph.id);
+    Z1.nodes[ph.id] = { g, core, shell };
+    addFocus(ph.id, g.position, [0, 14, 40]);
+  });
+
+  // branch outcomes at m4
+  const m4 = Z1.nodes.m4.g.position;
+  Z1.branches = {};
+  const offs = { approval: [-7, 5, 9], rfe: [-1, 7.5, 11], noid: [5, 5.5, 10], denial: [9, 2, 6] };
+  Object.entries(offs).forEach(([k, o]) => {
+    const end = m4.clone().add(new THREE.Vector3(...o));
+    const mid = m4.clone().lerp(end, 0.5).add(new THREE.Vector3(0, 2.5, 0));
+    const bc = new THREE.QuadraticBezierCurve3(m4.clone(), mid, end);
+    const col = new THREE.Color(OUT_COLORS[k]);
+    scene.add(new THREE.Mesh(new THREE.TubeGeometry(bc, 40, 0.14, 8, false), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.7 })));
+    const n = new THREE.Group(); n.position.copy(end);
+    n.add(new THREE.Mesh(new THREE.OctahedronGeometry(0.95, 0), mat(col, 1.0, { flatShading: true })), halo(col, 4.5, 0.7));
+    const lb = label(OUTCOMES[k].title === 'Request for Evidence' ? 'RFE' : OUTCOMES[k].title === 'Notice of Intent to Deny' ? 'NOID' : OUTCOMES[k].title, { size: 1, tier: 1, accent: OUT_COLORS[k] });
+    lb.position.set(0, 1.9, 0); n.add(lb);
+    scene.add(n); pickable(n, `out-${k}`, { noFly: true });
+    Z1.branches[k] = n;
+  });
+})();
+function nearestMonth(point) {
+  let best = 0, bd = Infinity;
+  for (let i = 0; i <= 240; i++) { const d = Z1.curve.getPointAt(i / 240).distanceToSquared(point); if (d < bd) { bd = d; best = i / 10; } }
+  return best;
+}
+
+
+/* =====================================================================
+   6. ZONE 2 — CRITERIA DECAGON
+   ===================================================================== */
+const Z2 = { pillars: [] };
+(() => {
+  const R = 15;
+  const ringPts = [];
+  for (let i = 0; i <= 10; i++) { const a = (i / 10) * Math.PI * 2 - Math.PI / 2; ringPts.push(new THREE.Vector3(Math.cos(a) * (R + 3), 0.05, Math.sin(a) * (R + 3))); }
+  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ringPts), new THREE.LineBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.6 })));
+  const inner = ringPts.map(p => p.clone().multiplyScalar(0.55));
+  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(inner), new THREE.LineBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.25 })));
+
+  // core
+  const core = new THREE.Group(); core.position.set(0, 6, 0);
+  const ico = new THREE.Mesh(new THREE.IcosahedronGeometry(2.6, 1), new THREE.MeshBasicMaterial({ color: 0xfbbf24, wireframe: true, transparent: true, opacity: 0.55 }));
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(1.3, 24, 16), mat(0xfbbf24, 1.2));
+  core.add(ico, ball, halo(0xfbbf24, 12, 0.5));
+  Z2.coreLabel = label('3 of 10 threshold', { size: 1.3, sub: '0 claimed', accent: '#fbbf24' });
+  scene.add(core); Z2.core = core; Z2.ico = ico;
+  // claim ring: ten arc segments
+  Z2.segs = [];
+  for (let i = 0; i < 10; i++) {
+    const seg = new THREE.Mesh(new THREE.RingGeometry(4.2, 5, 16, 1, -Math.PI / 2 + (i / 10) * Math.PI * 2 + 0.04, Math.PI * 2 / 10 - 0.08), new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.12, side: THREE.DoubleSide }));
+    seg.rotation.x = -Math.PI / 2; seg.position.y = 0.3;
+    scene.add(seg); Z2.segs.push(seg);
+  }
+  pickable(core, null, { kind: 'Threshold core', title: 'Three-of-ten core', tip: 'Lights one ring segment for each criterion claimed in Zone 3. Three segments open the Step 1 gate.', onClick: () => { setZone('adjud'); openItem('step1'); } });
+
+  CRITERIA.forEach((c, i) => {
+    const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+    const g = new THREE.Group(); g.position.set(Math.cos(a) * R, 0, Math.sin(a) * R);
+    g.rotation.y = -a + Math.PI / 2;
+    const layers = [];
+    const specs = [
+      { h: 1.6, color: 0x1e3a5f, e: 0.25, tab: 'inside', name: 'What\'s inside' },
+      { h: 1.6, color: 0x0891b2, e: 0.45, tab: 'checklist', name: 'Evidence checklist' },
+      { h: 0.8 + c.weight * 1.25, color: 0xfbbf24, e: 0.35 + c.weight * 0.12, tab: 'weight', name: `Weight ${c.weight}/5` },
+    ];
+    let y = 0;
+    specs.forEach((sp, j) => {
+      const L = new THREE.Group();
+      const m = new THREE.Mesh(new THREE.BoxGeometry(2.6, sp.h, 2.6), mat(sp.color, sp.e, { transparent: true, opacity: 0.92 }));
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: j === 2 ? 0xfde68a : 0x67e8f9, transparent: true, opacity: 0.7 }));
+      L.add(m, edges);
+      L.position.y = y + sp.h / 2; L.userData.baseY = L.position.y; L.userData.h = sp.h;
+      y += sp.h + 0.06;
+      const tag = label(sp.name, { size: 0.85, accent: j === 2 ? '#fbbf24' : '#22d3ee' });
+      tag.position.set(3.4, 0, 0); tag.material.opacity = 0; tag.material.depthTest = false; tag.renderOrder = 20; tag.visible = false; L.add(tag); L.userData.tag = tag;
+      g.add(L); layers.push(L);
+      pickable(L, `crit-${i}`, { tab: sp.tab, pillar: i });
+    });
+    const top = y;
+    const lb = label(`${c.n} · ${c.name}`, { size: 1.15, accent: '#fbbf24' });
+    lb.position.set(0, top + 1.4, 0); g.add(lb);
+    const h = halo(0xfbbf24, 5, 0.0); h.position.y = top + 0.2; g.add(h);
+    // weight pips on base
+    scene.add(g);
+    Z2.pillars.push({ g, layers, label: lb, halo: h, top, angle: a });
+    const wp = g.position.clone().setY(3);
+    const out = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
+    FOCUS[`crit-${i}`] = { target: wp.clone().setY(7), pos: wp.clone().addScaledVector(out, 30).add(new THREE.Vector3(0, 11, 0)) };
+  });
+  Z2.coreLabel.position.set(0, 10.5, 0); scene.add(Z2.coreLabel);
+})();
+
+function peel(i) {
+  const d = REDUCED ? 0.2 : 0.9;
+  Z2.pillars.forEach((P, k) => {
+    const on = k === i, other = i >= 0 && !on;
+    P.layers.forEach((L, j) => {
+      const tY = on ? L.userData.baseY + j * 1.5 + 0.8 : L.userData.baseY;
+      const tX = on ? (j - 1) * 0.0 : 0;
+      G.to(L.position, { y: tY, x: tX, duration: d, ease: 'back.out(1.6)', delay: on ? j * 0.08 : 0 });
+      G.to(L.rotation, { y: on ? (j - 1) * 0.35 : 0, duration: d, ease: 'power2.out' });
+      L.children.forEach(ch => { if (ch.material && ch !== L.userData.tag) G.to(ch.material, { opacity: other ? 0.18 : (ch.isLineSegments ? 0.7 : 0.92), duration: d * 0.6 }); });
+      const tag = L.userData.tag; tag.visible = true;
+      G.to(tag.material, { opacity: on ? 1 : 0, duration: d * 0.6, onComplete: () => { if (!on) tag.visible = false; } });
+    });
+    G.to(P.label.position, { y: on ? P.top + 1.5 * 2 + 2.4 : P.top + 1.4, duration: d, ease: 'power2.out' });
+    G.to(P.label.material, { opacity: other ? 0.25 : 1, duration: d * 0.6 });
+  });
+  S.peeled = i;
+}
+
+/* =====================================================================
+   7. ZONE 3 — TWO-STEP ADJUDICATION ENGINE
+   ===================================================================== */
+const Z3 = {};
+const FUN = { cx: 58, cz: -2, yTop: 25, yBot: 13 };
+const funR = y => 1.3 + 7.9 * Math.pow(clamp((y - FUN.yBot) / (FUN.yTop - FUN.yBot), 0, 1), 1.7);
+const SCALE_PIVOT = new THREE.Vector3(80, 11, 4);
+(() => {
+  // funnel
+  const prof = [];
+  for (let k = 0; k <= 24; k++) { const y = FUN.yBot + (k / 24) * (FUN.yTop - FUN.yBot); prof.push(new THREE.Vector2(funR(y), y - FUN.yBot)); }
+  const lg = new THREE.LatheGeometry(prof, 64);
+  const fun = new THREE.Group(); fun.position.set(FUN.cx, FUN.yBot, FUN.cz);
+  const skin = new THREE.Mesh(lg, new THREE.MeshStandardMaterial({ color: 0x22d3ee, emissive: 0x0e7490, emissiveIntensity: 0.5, transparent: true, opacity: 0.13, side: THREE.DoubleSide, depthWrite: false }));
+  const wire = new THREE.Mesh(lg, new THREE.MeshBasicMaterial({ color: 0x67e8f9, wireframe: true, transparent: true, opacity: 0.16 }));
+  fun.add(skin, wire);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(funR(FUN.yTop), 0.14, 8, 96), new THREE.MeshBasicMaterial({ color: 0x67e8f9 }));
+  rim.rotation.x = Math.PI / 2; rim.position.y = FUN.yTop - FUN.yBot; fun.add(rim);
+  scene.add(fun);
+  pickable(skin, 'step1');
+  const f1 = label('STEP 1 · THRESHOLD FILTER', { size: 1.5, sub: '1 major award  OR  3 of 10 criteria', accent: '#22d3ee' });
+  f1.position.set(FUN.cx, FUN.yTop + 5.2, FUN.cz); scene.add(f1);
+  addFocus('step1', new THREE.Vector3(FUN.cx, 17, FUN.cz), [4, 12, 38]);
+
+  // support struts
+  for (let k = 0; k < 3; k++) {
+    const a = k / 3 * Math.PI * 2 + 0.4, r = funR(FUN.yTop - 3);
+    const top = new THREE.Vector3(FUN.cx + Math.cos(a) * r, FUN.yTop - 3, FUN.cz + Math.sin(a) * r);
+    const bot = new THREE.Vector3(FUN.cx + Math.cos(a) * (r + 3), -0.5, FUN.cz + Math.sin(a) * (r + 3));
+    scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([top, bot]), new THREE.LineBasicMaterial({ color: 0x335577, transparent: true, opacity: 0.6 })));
+  }
+
+  // chutes
+  Z3.chutes = [];
+  CRITERIA.forEach((c, i) => {
+    const a = (i / 10) * Math.PI * 2 - Math.PI / 2, r = funR(FUN.yTop) + 0.9;
+    const g = new THREE.Group(); g.position.set(FUN.cx + Math.cos(a) * r, FUN.yTop + 0.6, FUN.cz + Math.sin(a) * r);
+    const box = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.45, 1.4, 6), mat(0x334155, 0.2));
+    g.add(box);
+    const hl = halo(0xfbbf24, 3.4, 0); hl.position.y = 0.9; g.add(hl);
+    const lb = label(c.n, { size: 0.8, tier: 2, accent: '#fbbf24' }); lb.position.y = 1.9; g.add(lb);
+    scene.add(g);
+    pickable(g, null, { kind: 'Criterion chute', title: `${c.n} · ${c.name}`, tip: 'Click to toggle whether this criterion is claimed in the petition.', hint: 'Click to toggle claim', onClick: () => toggleClaim(i) });
+    Z3.chutes.push({ g, box, hl, a });
+  });
+
+  // gate
+  const gate = new THREE.Mesh(new THREE.TorusGeometry(1.9, 0.28, 12, 48), new THREE.MeshBasicMaterial({ color: 0x34d399 }));
+  gate.rotation.x = Math.PI / 2; gate.position.set(FUN.cx, FUN.yBot - 0.8, FUN.cz); scene.add(gate);
+  const gateHalo = halo(0x34d399, 8, 0.6); gateHalo.position.copy(gate.position); scene.add(gateHalo);
+  Z3.gate = gate; Z3.gateHalo = gateHalo;
+  Z3.gateLabel = label('GATE', { size: 1, sub: '', accent: '#34d399' });
+  Z3.gateLabel.position.set(FUN.cx - 5.5, FUN.yBot - 1.2, FUN.cz + 1); scene.add(Z3.gateLabel);
+
+  // one-time award bypass
+  const bypass = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(FUN.cx + 12, FUN.yTop + 2, FUN.cz - 3), new THREE.Vector3(FUN.cx + 13, FUN.yTop - 5, FUN.cz - 1),
+    new THREE.Vector3(FUN.cx + 9, FUN.yBot + 1, FUN.cz + 1), new THREE.Vector3(FUN.cx + 1.8, FUN.yBot - 0.8, FUN.cz),
+  ]);
+  Z3.bypass = bypass;
+  const bpMesh = new THREE.Mesh(new THREE.TubeGeometry(bypass, 80, 0.3, 10, false), new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.18 }));
+  scene.add(bpMesh); Z3.bpMesh = bpMesh;
+  const bpOrb = new THREE.Group(); bpOrb.add(new THREE.Mesh(new THREE.SphereGeometry(0.8, 20, 14), mat(0xfde68a, 1.4)), halo(0xfbbf24, 5, 0.9));
+  bpOrb.position.copy(bypass.getPoint(0)); scene.add(bpOrb); Z3.bpOrb = bpOrb;
+  pickable(bpOrb, null, { kind: 'One-time achievement', title: 'Major one-time award bypass', tip: 'A major, internationally recognized award (Nobel, Pulitzer, Oscar, Olympic medal) replaces the three-criterion count. Click to toggle.', onClick: () => setOneTime(!S.oneTime) });
+  const bpl = label('ONE-TIME AWARD BYPASS', { size: 0.95, tier: 2, accent: '#fbbf24' }); bpl.position.copy(bypass.getPoint(0)).add(new THREE.Vector3(0, 2.2, 0)); scene.add(bpl);
+
+  // transit channel gate -> left pan
+  // (drawn dynamically since the pan moves; we keep a faint static guide)
+
+  // scale
+  const base = new THREE.Group(); base.position.set(SCALE_PIVOT.x, 0, SCALE_PIVOT.z);
+  base.add(new THREE.Mesh(new THREE.CylinderGeometry(3.4, 4.2, 1, 8), mat(0x1e293b, 0.15)));
+  const col = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.7, SCALE_PIVOT.y, 16), mat(0x475569, 0.2)); col.position.y = SCALE_PIVOT.y / 2; base.add(col);
+  const crown = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), mat(0x22d3ee, 1)); crown.position.y = SCALE_PIVOT.y + 1.1; base.add(crown);
+  scene.add(base);
+  const beam = new THREE.Group(); beam.position.copy(SCALE_PIVOT);
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(17, 0.45, 0.6), mat(0x94a3b8, 0.3)); beam.add(bar);
+  const beamEdge = new THREE.LineSegments(new THREE.EdgesGeometry(bar.geometry), new THREE.LineBasicMaterial({ color: 0x67e8f9, transparent: true, opacity: 0.6 })); beam.add(beamEdge);
+  const needle = new THREE.Mesh(new THREE.ConeGeometry(0.28, 3, 8), mat(0xfbbf24, 1)); needle.position.y = 1.8; beam.add(needle);
+  scene.add(beam); Z3.beam = beam; Z3.tilt = 0;
+  pickable(beam, 'step2'); pickable(base, 'step2');
+  const mkPan = (color, text) => {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(new THREE.CylinderGeometry(3, 2.2, 0.5, 32, 1, true), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.35, side: THREE.DoubleSide, metalness: 0.4, roughness: 0.4 })));
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(2.2, 32), mat(color, 0.25)); floor.rotation.x = -Math.PI / 2; floor.position.y = -0.24; g.add(floor);
+    const stack = new THREE.Group(); g.add(stack); g.userData.stack = stack;
+    const lb = label(text, { size: 0.9, tier: 1, accent: '#' + new THREE.Color(color).getHexString() }); lb.position.y = -1.6; g.add(lb);
+    const line = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(18), 3)), new THREE.LineBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.7 }));
+    scene.add(line); g.userData.line = line;
+    scene.add(g); pickable(g, 'step2'); return g;
+  };
+  Z3.panL = mkPan(0x34d399, 'Evidence of acclaim');
+  Z3.panR = mkPan(0xf43f5e, 'Gaps & doubts');
+  const s2 = label('STEP 2 · FINAL MERITS DETERMINATION', { size: 1.5, sub: 'Totality of the evidence · preponderance', accent: '#34d399' });
+  s2.position.set(SCALE_PIVOT.x, SCALE_PIVOT.y + 6.5, SCALE_PIVOT.z); scene.add(s2);
+  addFocus('step2', SCALE_PIVOT.clone().add(new THREE.Vector3(6, -2, 0)), [0, 9, 38]);
+
+  // merits matrix
+  Z3.matrix = [];
+  const mx0 = 94, mz = -2;
+  FACTORS.forEach((f, i) => {
+    const colCubes = [];
+    for (let k = 0; k < 5; k++) {
+      const c = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.25, 1.6), mat(0x22d3ee, 0.15, { transparent: true, opacity: 0.25 }));
+      c.position.set(mx0 + i * 2.4, 0.8 + k * 1.45, mz);
+      scene.add(c); colCubes.push(c);
+      pickable(c, `factor-${i}`, { noFly: true });
+    }
+    const lb = label(f.short, { size: 0.7, tier: 2, accent: '#22d3ee' }); lb.position.set(mx0 + i * 2.4, 8.6, mz); scene.add(lb);
+    Z3.matrix.push(colCubes);
+  });
+  const ml = label('MERITS MATRIX', { size: 1.1, sub: '7 factors × 5 levels', accent: '#22d3ee' }); ml.position.set(mx0 + 7.2, 11, mz); scene.add(ml);
+
+  // outcome pedestals
+  Z3.peds = {};
+  ['approval', 'rfe', 'noid', 'denial'].forEach((k, i) => {
+    const g = new THREE.Group(); g.position.set(58 + i * 8.5, 0, 17);
+    g.add(new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2, 1.4, 6), mat(0x1e293b, 0.1)));
+    const orb = new THREE.Mesh(new THREE.IcosahedronGeometry(0.9, 1), mat(OUT_COLORS[k], 0.7, { flatShading: true })); orb.position.y = 2.2; g.add(orb);
+    const hh = halo(OUT_COLORS[k], 4.5, 0.4); hh.position.y = 2.2; g.add(hh);
+    const lb = label(k === 'approval' ? 'Approval' : k.toUpperCase(), { size: 0.95, sub: 'simulate', accent: OUT_COLORS[k] }); lb.position.y = 4.3; g.add(lb);
+    scene.add(g);
+    pickable(g, `out-${k}`, { onClick: () => simulate(k), hint: 'Click to simulate this outcome' });
+    Z3.peds[k] = { g, orb, halo: hh };
+  });
+  ['approval', 'rfe', 'noid', 'denial'].forEach(k => addFocus(`out-${k}`, new THREE.Vector3(80, 8, 4), [0, 18, 56]));
+
+  // key light
+  Z3.key = new THREE.PointLight(0xffffff, 1.3, 120); Z3.key.position.set(78, 30, 14); scene.add(Z3.key);
+  Z3.rim = new THREE.PointLight(0x22d3ee, 0.8, 90); Z3.rim.position.set(80, 8, -18); scene.add(Z3.rim);
+})();
+FACTORS.forEach((f, i) => addFocus(`factor-${i}`, new THREE.Vector3(94 + i * 2.4, 4, -2), [-4, 7, 24]));
+
+/* ---- Zone 3 particles ---- */
+const PMAX = 520;
+const P = { list: [], geo: new THREE.BufferGeometry(), pos: new Float32Array(PMAX * 3), col: new Float32Array(PMAX * 3) };
+P.geo.setAttribute('position', new THREE.BufferAttribute(P.pos, 3));
+P.geo.setAttribute('color', new THREE.BufferAttribute(P.col, 3));
+const pMat = new THREE.PointsMaterial({ size: 0.55, vertexColors: true, transparent: true, opacity: 0.95, map: GLOW, blending: THREE.AdditiveBlending, depthWrite: false });
+const pts = new THREE.Points(P.geo, pMat); pts.frustumCulled = false; scene.add(pts);
+for (let i = 0; i < PMAX; i++) P.list.push({ st: -1, p: 0, q: 0, a: 0, sp: 0, ch: 0 });
+const cTmp = new THREE.Color(), C_AMBER = new THREE.Color(0xfbbf24), C_CYAN = new THREE.Color(0x67e8f9);
+function spawn(o) {
+  const claimed = [...S.claimed];
+  const bypassShare = S.oneTime ? (claimed.length ? 0.25 : 1) : 0;
+  if (!claimed.length && !S.oneTime) { o.st = -1; return; }
+  if (Math.random() < bypassShare) { o.st = 3; o.q = Math.random() * 0.1; o.sp = 0.22 + Math.random() * 0.1; return; }
+  o.ch = claimed[(Math.random() * claimed.length) | 0];
+  o.st = 0; o.p = Math.random() * 0.05; o.a = Z3.chutes[o.ch].a + (Math.random() - 0.5) * 0.3; o.sp = 0.16 + Math.random() * 0.12;
+}
+const _v = new THREE.Vector3(), _v2 = new THREE.Vector3();
+function panWorld(pan, out) { return out.copy(pan.position); }
+function updateParticles(dt, active) {
+  const pass = model().pass;
+  const gateP = new THREE.Vector3(FUN.cx, FUN.yBot - 0.8, FUN.cz);
+  const panP = panWorld(Z3.panL, _v2).add(new THREE.Vector3(0, 0.6, 0));
+  for (let i = 0; i < PMAX; i++) {
+    const o = P.list[i], k = i * 3;
+    if (i >= active) { P.pos[k + 1] = -999; continue; }
+    if (o.st === -1 || (o.st === 0 && !S.claimed.has(o.ch)) || (o.st === 3 && !S.oneTime)) spawn(o);
+    if (o.st === -1) { P.pos[k + 1] = -999; continue; }
+    if (o.st === 0) {
+      o.p += dt * o.sp;
+      const y = FUN.yTop - o.p * (FUN.yTop - FUN.yBot), r = funR(y) * 0.8;
+      o.a += dt * (0.5 + 2.8 * o.p);
+      P.pos[k] = FUN.cx + Math.cos(o.a) * r; P.pos[k + 1] = y; P.pos[k + 2] = FUN.cz + Math.sin(o.a) * r;
+      cTmp.copy(C_AMBER).lerp(C_CYAN, o.p);
+      if (o.p >= 1) { o.st = pass ? 1 : 2; o.q = 0; }
+    } else if (o.st === 1 || o.st === 3) {
+      if (o.st === 3) {
+        o.q += dt * o.sp;
+        Z3.bypass.getPoint(Math.min(o.q, 1), _v);
+        cTmp.set(0xfde68a);
+        if (o.q >= 1) { o.st = 1; o.q = 0; }
+      } else {
+        o.q += dt * 0.55;
+        const t = Math.min(o.q, 1), mid = _v.set((gateP.x + panP.x) / 2, gateP.y + 3, (gateP.z + panP.z) / 2 + 2);
+        const a = (1 - t) * (1 - t), b = 2 * (1 - t) * t, c = t * t;
+        _v.set(a * gateP.x + b * mid.x + c * panP.x, a * gateP.y + b * mid.y + c * panP.y, a * gateP.z + b * mid.z + c * panP.z);
+        cTmp.set(0x34d399);
+        if (o.q >= 1) spawn(o);
+      }
+      P.pos[k] = _v.x; P.pos[k + 1] = _v.y; P.pos[k + 2] = _v.z;
+    } else if (o.st === 2) {
+      o.q += dt * 0.8;
+      const r = 1.6 + o.q * 7;
+      P.pos[k] = FUN.cx + Math.cos(o.a) * r; P.pos[k + 1] = FUN.yBot - 0.8 - o.q * o.q * 12; P.pos[k + 2] = FUN.cz + Math.sin(o.a) * r;
+      cTmp.set(0xf43f5e);
+      if (o.q >= 1) spawn(o);
+    }
+    P.col[k] = cTmp.r; P.col[k + 1] = cTmp.g; P.col[k + 2] = cTmp.b;
+  }
+  P.geo.attributes.position.needsUpdate = true; P.geo.attributes.color.needsUpdate = true;
+}
+
+/* burst */
+const BMAX = 360;
+const B = { geo: new THREE.BufferGeometry(), pos: new Float32Array(BMAX * 3), vel: new Float32Array(BMAX * 3), t: 0, on: false };
+B.geo.setAttribute('position', new THREE.BufferAttribute(B.pos, 3));
+const bMat = new THREE.PointsMaterial({ size: 0.9, color: 0xffffff, transparent: true, opacity: 0, map: GLOW, blending: THREE.AdditiveBlending, depthWrite: false });
+const burst = new THREE.Points(B.geo, bMat); burst.frustumCulled = false; scene.add(burst);
+function fireBurst(origin, color) {
+  bMat.color.set(color); bMat.opacity = 1; B.t = 0; B.on = true;
+  const n = Math.round(BMAX * (0.35 + S.depth * 0.13));
+  for (let i = 0; i < BMAX; i++) {
+    const k = i * 3;
+    if (i >= n) { B.pos[k + 1] = -999; B.vel[k] = B.vel[k + 1] = B.vel[k + 2] = 0; continue; }
+    B.pos[k] = origin.x; B.pos[k + 1] = origin.y; B.pos[k + 2] = origin.z;
+    const th = Math.random() * Math.PI * 2, ph = Math.acos(Math.random() * 2 - 1), sp = 6 + Math.random() * 14;
+    B.vel[k] = Math.sin(ph) * Math.cos(th) * sp; B.vel[k + 1] = Math.abs(Math.cos(ph)) * sp * 0.9 + 3; B.vel[k + 2] = Math.sin(ph) * Math.sin(th) * sp;
+  }
+}
+function updateBurst(dt) {
+  if (!B.on) return;
+  B.t += dt;
+  for (let i = 0; i < BMAX; i++) {
+    const k = i * 3; if (B.pos[k + 1] < -900) continue;
+    B.vel[k + 1] -= 14 * dt;
+    B.pos[k] += B.vel[k] * dt; B.pos[k + 1] += B.vel[k + 1] * dt; B.pos[k + 2] += B.vel[k + 2] * dt;
+    B.vel[k] *= 0.985; B.vel[k + 2] *= 0.985;
+  }
+  bMat.opacity = Math.max(0, 1 - B.t / 2.4);
+  if (B.t > 2.4) B.on = false;
+  B.geo.attributes.position.needsUpdate = true;
+}
+
+/* =====================================================================
+   8. ZONE 4 — AAO REVIEW LAYER
+   ===================================================================== */
+const Z4 = {};
+const AAO_C = new THREE.Vector3(20, 32, -62);
+(() => {
+  const plat = new THREE.Group(); plat.position.copy(AAO_C);
+  plat.add(new THREE.Mesh(new THREE.CylinderGeometry(16, 13.5, 1.4, 64), mat(0x141a33, 0.12, { metalness: 0.6, roughness: 0.35 })));
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(16, 0.14, 8, 128), new THREE.MeshBasicMaterial({ color: 0xa78bfa })); rim.rotation.x = Math.PI / 2; rim.position.y = 0.7; plat.add(rim);
+  const rim2 = new THREE.Mesh(new THREE.TorusGeometry(10.5, 0.06, 6, 128), new THREE.MeshBasicMaterial({ color: 0xa78bfa, transparent: true, opacity: 0.5 })); rim2.rotation.x = Math.PI / 2; rim2.position.y = 0.72; plat.add(rim2);
+  const under = new THREE.Mesh(new THREE.ConeGeometry(13, 14, 48, 1, true), new THREE.MeshBasicMaterial({ color: 0xa78bfa, transparent: true, opacity: 0.06, side: THREE.DoubleSide, depthWrite: false }));
+  under.rotation.x = Math.PI; under.position.y = -7.7; plat.add(under);
+  const beamUp = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 20, 24, 1, true), new THREE.MeshBasicMaterial({ color: 0xc4b5fd, transparent: true, opacity: 0.12, side: THREE.DoubleSide, depthWrite: false }));
+  beamUp.position.y = 10; plat.add(beamUp);
+  // colonnade
+  for (let k = 0; k < 7; k++) {
+    const a = Math.PI + 0.35 + (k / 6) * (Math.PI - 0.7);
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 8, 12), mat(0x3b3f6b, 0.2));
+    c.position.set(Math.cos(a) * 12.5, 4.6, Math.sin(a) * 12.5); plat.add(c);
+  }
+  const arch = new THREE.Mesh(new THREE.TorusGeometry(12.5, 0.4, 8, 64, Math.PI - 0.7), mat(0xa78bfa, 0.5));
+  arch.rotation.x = Math.PI / 2; arch.rotation.z = Math.PI + 0.35; arch.position.y = 8.8; plat.add(arch);
+  scene.add(plat); Z4.plat = plat;
+  const t = label('ZONE 4 · AAO APPELLATE PLATFORM', { size: 2.2, sub: 'Administrative Appeals Office · de novo review', accent: '#a78bfa' });
+  t.position.copy(AAO_C).add(new THREE.Vector3(0, 23, 0)); scene.add(t);
+
+  // filter rings
+  Z4.rings = [];
+  ['aao-filing', 'aao-field', 'aao-record', 'aao-denovo', 'aao-burden', 'aao-precedent'].forEach((id, i) => {
+    const r = 6.4 - i * 0.72, y = 3 + i * 2.5;
+    const g = new THREE.Group(); g.position.copy(AAO_C).add(new THREE.Vector3(0, y, 0));
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(r, 0.3, 12, 96), mat(i % 2 ? 0xa78bfa : 0x22d3ee, 0.7));
+    ring.rotation.x = Math.PI / 2; g.add(ring);
+    const lb = label(AAO[id].title, { size: 0.8, tier: 1, accent: i % 2 ? '#a78bfa' : '#22d3ee' });
+    lb.position.set(r + 3.6, 0, 0); g.add(lb);
+    scene.add(g); pickable(g, id);
+    Z4.rings.push({ g, ring, i });
+    addFocus(id, g.position, [12, 8, 30]);
+  });
+
+  // pathway pedestals
+  Z4.paths = [];
+  Object.keys(PATHS).forEach((id, i) => {
+    const a = 0.35 + (i / 4) * (Math.PI - 0.7);
+    const g = new THREE.Group(); g.position.copy(AAO_C).add(new THREE.Vector3(Math.cos(a) * 12.5, 1.3, Math.sin(a) * 12.5));
+    g.add(new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, 1.2, 6), mat(0x2e1f5e, 0.3)));
+    const orb = new THREE.Mesh(new THREE.OctahedronGeometry(0.7, 0), mat(0xc4b5fd, 1, { flatShading: true })); orb.position.y = 1.6; g.add(orb);
+    const lb = label(PATHS[id].short, { size: 0.85, accent: '#a78bfa' }); lb.position.y = 3.2; g.add(lb);
+    scene.add(g); pickable(g, id);
+    Z4.paths.push({ g, orb });
+    addFocus(id, g.position, [0, 10, 26]);
+  });
+
+  // precedent tablets
+  Z4.orbit = new THREE.Group(); Z4.orbit.position.copy(AAO_C).add(new THREE.Vector3(0, 6, 0)); scene.add(Z4.orbit);
+  Z4.tablets = [];
+  PRECEDENTS.forEach((p, i) => {
+    const a = (i / PRECEDENTS.length) * Math.PI * 2;
+    const g = new THREE.Group(); g.position.set(Math.cos(a) * 22, Math.sin(i * 1.7) * 1.5, Math.sin(a) * 22);
+    g.lookAt(0, g.position.y, 0); g.rotateY(Math.PI);
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(3.2, 4.2, 0.25), mat(0x2a2413, 0.25, { metalness: 0.7, roughness: 0.3 }));
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(slab.geometry), new THREE.LineBasicMaterial({ color: 0xfbbf24 }));
+    g.add(slab, edges);
+    for (let k = 0; k < 5; k++) { const ln = new THREE.Mesh(new THREE.PlaneGeometry(2.2 - (k % 2) * 0.6, 0.12), new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.5 })); ln.position.set(0, 1.2 - k * 0.55, 0.14); g.add(ln); }
+    const lb = label(p.short, { size: 0.85, sub: p.cite.split(' (')[0].slice(0, 22), accent: '#fbbf24' }); lb.position.y = 3.2; g.add(lb);
+    Z4.orbit.add(g); pickable(g, `prec-${p.id}`);
+    Z4.tablets.push(g);
+  });
+  const ol = new THREE.Mesh(new THREE.TorusGeometry(22, 0.05, 6, 160), new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.3 }));
+  ol.rotation.x = Math.PI / 2; Z4.orbit.add(ol);
+
+  // connection beams from Zone 1 M5 and Zone 3 denial
+  Z4.links = [];
+  const mk = (from, to, color) => {
+    const mid = from.clone().lerp(to, 0.5).add(new THREE.Vector3(0, 12, 0));
+    const c = new THREE.QuadraticBezierCurve3(from, mid, to);
+    const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(c.getPoints(80)), new THREE.LineDashedMaterial({ color, dashSize: 1.2, gapSize: 0.9, transparent: true, opacity: 0.65 }));
+    l.computeLineDistances(); scene.add(l);
+    const pk = halo(color, 2.6, 0.95); scene.add(pk);
+    Z4.links.push({ c, pk, t: Math.random() });
+  };
+  mk(Z1.nodes.m5.g.position.clone(), AAO_C.clone().add(new THREE.Vector3(-14, 1, 4)), 0xa78bfa);
+  mk(Z3.peds.denial.g.position.clone().add(new THREE.Vector3(0, 2.2, 0)), AAO_C.clone().add(new THREE.Vector3(12, 1, 7)), 0xf43f5e);
+  mk(Z1.branches.denial.position.clone(), AAO_C.clone().add(new THREE.Vector3(-10, 1, 10)), 0xf43f5e);
+})();
+
+/* =====================================================================
+   9. STATE → SCENE SYNC
+   ===================================================================== */
+function setMonth(m) {
+  S.month = clamp(m, 0, 24);
+  const u = S.month / 24, p = Z1.curve.getPointAt(u);
+  Z1.pod.position.copy(p).add(new THREE.Vector3(0, 1.3, 0));
+  Z1.prog.geometry.setDrawRange(0, Math.floor(u * Z1.SEG) * Z1.RAD * 6);
+  Z1.cols.forEach((c, m2) => {
+    const d = Math.abs(m2 - S.month), on = d < 0.75, past = m2 <= S.month;
+    const v = WORK[m2];
+    c.material.color.set(on ? 0xfbbf24 : v > 75 ? 0xf59e0b : 0x22d3ee);
+    c.material.emissive.copy(c.material.color);
+    c.material.emissiveIntensity = on ? 1.3 : past ? 0.45 : 0.12;
+    c.material.opacity = past || on ? 0.9 : 0.35;
+  });
+  const ph = phaseAt(S.month);
+  Object.entries(Z1.nodes).forEach(([id, n]) => {
+    const act = id === ph.id;
+    n.core.material.color.set(act ? 0xfbbf24 : 0x22d3ee); n.core.material.emissive.copy(n.core.material.color);
+    n.core.material.emissiveIntensity = act ? 1.3 : 0.6;
+    n.core.userData.baseEI = n.core.material.emissiveIntensity;
+  });
+  updateTimelineReadout();
+}
+
+function syncClaims() {
+  const md = model();
+  Z3.chutes.forEach((c, i) => {
+    const on = S.claimed.has(i);
+    c.box.material.color.set(on ? 0xfbbf24 : 0x334155); c.box.material.emissive.copy(c.box.material.color);
+    c.box.material.emissiveIntensity = on ? 0.9 : 0.15; c.box.userData.baseEI = c.box.material.emissiveIntensity;
+    c.hl.material.opacity = on ? 0.8 : 0;
+  });
+  Z2.segs.forEach((s, i) => { s.material.opacity = S.claimed.has(i) ? 0.85 : 0.1; });
+  Z2.pillars.forEach((P2, i) => { P2.halo.material.opacity = S.claimed.has(i) ? 0.7 : 0; });
+  const gc = md.pass ? 0x34d399 : 0xf43f5e;
+  Z3.gate.material.color.set(gc); Z3.gateHalo.material.color.set(gc);
+  relabel(Z3.gateLabel, md.pass ? 'GATE OPEN' : 'GATE CLOSED', S.oneTime ? 'one-time award' : `${md.count} of 10 met`, md.pass ? '#34d399' : '#f43f5e');
+  relabel(Z2.coreLabel, '3 of 10 threshold', `${md.count} claimed${S.oneTime ? ' + award' : ''}`, '#fbbf24');
+  Z3.bpMesh.material.opacity = S.oneTime ? 0.7 : 0.14;
+  Z3.bpOrb.children[0].material.emissiveIntensity = S.oneTime ? 1.6 : 0.3;
+  Z3.bpOrb.children[1].material.opacity = S.oneTime ? 0.9 : 0.2;
+  syncMerits();
+}
+function relabel(sp, text, sub, accent) {
+  const fresh = label(text, { size: sp.userData.size || 1, sub, accent });
+  LABELS.splice(LABELS.indexOf(fresh), 1);
+  sp.material.map.dispose(); sp.material.map = fresh.material.map; fresh.material.dispose();
+  const h = sp.scale.y; sp.scale.set(h * fresh.scale.x / fresh.scale.y, h, 1);
+  sp.material.needsUpdate = true;
+}
+function syncMerits() {
+  const md = model();
+  Z3.matrix.forEach((col, i) => col.forEach((c, k) => {
+    const on = k < S.factors[i];
+    const color = on ? (k >= 3 ? 0xfbbf24 : 0x22d3ee) : 0x1e293b;
+    c.material.color.set(color); c.material.emissive.set(color);
+    c.material.emissiveIntensity = on ? 0.8 : 0.08; c.userData.baseEI = c.material.emissiveIntensity;
+    c.material.opacity = on ? 0.9 : 0.22;
+  }));
+  Z3.tiltTarget = md.pass ? (md.score - 0.5) * 0.62 : -0.3;
+  const stack = (pan, n, color) => {
+    const st = pan.userData.stack; while (st.children.length) st.remove(st.children[0]);
+    for (let k = 0; k < n; k++) {
+      const s = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 10), mat(color, 0.9));
+      const ring = Math.floor(k / 6), a = (k % 6) / 6 * Math.PI * 2 + ring * 0.5;
+      s.position.set(Math.cos(a) * (ring ? 0.7 : 1.3), 0.2 + ring * 0.6, Math.sin(a) * (ring ? 0.7 : 1.3)); st.add(s);
+    }
+  };
+  stack(Z3.panL, Math.min(12, md.count + (S.oneTime ? 3 : 0) + Math.round(md.score * 3)), 0x34d399);
+  stack(Z3.panR, Math.min(12, Math.round((1 - md.score) * 7) + (md.pass ? 0 : 3)), 0xf43f5e);
+  updateAdjReadout();
+}
+
+function toggleClaim(i) {
+  if (S.claimed.has(i)) S.claimed.delete(i); else S.claimed.add(i);
+  syncClaims(); if (S.zone === 'adjud') renderConsole();
+  toast(`${CRITERIA[i].n} · ${CRITERIA[i].name} ${S.claimed.has(i) ? 'claimed' : 'removed'}`, S.claimed.has(i) ? '#fbbf24' : '#64748b');
+}
+function setOneTime(v) { S.oneTime = v; syncClaims(); if (S.zone === 'adjud') renderConsole(); }
+
+function simulate(k) {
+  S.outcome = k;
+  const col = new THREE.Color(OUT_COLORS[k]);
+  const d = REDUCED ? 0.2 : 1.2;
+  G.to(Z3.key.color, { r: col.r, g: col.g, b: col.b, duration: d });
+  G.to(Z3.key, { intensity: 3.2, duration: 0.25, onComplete: () => G.to(Z3.key, { intensity: 1.6, duration: 1.4 }) });
+  G.to(Z3.rim.color, { r: col.r, g: col.g, b: col.b, duration: d });
+  const fogTo = new THREE.Color(0x04060c).lerp(col, 0.07);
+  G.to(scene.fog.color, { r: fogTo.r, g: fogTo.g, b: fogTo.b, duration: d });
+  G.to(scene.background, { r: fogTo.r, g: fogTo.g, b: fogTo.b, duration: d });
+  Object.entries(Z3.peds).forEach(([kk, p]) => {
+    const on = kk === k;
+    p.orb.material.emissiveIntensity = on ? 2 : 0.4; p.orb.userData.baseEI = p.orb.material.emissiveIntensity;
+    p.halo.material.opacity = on ? 1 : 0.2;
+    G.to(p.orb.position, { y: on ? 3.4 : 2.2, duration: 0.8, ease: 'back.out(2)' });
+  });
+  const origin = k === 'approval' ? Z3.panL.position.clone().add(new THREE.Vector3(0, 1, 0)) : Z3.peds[k].g.position.clone().add(new THREE.Vector3(0, 3, 0));
+  fireBurst(origin, OUT_COLORS[k]);
+  if (k === 'approval') Z3.tiltTarget = 0.3; else if (k === 'denial') Z3.tiltTarget = -0.32;
+  toast(`Simulated outcome: ${OUTCOMES[k].title}`, OUT_COLORS[k]);
+  openItem(`out-${k}`, null, { fly: false });
+  if (S.zone === 'adjud') renderConsole();
+}
+function resetOutcome() {
+  S.outcome = null;
+  const d = REDUCED ? 0.2 : 1;
+  G.to(Z3.key.color, { r: 1, g: 1, b: 1, duration: d }); G.to(Z3.key, { intensity: 1.3, duration: d });
+  const c2 = new THREE.Color(0x22d3ee); G.to(Z3.rim.color, { r: c2.r, g: c2.g, b: c2.b, duration: d });
+  const bg = new THREE.Color(0x04060c);
+  G.to(scene.fog.color, { r: bg.r, g: bg.g, b: bg.b, duration: d }); G.to(scene.background, { r: bg.r, g: bg.g, b: bg.b, duration: d });
+  Object.values(Z3.peds).forEach(p => { p.orb.material.emissiveIntensity = 0.7; p.orb.userData.baseEI = 0.7; p.halo.material.opacity = 0.4; G.to(p.orb.position, { y: 2.2, duration: 0.6 }); });
+  syncMerits();
+}
+
+/* ---- depth dial ---- */
+const PCOUNTS = [70, 150, 260, 380, 520];
+function setDepth(v) {
+  S.depth = clamp(Math.round(v), 1, 5);
+  $('#dial-range').value = S.depth; $('#dial-range').style.setProperty('--p', `${(S.depth - 1) * 25}%`);
+  $('#dial-num').textContent = S.depth; $('#dial-name').textContent = DEPTH_NAMES[S.depth - 1];
+  $('#dial-arc').setAttribute('stroke-dasharray', `${(S.depth / 5) * 113} 151`);
+  stars.geometry.setDrawRange(0, Math.round(STAR_MAX * [0.2, 0.4, 0.6, 0.8, 1][S.depth - 1]));
+  grid.visible = S.depth >= 2;
+  decor.visible = S.depth >= 4;
+  LABELS.forEach(l => { if (l.userData.tier > 1) l.visible = S.depth >= 2 + (l.userData.tier - 2) * 2; });
+  Z4.links.forEach(l => { l.pk.visible = S.depth >= 3; });
+  applyDepthToDom();
+}
+function applyDepthToDom(root = document) {
+  root.querySelectorAll('[data-depth]').forEach(el => { el.hidden = +el.dataset.depth > S.depth; });
+  root.querySelectorAll('[data-depth-max]').forEach(el => { el.hidden = S.depth > +el.dataset.depthMax; });
+}
+
+/* =====================================================================
+   10. CAMERA DIRECTOR
+   ===================================================================== */
+function flyTo(pos, target, dur = 1.9) {
+  const d = REDUCED ? 0.35 : dur;
+  if (camera.aspect < 1) pos = target.clone().add(pos.clone().sub(target).multiplyScalar(Math.min(2, 0.9 / camera.aspect)));   // portrait: pull back
+  G.killTweensOf(camera.position); G.killTweensOf(controls.target);
+  G.to(camera.position, { x: pos.x, y: pos.y, z: pos.z, duration: d, ease: 'power3.inOut' });
+  G.to(controls.target, { x: target.x, y: target.y, z: target.z, duration: d, ease: 'power3.inOut' });
+}
+const v3 = a => new THREE.Vector3(...a);
+function focusItem(id) {
+  if (id.startsWith('prec-')) {
+    const idx = PRECEDENTS.findIndex(p => `prec-${p.id}` === id), tab = Z4.tablets[idx];
+    const wp = tab.getWorldPosition(new THREE.Vector3());
+    const out = wp.clone().sub(AAO_C).setY(0).normalize();
+    flyTo(wp.clone().addScaledVector(out, 26).add(new THREE.Vector3(0, 7, 0)), wp); return;
+  }
+  const f = FOCUS[id]; if (f) flyTo(f.pos, f.target);
+}
+
+/* =====================================================================
+   11. UI — HUD, console, drawer, search, tour
+   ===================================================================== */
+const nav = $('#zone-nav');
+nav.innerHTML = Object.entries(ZONES).map(([k, z]) => `<button class="zbtn" data-zone="${k}" aria-current="false" aria-label="${z.long}" title="${z.long} (${z.n + 1})"><i data-lucide="${z.icon}"></i><span class="zn">${String(z.n).padStart(2, '0')}</span><span class="zl">${z.name}</span></button>`).join('');
+nav.addEventListener('click', e => { const b = e.target.closest('.zbtn'); if (b) { stopTour(); setZone(b.dataset.zone); } });
+
+function setZone(z, { fly = true } = {}) {
+  const changed = S.zone !== z;
+  S.zone = z;
+  nav.querySelectorAll('.zbtn').forEach(b => b.setAttribute('aria-current', String(b.dataset.zone === z)));
+  if (fly) flyTo(v3(ZONES[z].pos), v3(ZONES[z].target));
+  if (z !== 'decagon' && S.peeled >= 0) peel(-1);
+  if (z !== 'adjud' && S.outcome) resetOutcome();
+  PAD_LABELS.forEach(l => { l.visible = z === 'overview'; });
+  if (changed || fly) renderConsole();
+}
+
+/* ---- console ---- */
+const cBody = $('#console-body');
+function renderConsole() {
+  const z = S.zone;
+  $('#console-kicker').textContent = z === 'overview' ? 'Mission console' : `Zone ${ZONES[z].n} console`;
+  $('#console-title').textContent = ZONES[z].long.replace(/^Zone \d · /, '');
+  const keep = cBody.dataset.zone === z ? cBody.scrollTop : 0;
+  cBody.dataset.zone = z;
+  cBody.innerHTML = CONSOLE[z]();
+  cBody.scrollTop = keep;
+  bindConsole(z);
+  applyDepthToDom(cBody);
+  icons();
+}
+const CONSOLE = {
+  overview: () => `
+    <div class="c-sec"><p>A 360° walk through the EB-1A extraordinary ability petition: how a case is built, how USCIS filters it in two steps, and what happens on appeal. Pick a zone, or let the director fly you through it.</p>
+      <button class="btn cyan full" data-act="tour"><i data-lucide="clapperboard"></i>Start cinematic tour</button></div>
+    <div class="c-sec"><h3><i data-lucide="map"></i>Zones</h3>
+      ${['timeline', 'decagon', 'adjud', 'aao'].map(k => `<button class="zone-card" data-zone="${k}"><span class="zc-ico"><i data-lucide="${ZONES[k].icon}"></i></span><span><b>${ZONES[k].long}</b><span>${{ timeline: 'Month 0 to 18+: five milestones, a workload scrubber and the four-way outcome fork.', decagon: 'The ten regulatory criteria as peelable pillars: definition, evidence, weight.', adjud: 'The threshold funnel and the final-merits balance. Simulate outcomes and open recovery playbooks.', aao: 'The floating appellate layer: de novo review, record limits, motions and precedent.' }[k]}</span></span></button>`).join('')}</div>
+    <div class="c-sec"><h3><i data-lucide="info"></i>Legend</h3>
+      <div class="legend-row"><i style="background:var(--cyan)"></i>Process structure and filters</div>
+      <div class="legend-row"><i style="background:var(--amber)"></i>Evidence, criteria and weight</div>
+      <div class="legend-row"><i style="background:var(--ok)"></i>Approval / gate open</div>
+      <div class="legend-row"><i style="background:var(--rfe)"></i>Request for Evidence</div>
+      <div class="legend-row"><i style="background:var(--noid)"></i>Notice of Intent to Deny</div>
+      <div class="legend-row"><i style="background:var(--deny)"></i>Denial / gate closed</div>
+      <div class="legend-row"><i style="background:var(--violet)"></i>AAO appellate layer</div></div>
+    <div class="c-sec"><p class="note">Educational material, not legal advice. Weights, workloads and the adjudication model are illustrative teaching devices. Confirm fees and processing times on uscis.gov.</p></div>`,
+  timeline: () => {
+    const ph = phaseAt(S.month), m = MILESTONES[ph.id], w = workAt(S.month);
+    return `
+    <div class="c-sec"><h3><i data-lucide="timer"></i>Month scrubber</h3>
+      <div class="readout" style="margin-bottom:10px">
+        <div class="stat"><div class="k">Month</div><div class="v" id="tl-month">${S.month.toFixed(1)}</div></div>
+        <div class="stat"><div class="k">Workload index</div><div class="v" id="tl-work">${Math.round(w)}<small> /100</small></div></div>
+      </div>
+      <input id="tl-range" type="range" min="0" max="24" step="0.1" value="${S.month}" aria-label="Month" style="--p:${S.month / 24 * 100}%">
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <button class="btn cyan" data-act="play" style="flex:1"><i data-lucide="${S.playing ? 'pause' : 'play'}"></i>${S.playing ? 'Pause' : 'Play journey'}</button>
+        <button class="btn" data-act="reset-month" aria-label="Back to month 0"><i data-lucide="rotate-ccw"></i></button>
+      </div></div>
+    <div class="c-sec"><h3><i data-lucide="flag"></i>Current phase</h3>
+      <button class="row-btn active" data-open="${ph.id}" id="tl-phase"><span class="num">${m.n}</span><span class="grow">${m.title}<span class="sub">${m.months}</span></span><i data-lucide="chevron-right"></i></button>
+      <p id="tl-hours" style="margin-top:8px">Illustrative effort: about <strong>${Math.round(w * 0.22)} hours a week</strong> of petitioner and counsel time.</p></div>
+    <div class="c-sec"><h3><i data-lucide="chart-column"></i>Documentation intensity</h3><div id="tl-chart">${workChart(0, 24, S.month)}</div>
+      <p class="note">Peaks mark dossier assembly before filing and the RFE response window. Illustrative, not measured.</p></div>
+    <div class="c-sec"><h3><i data-lucide="route"></i>Milestones</h3>
+      ${PHASES.map(p => `<button class="row-btn" data-open="${p.id}" data-month="${p.at}"><span class="num">${MILESTONES[p.id].n}</span><span class="grow">${MILESTONES[p.id].title}<span class="sub">${MILESTONES[p.id].months}</span></span></button>`).join('')}
+      <div data-depth="2" style="margin-top:8px"><h3 style="font-family:var(--f-mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:10px 0 6px">Outcome branches</h3>
+      <div class="outcomes">${['approval', 'rfe', 'noid', 'denial'].map(k => `<button class="btn ob" data-open="out-${k}"><span class="dot" style="background:${OUT_COLORS[k]}"></span>${k === 'approval' ? 'Approval' : k.toUpperCase()}</button>`).join('')}</div></div></div>`;
+  },
+  decagon: () => `
+    <div class="c-sec"><p>Ten pillars, one per criterion in 8 CFR 204.5(h)(3). Pillar height tracks the persuasive weight index. Click a pillar to peel it into its three layers.</p>
+      <input id="crit-q" class="txt-input" type="search" placeholder="Search criteria (e.g. press, salary, review)" value="${esc(S.critQuery)}" aria-label="Search criteria"></div>
+    <div class="c-sec"><h3 style="justify-content:space-between"><span style="display:flex;gap:6px;align-items:center"><i data-lucide="hexagon"></i>Criteria</span>
+      <button class="btn" data-act="sort" style="padding:4px 8px;font-size:11px">${S.critSort === 'statute' ? 'Sort by weight' : 'Sort by statute'}</button></h3>
+      <div id="crit-list"></div></div>
+    <div class="c-sec"><h3><i data-lucide="layers"></i>Pillar layers</h3>
+      <div class="legend-row"><i style="background:#1e3a5f;border:1px solid #67e8f9"></i>Base: what's inside (definition, threshold)</div>
+      <div class="legend-row"><i style="background:#0891b2"></i>Middle: strategy and evidence checklist</div>
+      <div class="legend-row"><i style="background:var(--amber)"></i>Cap: persuasive weight (height = weight)</div>
+      ${S.peeled >= 0 ? '<button class="btn full" data-act="unpeel" style="margin-top:6px"><i data-lucide="rotate-ccw"></i>Reassemble ring</button>' : ''}</div>
+    <div class="c-sec" data-depth="3"><p class="note">The weight index is a teaching device reflecting how directly strong evidence under each criterion speaks to Step 2. It is not an official USCIS measure.</p></div>`,
+  adjud: () => {
+    const md = model();
+    return `
+    <div class="c-sec"><h3><i data-lucide="filter"></i>Step 1 · Threshold filter</h3>
+      <p>Toggle the criteria this petition claims. You can also click the chutes on the funnel rim.</p>
+      <div class="chips" style="margin-bottom:8px">${CRITERIA.map((c, i) => `<button class="chip" data-claim="${i}" aria-pressed="${S.claimed.has(i)}"><span class="cn">${c.n}</span>${c.name}</button>`).join('')}</div>
+      <div class="toggle-row"><button class="switch" role="switch" aria-checked="${S.oneTime}" data-act="onetime" aria-label="Major one-time award"></button><span>Major one-time award <span class="muted">(Nobel-level)</span></span></div>
+      <div class="verdict" style="margin-top:8px" id="adj-step1"></div></div>
+    <div class="c-sec"><h3><i data-lucide="scale"></i>Step 2 · Final merits</h3>
+      ${FACTORS.map((f, i) => `<div class="slider-row"><label for="f-${i}"><span>${f.name}</span></label><input id="f-${i}" type="range" min="1" max="5" step="1" value="${S.factors[i]}" data-factor="${i}" style="--p:${(S.factors[i] - 1) * 25}%"><output id="fo-${i}">${S.factors[i]}</output></div>`).join('')}
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <button class="btn" data-preset="thin" style="flex:1;font-size:11.5px">Thin record</button>
+        <button class="btn" data-preset="mid" style="flex:1;font-size:11.5px">Borderline</button>
+        <button class="btn" data-preset="strong" style="flex:1;font-size:11.5px">Strong</button>
+      </div>
+      <div class="balance" aria-hidden="true"><i id="adj-needle" style="left:${md.score * 100}%"></i></div>
+      <div style="display:flex;justify-content:space-between" class="note"><span>Doubts</span><span>Acclaim</span></div>
+      <div class="verdict" style="margin-top:8px" id="adj-step2"></div></div>
+    <div class="c-sec"><h3><i data-lucide="zap"></i>Outcome simulation hub</h3>
+      <button class="btn cyan full" data-act="run" style="margin-bottom:6px"><i data-lucide="play"></i>Run modeled adjudication</button>
+      <div class="outcomes">${['approval', 'rfe', 'noid', 'denial'].map(k => `<button class="btn ob${S.outcome === k ? ' amber' : ''}" data-sim="${k}"><span class="dot" style="background:${OUT_COLORS[k]}"></span>${k === 'approval' ? 'Approval' : k.toUpperCase()}</button>`).join('')}</div>
+      ${S.outcome ? '<button class="btn full" data-act="reset-outcome" style="margin-top:6px"><i data-lucide="rotate-ccw"></i>Reset lighting</button>' : ''}
+      <p class="note" style="margin-top:8px">The model is a teaching heuristic that shows how the two steps interact. It does not predict any real case.</p></div>
+    <div class="c-sec" data-depth="2"><h3><i data-lucide="book-marked"></i>Go deeper</h3>
+      <button class="row-btn" data-open="step1"><span class="grow">Step 1 · The threshold filter</span><i data-lucide="chevron-right"></i></button>
+      <button class="row-btn" data-open="step2"><span class="grow">Step 2 · Final merits determination</span><i data-lucide="chevron-right"></i></button></div>`;
+  },
+  aao: () => `
+    <div class="c-sec"><p>The elevated platform models what happens after a denial. Rings are the filters the AAO applies; pedestals are the routes open to you; the orbiting tablets are the decisions most cited in EB-1A cases.</p>
+      <div class="readout"><div class="stat"><div class="k">Appeal window</div><div class="v">30<small> days</small></div><div class="note">33 if mailed</div></div><div class="stat"><div class="k">Field review</div><div class="v">45<small> days</small></div><div class="note">issuing office</div></div></div></div>
+    <div class="c-sec"><h3><i data-lucide="filter"></i>Review filters</h3>
+      ${Object.keys(AAO).map(id => `<button class="row-btn" data-open="${id}"><span class="grow">${AAO[id].title}<span class="sub">${AAO[id].sub}</span></span></button>`).join('')}</div>
+    <div class="c-sec"><h3><i data-lucide="route"></i>Routes after denial</h3>
+      ${Object.keys(PATHS).map(id => `<button class="row-btn" data-open="${id}"><span class="grow">${PATHS[id].title}<span class="sub">${PATHS[id].sub}</span></span></button>`).join('')}</div>
+    <div class="c-sec"><h3><i data-lucide="book-marked"></i>Precedents</h3>
+      <input id="prec-q" class="txt-input" type="search" placeholder="Filter decisions" aria-label="Filter precedents" style="margin-bottom:6px">
+      <div id="prec-list">${PRECEDENTS.map(p => `<button class="row-btn" data-open="prec-${p.id}" data-q="${esc((p.title + ' ' + p.cite + ' ' + p.body).toLowerCase())}"><span class="grow">${p.title}<span class="sub">${p.cite}</span></span></button>`).join('')}</div></div>
+    <div class="c-sec" data-depth="3"><h3><i data-lucide="git-branch"></i>Which route fits?</h3>
+      ${H.acc('The officer misread the law or the record', H.p('Appeal to the AAO, or a motion to reconsider if the error is narrow and the deciding office can fix it quickly.'))}
+      ${H.acc('I have strong evidence that existed at filing but was left out', H.p('Motion to reopen, unless an RFE already asked for it; then <em>Soriano</em> makes it hard. Consider refiling.'))}
+      ${H.acc('My record was thin, and it is stronger now', H.p('Refile. New achievements cannot rescue the old petition (<em>Katigbak</em>), but they count in a new one.'))}
+      ${H.acc('The agency\'s final decision was arbitrary', H.p('Federal court review under the APA. Usually the remedy is a remand to USCIS.'))}</div>`,
+};
+
+function bindConsole(z) {
+  cBody.querySelectorAll('[data-zone]').forEach(b => b.onclick = () => setZone(b.dataset.zone));
+  cBody.querySelectorAll('[data-open]').forEach(b => b.onclick = () => {
+    if (b.dataset.month) setMonth(+b.dataset.month);
+    openItem(b.dataset.open);
+  });
+  const act = (name, fn) => cBody.querySelectorAll(`[data-act="${name}"]`).forEach(b => b.onclick = fn);
+  act('tour', startTour);
+  if (z === 'timeline') {
+    const r = $('#tl-range');
+    r.oninput = () => { S.playing = false; setMonth(+r.value); };
+    act('play', () => { S.playing = !S.playing; if (S.playing && S.month >= 24) setMonth(0); renderConsole(); });
+    act('reset-month', () => { S.playing = false; setMonth(0); renderConsole(); });
+  }
+  if (z === 'decagon') {
+    const q = $('#crit-q');
+    q.oninput = () => { S.critQuery = q.value; renderCritList(); };
+    act('sort', () => { S.critSort = S.critSort === 'statute' ? 'weight' : 'statute'; renderConsole(); });
+    act('unpeel', () => { peel(-1); closeDrawer(); renderConsole(); });
+    renderCritList();
+  }
+  if (z === 'adjud') {
+    cBody.querySelectorAll('[data-claim]').forEach(b => b.onclick = () => toggleClaim(+b.dataset.claim));
+    act('onetime', () => setOneTime(!S.oneTime));
+    cBody.querySelectorAll('[data-factor]').forEach(r => r.oninput = () => {
+      const i = +r.dataset.factor; S.factors[i] = +r.value;
+      r.style.setProperty('--p', `${(S.factors[i] - 1) * 25}%`); $(`#fo-${i}`).textContent = r.value;
+      syncMerits();
+    });
+    cBody.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => {
+      const pr = { thin: { c: [3, 5], f: [2, 1, 2, 1, 2, 2, 3] }, mid: { c: [2, 3, 5, 7], f: [3, 3, 3, 2, 3, 3, 4] }, strong: { c: [0, 2, 3, 4, 5, 7], f: [5, 4, 5, 4, 5, 4, 5] } }[b.dataset.preset];
+      S.claimed = new Set(pr.c); S.factors = pr.f.slice(); S.oneTime = false;
+      syncClaims(); renderConsole();
+    });
+    cBody.querySelectorAll('[data-sim]').forEach(b => b.onclick = () => simulate(b.dataset.sim));
+    act('run', () => { const md = model(); flyTo(v3([80, 26, 60]), v3([80, 10, 2]), 1.2); G.delayedCall(REDUCED ? 0.1 : 0.9, () => simulate(md.outcome)); });
+    act('reset-outcome', () => { resetOutcome(); renderConsole(); });
+    updateAdjReadout();
+  }
+  if (z === 'aao') {
+    const q = $('#prec-q');
+    q.oninput = () => { const s = q.value.toLowerCase().trim(); cBody.querySelectorAll('#prec-list .row-btn').forEach(b => { b.hidden = s && !b.dataset.q.includes(s); }); };
+  }
+}
+function renderCritList() {
+  const el = $('#crit-list'); if (!el) return;
+  const q = S.critQuery.toLowerCase().trim();
+  let list = CRITERIA.map((c, i) => ({ c, i }));
+  if (S.critSort === 'weight') list.sort((a, b) => b.c.weight - a.c.weight || a.i - b.i);
+  list = list.filter(({ c }) => !q || `${c.name} ${c.full} ${c.tags} ${c.reg}`.toLowerCase().includes(q));
+  el.innerHTML = list.length ? list.map(({ c, i }) => `<button class="row-btn${S.peeled === i ? ' active' : ''}" data-crit="${i}"><span class="num">${c.n}</span><span class="grow">${c.name}<span class="sub">${c.full}</span></span><span class="wbar" aria-label="weight ${c.weight} of 5">${[1, 2, 3, 4, 5].map(k => `<i class="${k <= c.weight ? 'on' : ''}"></i>`).join('')}</span></button>`).join('') : '<p class="note">No criteria match that search.</p>';
+  el.querySelectorAll('[data-crit]').forEach(b => b.onclick = () => openCriterion(+b.dataset.crit));
+}
+function openCriterion(i, tab) {
+  peel(i);
+  openItem(`crit-${i}`, tab);
+  if (S.zone === 'decagon') { const l = $('#crit-list'); if (l) renderCritList(); }
+}
+
+function updateTimelineReadout() {
+  if (S.zone !== 'timeline') return;
+  const w = workAt(S.month), ph = phaseAt(S.month), m = MILESTONES[ph.id];
+  const set = (id, h) => { const e = $(id); if (e) e.innerHTML = h; };
+  set('#tl-month', S.month.toFixed(1));
+  set('#tl-work', `${Math.round(w)}<small> /100</small>`);
+  set('#tl-chart', workChart(0, 24, S.month));
+  set('#tl-hours', `Illustrative effort: about <strong>${Math.round(w * 0.22)} hours a week</strong> of petitioner and counsel time.`);
+  const pb = $('#tl-phase');
+  if (pb && pb.dataset.open !== ph.id) { pb.dataset.open = ph.id; pb.innerHTML = `<span class="num">${m.n}</span><span class="grow">${m.title}<span class="sub">${m.months}</span></span><i data-lucide="chevron-right"></i>`; icons(); }
+  const r = $('#tl-range'); if (r && document.activeElement !== r) { r.value = S.month; }
+  if (r) r.style.setProperty('--p', `${S.month / 24 * 100}%`);
+}
+function updateAdjReadout() {
+  const md = model();
+  const s1 = $('#adj-step1'), s2 = $('#adj-step2'), nd = $('#adj-needle');
+  if (s1) s1.innerHTML = md.pass
+    ? `<b style="color:var(--ok)">Gate open.</b> ${S.oneTime ? 'The one-time award path satisfies Step 1 by itself.' : `${md.count} of 10 criteria claimed, so evidence flows to the final merits.`}`
+    : `<b style="color:var(--deny)">Gate closed.</b> ${md.count} of 10 claimed. At least three are needed, so the officer need not reach Step 2.`;
+  const lean = !md.pass ? 'not reached' : md.score >= 0.72 ? 'leans toward acclaim' : md.score >= 0.5 ? 'close to even: expect questions' : md.score >= 0.33 ? 'leans toward doubt' : 'weighs heavily toward doubt';
+  if (s2) s2.innerHTML = `<b>Balance: ${lean}.</b> Modeled first action: <span style="color:${OUT_COLORS[md.outcome]};font-weight:600">${OUTCOMES[md.outcome].title}</span>.`;
+  if (nd) nd.style.left = `${md.score * 100}%`;
+}
+
+/* ---- view offset: keep the scene centred in the gap between panels ---- */
+const VIEW = { x: 0 };
+function panelShift() {
+  const W = window.innerWidth;
+  if (W <= 900) return 0;
+  const left = $('#console').getBoundingClientRect().right;
+  const right = drawer.classList.contains('open') ? W - drawer.offsetWidth - 10 : W;
+  return (left + right) / 2 - W / 2;
+}
+function applyView() {
+  const W = window.innerWidth, Hh = window.innerHeight;
+  if (Math.abs(VIEW.x) < 0.5) camera.clearViewOffset(); else camera.setViewOffset(W, Hh, -VIEW.x, 0, W, Hh);
+}
+function updateViewOffset(instant = false) {
+  const target = panelShift();
+  if (instant || REDUCED) { VIEW.x = target; applyView(); return; }
+  G.to(VIEW, { x: target, duration: 0.5, ease: 'power2.out', onUpdate: applyView });
+}
+
+/* ---- drawer ---- */
+const drawer = $('#drawer');
+let curTab = null;
+function openItem(id, tabKey, { fly = true } = {}) {
+  const it = ITEMS.get(id); if (!it) return;
+  S.openId = id;
+  if (it.zone && it.zone !== S.zone) setZone(it.zone, { fly: false });
+  drawer.style.setProperty('--accent', it.accent || 'var(--cyan)');
+  $('#drawer-kicker').textContent = it.kicker;
+  $('#drawer-title').textContent = it.title;
+  $('#drawer-sub').textContent = it.sub;
+  const acts = [{ label: 'Fly to', icon: 'crosshair', run: () => focusItem(id) }].concat(it.actions || []);
+  $('#drawer-actions').innerHTML = acts.map((a, i) => `<button class="btn" data-a="${i}"><i data-lucide="${a.icon}"></i>${a.label}</button>`).join('');
+  $('#drawer-actions').querySelectorAll('[data-a]').forEach(b => b.onclick = () => acts[+b.dataset.a].run());
+  $('#drawer-tabs').innerHTML = it.tabs.map(t => `<button class="tab" role="tab" data-tab="${t.key}" aria-selected="false"><i data-lucide="${t.icon}"></i>${t.label}</button>`).join('');
+  $('#drawer-tabs').querySelectorAll('.tab').forEach(b => b.onclick = () => selectTab(b.dataset.tab));
+  selectTab(tabKey && it.tabs.some(t => t.key === tabKey) ? tabKey : it.tabs[0].key);
+  drawer.classList.add('open');
+  updateViewOffset();
+  if (fly) focusItem(id);
+  if (window.innerWidth <= 900) setConsoleExpanded(false);
+}
+function selectTab(key) {
+  const it = ITEMS.get(S.openId); if (!it) return;
+  curTab = key;
+  $('#drawer-tabs').querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === key)));
+  const t = it.tabs.find(x => x.key === key);
+  const body = $('#drawer-body');
+  body.innerHTML = t.html() + (S.depth < 5 ? `<div class="depth-note">Depth ${S.depth} of 5 · ${DEPTH_NAMES[S.depth - 1]}. Turn the dial up for more legal detail where it exists.</div>` : '');
+  body.scrollTop = 0;
+  body.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openItem(b.dataset.open));
+  applyDepthToDom(body);
+  icons();
+}
+function closeDrawer() {
+  drawer.classList.remove('open'); S.openId = null;
+  updateViewOffset();
+  if (S.peeled >= 0) { peel(-1); if (S.zone === 'decagon') renderCritList(); }
+}
+$('#drawer-close').onclick = closeDrawer;
+
+/* ---- search ---- */
+const sInput = $('#search'), sRes = $('#search-results');
+let sIdx = 0, sHits = [];
+function runSearch() {
+  const q = sInput.value.toLowerCase().trim();
+  if (!q) { sRes.classList.remove('open'); return; }
+  const words = q.split(/\s+/);
+  sHits = [...ITEMS.values()].map(it => {
+    const hay = `${it.title} ${it.kind} ${it.search || ''} ${it.sub || ''}`.toLowerCase();
+    let sc = 0; for (const w of words) { if (!hay.includes(w)) return null; sc += it.title.toLowerCase().includes(w) ? 3 : 1; }
+    return { it, sc };
+  }).filter(Boolean).sort((a, b) => b.sc - a.sc).slice(0, 9).map(x => x.it);
+  sIdx = 0;
+  sRes.innerHTML = sHits.length ? sHits.map((it, i) => `<button class="sr-item${i === 0 ? ' active' : ''}" role="option" data-id="${it.id}"><span class="sr-kind">${it.kind}</span><span><span class="sr-title">${esc(it.title)}</span><br><span class="sr-sub">${esc((it.sub || '').slice(0, 80))}${(it.sub || '').length > 80 ? '…' : ''}</span></span></button>`).join('') : '<div class="sr-sub" style="padding:10px">No matches.</div>';
+  sRes.classList.add('open');
+  sRes.querySelectorAll('.sr-item').forEach(b => b.onclick = () => pickSearch(b.dataset.id));
+}
+function pickSearch(id) {
+  sRes.classList.remove('open'); sInput.value = ''; sInput.blur(); $('#search-wrap').classList.remove('mobile-open');
+  stopTour();
+  if (id.startsWith('crit-')) { setZone('decagon', { fly: false }); openCriterion(+id.slice(5)); }
+  else openItem(id);
+}
+sInput.addEventListener('input', runSearch);
+sInput.addEventListener('keydown', e => {
+  if (!sHits.length) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault(); sIdx = (sIdx + (e.key === 'ArrowDown' ? 1 : -1) + sHits.length) % sHits.length;
+    sRes.querySelectorAll('.sr-item').forEach((b, i) => b.classList.toggle('active', i === sIdx));
+  } else if (e.key === 'Enter') { e.preventDefault(); pickSearch(sHits[sIdx].id); }
+  else if (e.key === 'Escape') { sRes.classList.remove('open'); sInput.blur(); }
+});
+document.addEventListener('pointerdown', e => { if (!e.target.closest('#search-wrap') && !e.target.closest('#btn-search-m')) { sRes.classList.remove('open'); $('#search-wrap').classList.remove('mobile-open'); } });
+$('#btn-search-m').onclick = () => { $('#search-wrap').classList.toggle('mobile-open'); sInput.focus(); };
+
+/* ---- tour ---- */
+const TOUR = [
+  { zone: 'overview', k: 'Overview', t: 'Four zones: the lifecycle highway, the criteria decagon, the two-step adjudication engine, and the AAO platform floating above.' },
+  { zone: 'timeline', k: 'Zone 1', t: 'The lifecycle highway runs from strategy to appeal. Columns show how documentation workload rises and falls month by month.', do: () => setMonth(0), anim: true },
+  { item: 'm2', k: 'Zone 1 · Dossier', t: 'Workload peaks just before filing, when evidence becomes an argued petition.', do: () => setMonth(6) },
+  { item: 'm4', k: 'Zone 1 · The fork', t: 'After filing, the case branches: approval, a Request for Evidence, a Notice of Intent to Deny, or denial.', do: () => setMonth(11) },
+  { zone: 'decagon', k: 'Zone 2', t: 'Ten pillars for the ten criteria in 8 CFR 204.5(h)(3). Height tracks how much each tends to weigh in the final merits.' },
+  { crit: 4, k: 'Zone 2 · Peel', t: 'Peeling a pillar exposes its definition, its evidence checklist and its weight. Original contributions usually weighs the most.' },
+  { zone: 'adjud', k: 'Zone 3 · Step 1', t: 'Criteria drop through the threshold funnel. Three or more, or one major award, and the gate opens.', fly: ['step1'] },
+  { item: 'step2', k: 'Zone 3 · Step 2', t: 'The final-merits balance weighs the totality of the evidence: sustained acclaim, and a place at the very top of the field.' },
+  { sim: 'rfe', k: 'Zone 3 · Outcome', t: 'Outcomes relight the engine and open a recovery playbook. Here: a Request for Evidence.' },
+  { zone: 'aao', k: 'Zone 4', t: 'Above it all, the AAO platform: de novo review, record limits, motions, and the precedents that shape every decision.' },
+];
+let tourTimer = null, tourIdx = -1;
+function startTour() {
+  stopTour(); tourIdx = -1; closeDrawer();
+  $('#caption').classList.add('show'); nextTour();
+}
+function nextTour() {
+  tourIdx++;
+  if (tourIdx >= TOUR.length) { stopTour(); setZone('overview'); return; }
+  const s = TOUR[tourIdx];
+  closeDrawer();
+  if (s.do) s.do();
+  if (s.zone) setZone(s.zone);
+  if (s.fly) focusItem(s.fly[0]);
+  if (s.item) { const it = ITEMS.get(s.item); setZone(it.zone, { fly: false }); focusItem(s.item); }
+  if (s.crit != null) { setZone('decagon', { fly: false }); peel(s.crit); focusItem(`crit-${s.crit}`); }
+  if (s.sim) { setZone('adjud', { fly: false }); flyTo(v3([80, 26, 60]), v3([80, 10, 2])); G.delayedCall(1.4, () => { if (tourIdx >= 0) { simulate(s.sim); closeDrawer(); } }); }
+  if (s.anim) S.playing = true;
+  $('#cap-k').textContent = `${s.k} · ${tourIdx + 1}/${TOUR.length}`;
+  $('#cap-t').textContent = s.t;
+  tourTimer = setTimeout(nextTour, REDUCED ? 5200 : 6200);
+}
+function stopTour() {
+  if (tourTimer) clearTimeout(tourTimer); tourTimer = null;
+  if (tourIdx >= 0) { tourIdx = -1; S.playing = false; if (S.outcome) resetOutcome(); }
+  $('#caption').classList.remove('show');
+}
+$('#cap-stop').onclick = stopTour;
+$('#btn-tour').onclick = startTour;
+
+/* ---- toast ---- */
+let toastT = null;
+function toast(msg, color = '#22d3ee') {
+  const t = $('#toast'); t.innerHTML = `<span class="dot" style="background:${color};box-shadow:0 0 10px ${color}"></span>${esc(msg)}`;
+  t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+/* ---- help, dial, console toggle, keys ---- */
+const help = $('#help');
+$('#btn-help').onclick = () => help.classList.add('open');
+$('#help-close').onclick = () => help.classList.remove('open');
+help.addEventListener('click', e => { if (e.target === help) help.classList.remove('open'); });
+$('#dial-range').oninput = e => setDepth(+e.target.value);
+$('#dial-minus').onclick = () => setDepth(S.depth - 1);
+$('#dial-plus').onclick = () => setDepth(S.depth + 1);
+function setConsoleExpanded(v) { $('#console').classList.toggle('expanded', v); $('#console-toggle').setAttribute('aria-expanded', String(v)); }
+$('#console-toggle').onclick = () => setConsoleExpanded(!$('#console').classList.contains('expanded'));
+$('#console-head').addEventListener('click', e => { if (window.innerWidth <= 900 && !e.target.closest('#console-toggle')) setConsoleExpanded(!$('#console').classList.contains('expanded')); });
+
+window.addEventListener('keydown', e => {
+  const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) && document.activeElement.type !== 'range';
+  if (e.key === 'Escape') { if (help.classList.contains('open')) help.classList.remove('open'); else if (tourIdx >= 0) stopTour(); else closeDrawer(); return; }
+  if (typing) return;
+  if (e.key === '/' || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k')) { e.preventDefault(); if (window.innerWidth <= 900) $('#search-wrap').classList.add('mobile-open'); sInput.focus(); return; }
+  const zk = { 1: 'overview', 2: 'timeline', 3: 'decagon', 4: 'adjud', 5: 'aao' }[e.key];
+  if (zk) { stopTour(); setZone(zk); }
+  if (e.key.toLowerCase() === 't') startTour();
+  if (e.key === '?') help.classList.add('open');
+});
+
+/* =====================================================================
+   12. RAYCASTING: hover tooltips + click
+   ===================================================================== */
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+const tip = $('#tooltip');
+let hovered = null, downAt = null, lastPointer = null;
+function visibleChain(o) { while (o) { if (!o.visible) return false; o = o.parent; } return true; }
+function hitTest(ev) {
+  const r = renderer.domElement.getBoundingClientRect();
+  mouse.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  const hits = ray.intersectObjects(pickables, false);
+  for (const h of hits) if (visibleChain(h.object)) return h;
+  return null;
+}
+function setHover(root) {
+  if (hovered === root) return;
+  if (hovered) hovered.traverse(o => { if (o.isMesh && o.userData.baseEI != null) o.material.emissiveIntensity = o.userData.baseEI; });
+  hovered = root;
+  if (hovered) hovered.traverse(o => { if (o.isMesh && o.userData.baseEI != null) o.material.emissiveIntensity = o.userData.baseEI * 1.9 + 0.3; });
+  renderer.domElement.style.cursor = hovered ? 'pointer' : '';
+}
+function describe(root) {
+  const u = root.userData;
+  if (u.itemId) { const it = ITEMS.get(u.itemId); return { k: it.kind, t: it.title, s: u.tab ? `${{ inside: 'Base layer: statutory definition and threshold', checklist: 'Middle layer: strategy and evidence checklist', weight: 'Cap: persuasive weight index' }[u.tab]}` : it.tip, h: u.hint || (u.tab ? 'Click to peel and open this layer' : 'Click to open analysis') }; }
+  return { k: u.kind, t: u.title, s: u.tip, h: u.hint || 'Click to interact' };
+}
+renderer.domElement.addEventListener('pointermove', e => {
+  lastPointer = e;
+  if (e.pointerType === 'touch') return;
+  const h = hitTest(e);
+  const root = h ? h.object.userData.pickRoot : null;
+  setHover(root);
+  if (root) {
+    const d = describe(root);
+    tip.innerHTML = `<div class="tt-k">${esc(d.k || '')}</div><div class="tt-t">${esc(d.t || '')}</div><div class="tt-s">${esc(d.s || '')}</div><div class="tt-h">${esc(d.h)}</div>`;
+    const x = Math.min(e.clientX + 16, window.innerWidth - 296), y = Math.min(e.clientY + 16, window.innerHeight - tip.offsetHeight - 10);
+    tip.style.left = `${x}px`; tip.style.top = `${y}px`; tip.classList.add('show');
+  } else tip.classList.remove('show');
+});
+renderer.domElement.addEventListener('pointerleave', () => { setHover(null); tip.classList.remove('show'); });
+renderer.domElement.addEventListener('pointerdown', e => { downAt = { x: e.clientX, y: e.clientY }; if (tourIdx >= 0) stopTour(); });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downAt || Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 6) return;
+  const h = hitTest(e);
+  if (!h) return;
+  const root = h.object.userData.pickRoot, u = root.userData;
+  tip.classList.remove('show');
+  if (u.onClick) { u.onClick(h); return; }
+  if (u.pillar != null) { if (S.zone !== 'decagon') setZone('decagon', { fly: false }); openCriterion(u.pillar, u.tab); return; }
+  if (u.itemId) openItem(u.itemId, null, { fly: !u.noFly });
+});
+
+/* =====================================================================
+   13. LOOP
+   ===================================================================== */
+const clock = new THREE.Clock();
+let hoverPause = false;
+function tick() {
+  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+  controls.update();
+  // timeline playback
+  if (S.playing) {
+    setMonth(S.month + dt * 1.6);
+    if (S.month >= 24) { S.playing = false; if (S.zone === 'timeline') renderConsole(); }
+  }
+  // Z1 animation
+  Object.values(Z1.nodes).forEach((n, i) => { n.shell.rotation.y = t * 0.3 + i; n.shell.rotation.x = t * 0.2; n.g.position.y += Math.sin(t * 1.2 + i) * 0.004; });
+  Z1.pod.children[1].material.opacity = 0.7 + Math.sin(t * 4) * 0.2;
+  // Z2 animation
+  Z2.ico.rotation.y = t * 0.25; Z2.ico.rotation.x = t * 0.12;
+  Z2.core.position.y = 6 + Math.sin(t * 0.9) * 0.3;
+  // Z3 animation
+  Z3.tilt = lerp(Z3.tilt, Z3.tiltTarget || 0, Math.min(1, dt * 2.2));
+  Z3.beam.rotation.z = Z3.tilt + Math.sin(t * 1.3) * 0.01;
+  [[Z3.panL, -7.8], [Z3.panR, 7.8]].forEach(([pan, x]) => {
+    const endX = SCALE_PIVOT.x + x * Math.cos(Z3.beam.rotation.z), endY = SCALE_PIVOT.y + x * Math.sin(Z3.beam.rotation.z);
+    pan.position.set(endX, endY - 4.2, SCALE_PIVOT.z);
+    const a = pan.userData.line.geometry.attributes.position.array;
+    for (let k = 0; k < 3; k++) {
+      const ang = k / 3 * Math.PI * 2;
+      a[k * 6] = endX; a[k * 6 + 1] = endY; a[k * 6 + 2] = SCALE_PIVOT.z;
+      a[k * 6 + 3] = endX + Math.cos(ang) * 2.8; a[k * 6 + 4] = endY - 4.0; a[k * 6 + 5] = SCALE_PIVOT.z + Math.sin(ang) * 2.8;
+    }
+    pan.userData.line.geometry.attributes.position.needsUpdate = true;
+  });
+  Z3.gate.rotation.z = t * 0.8;
+  if (S.oneTime) { const u = (t * 0.25) % 1; Z3.bypass.getPoint(u, Z3.bpOrb.position); } else Z3.bpOrb.position.copy(Z3.bypass.getPoint(0));
+  Object.values(Z3.peds).forEach((p, i) => { p.orb.rotation.y = t * 0.8 + i; });
+  updateParticles(dt, PCOUNTS[S.depth - 1]);
+  updateBurst(dt);
+  // Z4 animation
+  Z4.rings.forEach(r => { r.ring.rotation.z = t * (0.15 + r.i * 0.04) * (r.i % 2 ? -1 : 1); r.g.position.y = AAO_C.y + 3 + r.i * 2.5 + Math.sin(t * 0.8 + r.i) * 0.15; });
+  hoverPause = hovered && hovered.parent === Z4.orbit;
+  if (!hoverPause) Z4.orbit.rotation.y += dt * 0.05;
+  Z4.paths.forEach((p, i) => { p.orb.rotation.y = t + i; });
+  Z4.plat.position.y = AAO_C.y + Math.sin(t * 0.5) * 0.25;
+  Z4.links.forEach(l => { l.t = (l.t + dt * 0.12) % 1; l.c.getPoint(l.t, l.pk.position); });
+  renderer.render(scene, camera);
+}
+renderer.setAnimationLoop(tick);
+document.addEventListener('visibilitychange', () => { if (document.hidden) renderer.setAnimationLoop(null); else { clock.getDelta(); renderer.setAnimationLoop(tick); } });
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  updateViewOffset(true); camera.updateProjectionMatrix();
+});
+
+/* =====================================================================
+   14. BOOT
+   ===================================================================== */
+setMonth(S.month);
+syncClaims();
+setDepth(3);
+setZone('overview', { fly: false });
+renderConsole();
+updateViewOffset(true);
+icons();
+G.delayedCall(0.2, () => { $('#loading').classList.add('done'); flyTo(v3(ZONES.overview.pos), v3(ZONES.overview.target), 3.2); });
+let seenHelp = false;
+try { seenHelp = localStorage.getItem('eb1lab-help') === '1'; } catch (e) { /* storage unavailable */ }
+if (!seenHelp) { help.classList.add('open'); try { localStorage.setItem('eb1lab-help', '1'); } catch (e) { /* ignore */ } }
+window.__lab = { S, setZone, openItem, simulate, setDepth, setMonth, peel, ITEMS, camera, Z3 };
+})();
+</script>
+</body>
+</html>
