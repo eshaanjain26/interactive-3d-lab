@@ -1,0 +1,1655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fetal Growth Timeline Lab</title>
+<meta name="description" content="Interactive 3D timeline of embryonic and fetal development from week 1 to week 40: daily size and weight, real-scale comparison objects, and organ-system milestones.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style type="text/tailwindcss">
+  @theme {
+    --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --color-ink: #e7eefb;
+    --color-mute: #97a8c6;
+    --color-faint: #62728f;
+    --color-line: rgba(150, 180, 230, 0.14);
+    --color-accent: #72d4ff;
+  }
+</style>
+<style>
+  /* One committed dark clinical world, so no light-theme blocks. */
+  :root {
+    color-scheme: dark;
+    --bg0: #050a15;
+    --bg1: #16264a;
+    --panel: rgba(9, 15, 30, 0.8);
+    --line: rgba(150, 180, 230, 0.14);
+    --line-strong: rgba(150, 180, 230, 0.3);
+    --ink: #e7eefb;
+    --mute: #97a8c6;
+    --faint: #62728f;
+    --accent: #72d4ff;
+    --t1: #5fb6ff;
+    --t2: #9a8cff;
+    --t3: #ff8fb8;
+    --thumb: 18px;
+  }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body { background: radial-gradient(ellipse at 45% 38%, var(--bg1) 0%, var(--bg0) 70%); background-color: var(--bg0);
+    color: var(--ink); -webkit-font-smoothing: antialiased; }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; outline: none; touch-action: none; }
+  #labels { position: fixed; inset: 0; pointer-events: none; z-index: 5; overflow: hidden; }
+  .lbl { position: absolute; left: 0; top: 0; white-space: nowrap; will-change: transform; }
+  .lbl-obj { font: 600 12px/1.2 Inter, sans-serif; color: var(--ink); padding: 4px 8px; border-radius: 999px;
+    background: rgba(8, 14, 28, 0.66); border: 1px solid var(--line); backdrop-filter: blur(6px); }
+  .lbl-obj small { font: 500 11px "JetBrains Mono", monospace; color: var(--mute); margin-left: 6px; }
+  .lbl-tick { font: 500 10.5px "JetBrains Mono", monospace; color: #7f93b6; text-shadow: 0 0 4px #000; }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5); }
+  .hud-scroll { scrollbar-width: thin; scrollbar-color: #2a3a60 transparent; }
+  .eyebrow { font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px;
+    font-size: 11.5px; color: var(--mute); background: rgba(255, 255, 255, 0.03); white-space: nowrap; }
+  .btn { display: inline-grid; place-items: center; min-width: 36px; height: 36px; padding: 0 10px; border-radius: 10px;
+    border: 1px solid var(--line); background: rgba(255, 255, 255, 0.04); color: var(--ink); font-size: 13px; cursor: pointer;
+    transition: background 0.15s, border-color 0.15s; }
+  .btn:hover { background: rgba(255, 255, 255, 0.09); border-color: var(--line-strong); }
+  .btn:focus-visible, .seg button:focus-visible, select:focus-visible, .sys:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn-play { background: var(--accent); color: #04131f; border-color: transparent; min-width: 44px; font-weight: 700; }
+  .btn-play:hover { background: #a3e3ff; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: rgba(255, 255, 255, 0.03); }
+  .seg button { height: 32px; min-width: 32px; padding: 0 9px; font-size: 12px; color: var(--mute); background: transparent; border: 0; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button:hover { color: var(--ink); background: rgba(255, 255, 255, 0.06); }
+  .seg button[aria-pressed="true"] { color: #04131f; background: var(--accent); font-weight: 600; }
+  select.sel { height: 32px; border-radius: 10px; border: 1px solid var(--line); background: #0d1628; color: var(--ink); font-size: 12.5px; padding: 0 8px; }
+  .tog { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--mute); cursor: pointer; user-select: none; white-space: nowrap; }
+  .tog input { appearance: none; width: 30px; height: 18px; border-radius: 999px; background: #22314f; position: relative; cursor: pointer; transition: background 0.15s; margin: 0; }
+  .tog input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #cfdcf2; transition: transform 0.15s; }
+  .tog input:checked { background: var(--accent); }
+  .tog input:checked::after { transform: translateX(12px); background: #04131f; }
+
+  /* Scrubber: the native range sits over custom trimester bands; bands are inset by half a thumb so ends line up. */
+  .scrub-wrap { position: relative; height: 46px; }
+  .bands { position: absolute; left: calc(var(--thumb) / 2); right: calc(var(--thumb) / 2); top: 12px; height: 8px; border-radius: 999px; overflow: hidden; display: flex; }
+  .bands > div { height: 100%; opacity: 0.55; }
+  .fill { position: absolute; left: calc(var(--thumb) / 2); top: 12px; height: 8px; border-radius: 999px; pointer-events: none;
+    background: linear-gradient(90deg, var(--t1), var(--t2) 50%, var(--t3)); box-shadow: 0 0 14px rgba(114, 212, 255, 0.45); }
+  .ticks { position: absolute; left: calc(var(--thumb) / 2); right: calc(var(--thumb) / 2); top: 24px; height: 20px; pointer-events: none; }
+  .ticks span { position: absolute; transform: translateX(-50%); font: 500 10px "JetBrains Mono", monospace; color: var(--faint); padding-top: 6px; }
+  .ticks span::before { content: ""; position: absolute; left: 50%; top: 0; width: 1px; height: 4px; background: var(--line-strong); }
+  input.scrub { position: absolute; inset: 0 0 auto 0; width: 100%; height: 32px; margin: 0; background: transparent; appearance: none; -webkit-appearance: none; cursor: pointer; }
+  input.scrub::-webkit-slider-runnable-track { height: 32px; background: transparent; }
+  input.scrub::-moz-range-track { height: 32px; background: transparent; }
+  input.scrub::-webkit-slider-thumb { -webkit-appearance: none; width: var(--thumb); height: var(--thumb); margin-top: 7px; border-radius: 50%;
+    background: #fff; border: 3px solid var(--accent); box-shadow: 0 0 0 5px rgba(114, 212, 255, 0.18), 0 2px 8px rgba(0, 0, 0, 0.5); }
+  input.scrub::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 3px solid var(--accent);
+    box-shadow: 0 0 0 5px rgba(114, 212, 255, 0.18); }
+
+  .ms { display: grid; grid-template-columns: 18px 1fr; gap: 8px; padding: 7px 8px; border-radius: 10px; cursor: default; transition: background 0.15s; }
+  .ms:hover { background: rgba(255, 255, 255, 0.04); }
+  .ms .box { width: 16px; height: 16px; border-radius: 5px; margin-top: 1px; display: grid; place-items: center; border: 1.5px solid; }
+  .ms.pending { opacity: 0.55; }
+  .sys { display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 9px; cursor: pointer;
+    border: 1px solid transparent; background: transparent; color: inherit; text-align: left; width: 100%; font: inherit; }
+  .sys:hover { background: rgba(255, 255, 255, 0.04); }
+  .sys[aria-pressed="true"] { border-color: var(--line-strong); background: rgba(255, 255, 255, 0.06); }
+  .sys .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .sys.live .dot { box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 25%, transparent), 0 0 10px currentColor; }
+  .bar { height: 3px; border-radius: 99px; background: #1d2a45; overflow: hidden; grid-column: 2 / 4; }
+  .bar > i { display: block; height: 100%; border-radius: 99px; }
+  details summary { cursor: pointer; list-style: none; }
+  details summary::-webkit-details-marker { display: none; }
+
+  @media (max-width: 1023px) {
+    #hud[data-open="false"] .hud-more { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body class="font-sans text-[13px] leading-[1.45]">
+
+<div id="stage" aria-label="3D view of the embryo or fetus beside a comparison object. Drag to orbit, scroll or pinch to zoom."></div>
+<div id="labels"></div>
+
+<!-- Title -->
+<div class="fixed left-3 top-3 z-20 hidden lg:block pointer-events-none">
+  <div class="eyebrow" style="color:#7fb9dd">Biology · Education</div>
+  <h1 class="text-[17px] font-semibold tracking-tight text-ink mt-0.5">Fetal Growth &amp; Gestational Timeline Lab</h1>
+  <p class="text-[12px] text-mute mt-0.5">Drag to orbit · scroll to zoom · <span class="font-mono">←/→</span> day · <span class="font-mono">⇧←/→</span> week · <span class="font-mono">space</span> play</p>
+</div>
+
+<!-- HUD -->
+<aside id="hud" data-open="false" class="panel hud-scroll fixed z-20 rounded-2xl overflow-y-auto
+  left-2 right-2 top-2 max-h-[46vh] p-3
+  lg:left-auto lg:right-3 lg:top-3 lg:w-[372px] lg:p-4 lg:max-h-none" aria-label="Gestational details">
+
+  <div class="flex items-start justify-between gap-3">
+    <div class="min-w-0">
+      <div class="eyebrow">Gestational age</div>
+      <div class="flex items-baseline gap-2 mt-0.5">
+        <span id="hWeek" class="text-[30px] lg:text-[34px] font-semibold tracking-tight leading-none">Week 20</span>
+        <span id="hDay" class="text-mute text-[14px]">Day 1</span>
+      </div>
+      <div id="hGA" class="font-mono text-[11.5px] text-mute mt-1.5"></div>
+    </div>
+    <button id="hudToggle" class="btn lg:!hidden shrink-0" aria-expanded="false" aria-controls="hud">Details</button>
+  </div>
+  <div class="flex flex-wrap gap-1.5 mt-2.5">
+    <span id="hMonth" class="chip"></span><span id="hTri" class="chip"></span><span id="hStage" class="chip"></span>
+  </div>
+
+  <div class="grid grid-cols-2 gap-2 mt-3">
+    <div class="rounded-xl border border-line bg-white/[0.03] p-2.5">
+      <div class="eyebrow">Length</div>
+      <div id="mLen" class="text-[20px] font-semibold mt-0.5 font-mono tracking-tight"></div>
+      <div id="mLenKind" class="text-[11px] text-faint"></div>
+    </div>
+    <div class="rounded-xl border border-line bg-white/[0.03] p-2.5">
+      <div class="eyebrow">Weight</div>
+      <div id="mWt" class="text-[20px] font-semibold mt-0.5 font-mono tracking-tight"></div>
+      <div id="mWtNote" class="text-[11px] text-faint"></div>
+    </div>
+    <div class="hud-more rounded-xl border border-line bg-white/[0.03] p-2.5">
+      <div class="eyebrow">Heart rate</div>
+      <div id="mHr" class="text-[16px] font-semibold mt-0.5 font-mono"></div>
+      <div class="text-[11px] text-faint">typical, beats/min</div>
+    </div>
+    <div class="hud-more rounded-xl border border-line bg-white/[0.03] p-2.5">
+      <div class="eyebrow">Due date</div>
+      <div id="mDue" class="text-[16px] font-semibold mt-0.5 font-mono"></div>
+      <div id="mDueNote" class="text-[11px] text-faint">at 40w 0d</div>
+    </div>
+  </div>
+
+  <div class="mt-3 rounded-xl border border-line bg-white/[0.03] p-2.5 flex items-center gap-3">
+    <div id="cSwatch" class="w-10 h-10 rounded-full shrink-0 ring-1 ring-white/10"></div>
+    <div class="min-w-0">
+      <div class="eyebrow">Size comparison</div>
+      <div id="cName" class="text-[14.5px] font-semibold mt-0.5 truncate"></div>
+      <div id="cNote" class="text-[11.5px] text-mute"></div>
+    </div>
+  </div>
+
+  <div class="hud-more">
+    <div class="flex items-center justify-between mt-4">
+      <div class="eyebrow">Milestones this week</div>
+      <span id="nowCount" class="font-mono text-[11px] text-faint"></span>
+    </div>
+    <ul id="hNow" class="mt-1.5 -mx-1"></ul>
+
+    <div class="flex items-center justify-between mt-3">
+      <div class="eyebrow">Organ systems</div>
+      <button id="sysClear" class="text-[11px] text-accent hover:underline hidden">Clear focus</button>
+    </div>
+    <p class="text-[11px] text-faint mt-0.5">Glowing systems have milestones this week. Select one to spotlight it in 3D.</p>
+    <div id="hSys" class="mt-1.5 -mx-1 grid gap-0.5"></div>
+
+    <details id="hPast" class="mt-3 rounded-xl border border-line bg-white/[0.02]">
+      <summary class="flex items-center justify-between px-3 py-2.5">
+        <span class="text-[12.5px] font-medium">Milestones reached so far</span>
+        <span id="pastCount" class="font-mono text-[11px] text-faint"></span>
+      </summary>
+      <div id="pastList" class="px-2 pb-2 max-h-[340px] overflow-y-auto hud-scroll"></div>
+    </details>
+
+    <p class="text-[10.5px] text-faint mt-3 leading-[1.5]">
+      Educational model. Values are population averages and every pregnancy varies; this is not medical guidance.
+      Ages count from the first day of the last menstrual period (1w0d to 40w6d). Length is crown to rump through week 19
+      and crown to heel from week 20, following the widely used average fetal growth chart; weeks 1 to 7 use embryology references
+      (Carnegie stages). Daily values are interpolated. The 3D form is stylized and posed curled, so it looks shorter than its measured length; stretched out, it matches the chart. Comparison objects are shown at typical real sizes.
+    </p>
+  </div>
+</aside>
+
+<!-- Timeline -->
+<footer id="timeline" class="panel fixed z-30 bottom-2 left-2 right-2 lg:left-3 lg:right-[399px] lg:bottom-3 rounded-2xl px-3 pt-2.5 pb-3">
+  <div class="flex items-center gap-2 lg:gap-3">
+    <div class="flex items-center gap-1 shrink-0">
+      <button class="btn max-sm:!hidden" id="bWkBack" aria-label="Back one week" title="Back one week (Shift+←)">«</button>
+      <button class="btn" id="bDayBack" aria-label="Back one day" title="Back one day (←)">‹</button>
+      <button class="btn btn-play" id="bPlay" aria-label="Play timeline" title="Play / pause (Space)">▶</button>
+      <button class="btn" id="bDayFwd" aria-label="Forward one day" title="Forward one day (→)">›</button>
+      <button class="btn max-sm:!hidden" id="bWkFwd" aria-label="Forward one week" title="Forward one week (Shift+→)">»</button>
+    </div>
+    <div class="scrub-wrap flex-1 min-w-0">
+      <div class="bands" id="bands"></div>
+      <div class="fill" id="fill"></div>
+      <div class="ticks" id="ticks"></div>
+      <input id="scrub" class="scrub" type="range" min="7" max="286" step="1" value="140" aria-label="Gestational age in days">
+    </div>
+    <div class="shrink-0 text-right hidden sm:block w-[86px]">
+      <div id="tGA" class="font-mono text-[15px] font-semibold"></div>
+      <div id="tTri" class="text-[10.5px] text-faint"></div>
+    </div>
+  </div>
+
+  <div class="flex items-center gap-x-4 gap-y-2 mt-2 overflow-x-auto hud-scroll pb-0.5">
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="eyebrow">Month</span>
+      <div class="seg" id="months" role="group" aria-label="Jump to month"></div>
+    </div>
+    <label class="flex items-center gap-2 shrink-0"><span class="eyebrow">Week</span><select id="selWeek" class="sel"></select></label>
+    <label class="flex items-center gap-2 shrink-0"><span class="eyebrow">Day</span><select id="selDay" class="sel"></select></label>
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="eyebrow">Scale</span>
+      <div class="seg" role="group" aria-label="Scale mode">
+        <button id="scFit" aria-pressed="true" title="Zoom to keep both objects in view">Fit</button>
+        <button id="scTrue" aria-pressed="false" title="Fixed camera: shows true relative growth from week 1 to 40">True size</button>
+      </div>
+    </div>
+    <label class="tog shrink-0"><input type="checkbox" id="tGlow" checked> Organ glow</label>
+    <label class="tog shrink-0"><input type="checkbox" id="tRotate"> Rotate</label>
+    <button class="btn shrink-0 !h-8 text-[12px]" id="bReset">Reset view</button>
+  </div>
+</footer>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { MarchingCubes } from 'three/addons/objects/MarchingCubes.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+/* ================= Data ================= */
+// Gestational age (GA) is counted in days from the first day of the last menstrual period.
+// "Week N" means N weeks 0 days through N weeks 6 days, the convention the growth chart is keyed to.
+const DAY_MIN = 7, DAY_MAX = 286, DUE_DAY = 280;
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+
+const SYSTEMS = {
+  heart:       { name: 'Heart & circulation',    color: '#ff5d7f' },
+  nervous:     { name: 'Brain & nervous system', color: '#a08fff' },
+  sensory:     { name: 'Eyes, ears & face',      color: '#ffc95c' },
+  skeletal:    { name: 'Limbs, bones & muscle',  color: '#d8e6ff' },
+  digestive:   { name: 'Digestive organs',       color: '#4fe3a4' },
+  respiratory: { name: 'Lungs & airway',         color: '#56d0ff' },
+  urogenital:  { name: 'Kidneys & reproductive', color: '#ff9d5c' },
+  skin:        { name: 'Skin, fat & hair',       color: '#ffb0d2' },
+  support:     { name: 'Placenta & support',     color: '#b8f06c' },
+  body:        { name: 'Body plan & milestones', color: '#a8c4ec' },
+};
+const SYSTEM_KEYS = Object.keys(SYSTEMS);
+
+const MONTHS = [[1, 4], [5, 8], [9, 13], [14, 17], [18, 22], [23, 27], [28, 31], [32, 35], [36, 40]];
+const KIND_LABEL = { cell: 'Egg / conceptus diameter', disc: 'Embryonic disc length', crl: 'Crown–rump length', ch: 'Crown–heel length' };
+// Daily interpolation only runs between weeks measured the same way.
+const SERIES = { cell: 'a', disc: 'b', crl: 'b', ch: 'c' };
+
+const OBJECTS = {
+  salt:        { name: 'Grain of salt', cm: 0.03, shape: 'cube', c: ['#f4f7fb', '#dde6f3'], rough: 0.2, clear: 0.6 },
+  poppy:       { name: 'Poppy seed', cm: 0.1, shape: 'ellipsoid', aspect: 0.8, bend: 0.35, c: ['#3a4257', '#5b647c'], rough: 0.6 },
+  sesame:      { name: 'Sesame seed', cm: 0.3, shape: 'teardrop', aspect: 1.55, flat: 0.45, c: ['#ecdcb6', '#d8c190'], rough: 0.7 },
+  lentil:      { name: 'Lentil', cm: 0.5, shape: 'sphere', aspect: 0.42, c: ['#ea874a', '#d86e38'], rough: 0.55 },
+  blueberry:   { name: 'Blueberry', cm: 1.2, shape: 'sphere', aspect: 0.86, dimple: [0.08, 0.03], c: ['#303d78', '#7582bd'], grad: 'bloom', rough: 0.55, extras: ['star'] },
+  raspberry:   { name: 'Raspberry', cm: 2, shape: 'teardrop', aspect: 1.05, drupe: [14, 9, 0.03], round: true, c: ['#b81c42', '#e24a6c'], rough: 0.45, clear: 0.4 },
+  cherry:      { name: 'Cherry', cm: 2.3, shape: 'sphere', aspect: 0.92, dimple: [0.08, 0.02], c: ['#730a1d', '#b31b37'], rough: 0.18, clear: 1, extras: ['longstem'] },
+  strawberry:  { name: 'Strawberry', cm: 3.3, shape: 'heart', aspect: 1.15, c: ['#dc2f3c', '#f25c52'], pattern: 'seeds', rough: 0.35, clear: 0.6, extras: ['calyx'] },
+  fig:         { name: 'Fig', cm: 4.5, shape: 'teardrop', aspect: 1.2, c: ['#53284a', '#93627f'], rough: 0.5, sheen: 0.6, extras: ['stem'] },
+  lime:        { name: 'Lime', cm: 5.5, shape: 'lemon', aspect: 1.18, pores: 0.004, c: ['#4c972f', '#7cc24b'], rough: 0.4, clear: 0.4 },
+  lemon:       { name: 'Lemon', cm: 7.5, shape: 'lemon', aspect: 1.38, pores: 0.004, c: ['#f0cc2c', '#f8e36a'], rough: 0.4, clear: 0.4 },
+  peach:       { name: 'Peach', cm: 8, shape: 'sphere', aspect: 0.96, crease: 0.05, dimple: [0.05, 0], c: ['#d8423a', '#f29a48'], grad: 'blush', rough: 0.7, sheen: 1 },
+  apple:       { name: 'Apple', cm: 9, shape: 'apple', aspect: 0.92, dimple: [0.1, 0.06], c: ['#be1b33', '#f0b04a'], grad: 'streak', rough: 0.3, clear: 0.8, extras: ['stem'] },
+  avocado:     { name: 'Avocado', cm: 11, shape: 'teardrop', aspect: 1.45, pores: 0.006, c: ['#223b16', '#3f5f25'], rough: 0.7, extras: ['nub'] },
+  pear:        { name: 'Pear', cm: 13, shape: 'pear', aspect: 1.5, c: ['#9db439', '#e4d35c'], rough: 0.5, extras: ['stem'] },
+  pepper:      { name: 'Bell pepper', cm: 13, shape: 'pepper', aspect: 1.05, ribs: [4, 0.13], dimple: [0.09, 0.05], c: ['#bf141e', '#e8342f'], rough: 0.15, clear: 1, extras: ['fatstem'] },
+  mango:       { name: 'Mango', cm: 15, shape: 'ellipsoid', aspect: 1.35, flat: 0.82, bend: 0.12, c: ['#e98d24', '#8fb33c'], grad: 'blush', rough: 0.4, clear: 0.3 },
+  banana:      { name: 'Banana', cm: 20, shape: 'banana', aspect: 6, ribs: [5, 0.07], bend: 1.2, c: ['#f1cd3b', '#e0b52a'], pattern: 'tips', rough: 0.45, lie: true },
+  carrot:      { name: 'Carrot', cm: 23, shape: 'cone', aspect: 5.5, rings: 0.006, c: ['#ee781b', '#f59a3f'], rough: 0.55, lie: true, extras: ['tops'] },
+  papaya:      { name: 'Papaya', cm: 25, shape: 'pear', aspect: 1.7, neck: 0.22, c: ['#efa137', '#8db33c'], grad: 'blush', rough: 0.4, lie: true },
+  corn:        { name: 'Ear of corn', cm: 22, shape: 'cyl', aspect: 4.2, taper: 0.35, drupe: [16, 36, 0.03], c: ['#eec638', '#f7df72'], rough: 0.4, clear: 0.3, lie: true },
+  cantaloupe:  { name: 'Cantaloupe', cm: 16, shape: 'sphere', aspect: 0.95, c: ['#7f8a4c', '#e2d3a4'], grad: 'flat', pattern: 'net', rough: 0.85 },
+  cauliflower: { name: 'Cauliflower', cm: 18, shape: 'sphere', aspect: 0.82, florets: 0.05, c: ['#ece3c9', '#fbf6e6'], rough: 0.85, extras: ['baseleaves'] },
+  cabbage:     { name: 'Cabbage', cm: 18, shape: 'sphere', aspect: 0.92, leafy: 0.02, c: ['#8cc467', '#d2ebab'], pattern: 'veins', rough: 0.6 },
+  lettuce:     { name: 'Head of lettuce', cm: 20, shape: 'sphere', aspect: 0.88, leafy: 0.045, c: ['#6bbd49', '#d8efac'], pattern: 'veins', rough: 0.7 },
+  eggplant:    { name: 'Eggplant', cm: 22, shape: 'teardrop', aspect: 2.1, bend: 0.25, c: ['#2b1336', '#512b62'], rough: 0.15, clear: 1, lie: true, extras: ['calyx'] },
+  butternut:   { name: 'Butternut squash', cm: 25, shape: 'pear', aspect: 2.1, neck: 0.45, c: ['#dea35e', '#efc27f'], rough: 0.6, lie: true, extras: ['stem'] },
+  cucumber:    { name: 'Cucumber', cm: 30, shape: 'cyl', aspect: 5.2, taper: 0.15, pores: 0.01, c: ['#235a21', '#3f7f33'], pattern: 'softstripes', rough: 0.45, lie: true },
+  coconut:     { name: 'Coconut', cm: 20, shape: 'sphere', aspect: 1.1, fiber: 0.015, c: ['#5a3a22', '#8a6440'], rough: 0.95 },
+  squash:      { name: 'Spaghetti squash', cm: 25, shape: 'ellipsoid', aspect: 1.55, c: ['#eecd4f', '#f7e38a'], rough: 0.5, lie: true, extras: ['stem'] },
+  pineapple:   { name: 'Pineapple', cm: 30, shape: 'ellipsoid', aspect: 1.5, drupe: [13, 10, 0.03], c: ['#c98a26', '#6a4616'], pattern: 'diamond', rough: 0.6, extras: ['crown'] },
+  pomelo:      { name: 'Pomelo', cm: 22, shape: 'teardrop', aspect: 1.05, pores: 0.004, c: ['#c7da58', '#eef08a'], rough: 0.45 },
+  honeydew:    { name: 'Honeydew melon', cm: 20, shape: 'ellipsoid', aspect: 1.1, c: ['#d7e2a4', '#eef3cf'], rough: 0.35, clear: 0.4 },
+  romaine:     { name: 'Romaine lettuce', cm: 30, shape: 'cyl', aspect: 2.6, taper: 0.5, leafy: 0.04, c: ['#e4f2c0', '#3d8d2a'], pattern: 'veins', grad: 'along', rough: 0.6, lie: true },
+  wintermelon: { name: 'Winter melon', cm: 35, shape: 'ellipsoid', aspect: 1.7, c: ['#5c874c', '#8fb57a'], pattern: 'speckle', rough: 0.7, lie: true },
+  leek:        { name: 'Leek', cm: 45, shape: 'cyl', aspect: 9, taper: 0.1, c: ['#f4f2e3', '#3c7c2c'], grad: 'along', rough: 0.5, lie: true },
+  watermelon:  { name: 'Mini watermelon', cm: 25, shape: 'ellipsoid', aspect: 1.15, c: ['#27591f', '#8cc35d'], pattern: 'stripes', rough: 0.3, clear: 0.5, lie: true },
+  pumpkin:     { name: 'Small pumpkin', cm: 28, shape: 'sphere', aspect: 0.72, ribs: [10, 0.1], dimple: [0.1, 0.05], c: ['#e6741a', '#f59a3a'], rough: 0.5, extras: ['fatstem'] },
+};
+
+const OBJECT_OF_WEEK = ['salt', 'salt', 'salt', 'poppy', 'sesame', 'lentil', 'blueberry', 'raspberry', 'cherry', 'strawberry',
+  'fig', 'lime', 'lemon', 'peach', 'apple', 'avocado', 'pear', 'pepper', 'mango', 'banana',
+  'carrot', 'papaya', 'corn', 'cantaloupe', 'cauliflower', 'cabbage', 'lettuce', 'eggplant', 'butternut', 'cucumber',
+  'coconut', 'squash', 'pineapple', 'pomelo', 'honeydew', 'romaine', 'wintermelon', 'leek', 'watermelon', 'pumpkin'];
+
+// [length cm, how length is measured, weight g (null = under 1 g), milestones: [system, text, exact GA day if day-specific]]
+const RAW_WEEKS = [
+  [0.012, 'cell', null, [
+    ['body', 'Pregnancy is dated from the first day of the last menstrual period, so conception has not happened yet.'],
+    ['urogenital', 'A dominant follicle matures in the ovary while the uterine lining rebuilds.']]],
+  [0.012, 'cell', null, [
+    ['urogenital', 'Ovulation releases an egg (oocyte) about 0.1 mm across, around day 14 of a 28-day cycle.', 14],
+    ['body', 'Fertilization in the fallopian tube, usually within a day of ovulation. The zygote has 46 chromosomes and its genetic sex is set.', 14],
+    ['body', 'Cleavage divisions produce 2, 4, then 8 cells, and a compact morula about 3 days after fertilization.', 17],
+    ['support', 'A fluid-filled blastocyst forms about 5 days after fertilization, then hatches from its shell to implant.', 19]]],
+  [0.015, 'disc', null, [
+    ['support', 'Implantation: the blastocyst embeds in the uterine lining, starting 6 to 7 days after fertilization.', 21],
+    ['body', 'The inner cell mass flattens into a two-layer (bilaminar) embryonic disc.', 22],
+    ['support', 'The amniotic cavity and yolk sac form, and the outer trophoblast starts making hCG, the hormone pregnancy tests detect.', 23]]],
+  [0.04, 'disc', null, [
+    ['support', 'Around the expected period (4w 0d), a home pregnancy test usually turns positive.', 28],
+    ['body', 'Gastrulation: the primitive streak organizes three germ layers (ectoderm, mesoderm, endoderm).', 29],
+    ['nervous', 'The neural plate forms and starts folding into the neural tube.', 32],
+    ['heart', 'Paired heart tubes form, and the first blood cells appear in the wall of the yolk sac.', 33],
+    ['skeletal', 'The first somites appear: paired blocks that become vertebrae, ribs and skeletal muscle.', 34]]],
+  [0.2, 'crl', null, [
+    ['heart', 'The tubular heart begins to beat, about 22 days after fertilization.', 36],
+    ['sensory', 'Optic vesicles, the start of the eyes, bud from the forebrain.', 37],
+    ['digestive', 'The liver bud grows out of the foregut.', 37],
+    ['body', 'The embryo folds into a C-shape, and pharyngeal arches (future jaw, face and neck) appear.', 38],
+    ['skeletal', 'Arm buds appear.', 40],
+    ['nervous', 'The neural tube closes: the head end about 25 days after fertilization, the tail end about 2 days later.', 41]]],
+  [0.5, 'crl', null, [
+    ['skeletal', 'Leg buds appear, and hand plates form at the ends of the arm buds.', 42],
+    ['respiratory', 'The lung bud branches off the foregut.', 42],
+    ['sensory', 'Lens placodes and the inner-ear (otic) vesicles form.'],
+    ['digestive', 'Stomach and pancreas buds take shape.'],
+    ['nervous', 'The brain divides into five secondary vesicles.'],
+    ['heart', 'A heartbeat is usually visible on a transvaginal ultrasound.']]],
+  [1.0, 'crl', null, [
+    ['heart', 'Septa start dividing the heart into four chambers.'],
+    ['urogenital', 'The permanent kidneys (metanephros) begin to form.'],
+    ['sensory', 'Pigment in the retina makes the eyes visible as dark spots.', 51],
+    ['nervous', 'The cerebral hemispheres expand and the head grows quickly.'],
+    ['sensory', 'Nasal pits, the upper lip and the outer-ear hillocks start to form.'],
+    ['skeletal', 'Foot plates form, and finger rays appear in the hand plates.', 55]]],
+  [1.6, 'crl', 1, [
+    ['digestive', 'The midgut loops out into the umbilical cord (a normal, temporary herniation); it returns around week 12.'],
+    ['skeletal', 'Toe rays appear, elbows and wrists become visible, and bone formation starts in the collarbone and jaw.', 58],
+    ['sensory', 'Eyelid folds begin to form.', 58],
+    ['nervous', 'The first spontaneous movements can be seen on ultrasound.'],
+    ['urogenital', 'The gonads begin to differentiate under the control of sex-chromosome genes.']]],
+  [2.3, 'crl', 2, [
+    ['skeletal', 'Fingers separate, the arms bend at the elbows, and the hands move toward the face.'],
+    ['heart', 'The four-chambered heart is largely formed; the heart rate nears its peak of about 170 beats per minute.'],
+    ['sensory', 'The outer ear and the tip of the nose take shape.'],
+    ['body', 'The embryonic tail is regressing.']]],
+  [3.1, 'crl', 4, [
+    ['body', 'The embryonic period ends at 10w 0d (Carnegie stage 23). From here the term is fetus.', 70],
+    ['body', 'All major organs are present in basic form, and the tail is gone.'],
+    ['sensory', 'The eyelids fuse closed; they reopen around weeks 26 to 28.'],
+    ['digestive', 'Tooth buds for the primary teeth begin forming.'],
+    ['urogenital', 'In XY fetuses, the testes begin producing testosterone.']]],
+  [4.1, 'crl', 7, [
+    ['urogenital', 'The kidneys begin producing urine, which becomes part of the amniotic fluid.'],
+    ['urogenital', 'The external genitalia begin to differentiate.'],
+    ['skin', 'Hair follicles and nail beds begin to form.'],
+    ['body', 'The head still makes up about half of crown–rump length.']]],
+  [5.4, 'crl', 14, [
+    ['digestive', 'The intestines return from the umbilical cord into the abdomen.'],
+    ['nervous', 'Reflexes develop: the fingers flex and the mouth makes sucking movements.'],
+    ['skin', 'Fingernails begin to grow.'],
+    ['support', 'First-trimester screening (nuchal translucency) is usually done between 11w 0d and 13w 6d.']]],
+  [7.4, 'crl', 23, [
+    ['digestive', 'The pancreas begins producing insulin.'],
+    ['respiratory', 'The larynx and vocal folds are forming.'],
+    ['support', 'The placenta has taken over hormone production from the ovary\'s corpus luteum.'],
+    ['skeletal', 'Ossification spreads through the long bones and the skull.'],
+    ['body', 'The first trimester ends at 13w 6d.', 97]]],
+  [8.7, 'crl', 43, [
+    ['body', 'The second trimester begins.', 98],
+    ['skin', 'Lanugo, a fine downy hair, starts to appear.'],
+    ['body', 'The neck lengthens and the chin lifts away from the chest.'],
+    ['digestive', 'The liver starts producing bile, and the spleen joins in making red blood cells.']]],
+  [10.1, 'crl', 70, [
+    ['skeletal', 'The legs are now growing faster than the arms.'],
+    ['respiratory', 'Breathing-like chest movements move amniotic fluid in and out of the lungs.'],
+    ['sensory', 'Taste buds are forming on the tongue.'],
+    ['skeletal', 'Bones show clearly on ultrasound as calcium is laid down.']]],
+  [11.6, 'crl', 100, [
+    ['nervous', 'Movements become coordinated. First movements ("quickening") are usually felt between 16 and 25 weeks, often earlier in a later pregnancy.'],
+    ['sensory', 'The eyes make slow movements behind the fused lids.'],
+    ['respiratory', 'The lungs enter the canalicular stage (about weeks 16 to 26): airways branch and capillaries grow alongside them.'],
+    ['sensory', 'The ears move toward their final position on the sides of the head.']]],
+  [13, 'crl', 140, [
+    ['skin', 'Fat starts to be stored, including brown fat that helps with temperature control after birth.'],
+    ['support', 'The umbilical cord grows thicker and stronger.'],
+    ['skin', 'Sweat glands begin to develop.'],
+    ['skeletal', 'More of the cartilage skeleton turns into bone.']]],
+  [14.2, 'crl', 190, [
+    ['nervous', 'Myelin, the insulating layer around nerves, begins to form.'],
+    ['sensory', 'The middle-ear bones harden, so the structures for hearing are in place.'],
+    ['support', 'The mid-pregnancy anatomy scan is usually done between 18 and 22 weeks.'],
+    ['urogenital', 'External genitals are often visible on ultrasound.']]],
+  [15.3, 'crl', 240, [
+    ['skin', 'Vernix caseosa, a waxy protective coating, begins to cover the skin.'],
+    ['nervous', 'Brain areas for smell, taste, hearing, vision and touch are developing.'],
+    ['urogenital', 'In XX fetuses the ovaries hold about 6 to 7 million immature eggs, the lifetime peak.']]],
+  [25.6, 'ch', 300, [
+    ['body', 'Halfway point. From this week length is measured crown to heel, so the number jumps without a growth spurt.', 140],
+    ['digestive', 'The fetus swallows amniotic fluid, and meconium (the first stool) collects in the bowel.'],
+    ['skin', 'Scalp hair and eyebrows are growing.']]],
+  [26.7, 'ch', 360, [
+    ['skeletal', 'Bone marrow starts to take part in making blood cells.'],
+    ['nervous', 'Movements become stronger and more frequent.'],
+    ['digestive', 'The gut can absorb small amounts of water and sugar from swallowed fluid.']]],
+  [27.8, 'ch', 430, [
+    ['nervous', 'A strong grasp reflex develops; the fetus touches its face and the cord.'],
+    ['sensory', 'The eyes are formed, though the iris still lacks pigment.'],
+    ['skin', 'The skin is thin, wrinkled and still translucent.']]],
+  [28.9, 'ch', 501, [
+    ['respiratory', 'Cells that will make surfactant (type II pneumocytes) begin to appear in the lungs.'],
+    ['sensory', 'Rapid eye movements begin.'],
+    ['heart', 'Blood vessels in the lungs develop in preparation for breathing.']]],
+  [30, 'ch', 600, [
+    ['respiratory', 'The lungs enter the saccular stage: the first air sacs start to form.'],
+    ['sensory', 'The inner ear is developed enough for the fetus to respond to sound.'],
+    ['body', 'Weeks 22 to 24 mark the current threshold of viability with neonatal intensive care.'],
+    ['support', 'Glucose screening is often done between 24 and 28 weeks.']]],
+  [34.6, 'ch', 660, [
+    ['skeletal', 'The hands are fully formed and explore the face and surroundings.'],
+    ['respiratory', 'The nostrils begin to open.'],
+    ['skin', 'Capillaries form under the skin, giving it a pinker tone.']]],
+  [35.6, 'ch', 760, [
+    ['sensory', 'The eyelids begin to reopen.'],
+    ['nervous', 'A startle response to loud sounds can be seen.'],
+    ['respiratory', 'Air sacs and surfactant production keep increasing.']]],
+  [36.6, 'ch', 875, [
+    ['nervous', 'Sleep and wake cycles become more regular.'],
+    ['sensory', 'The layers of the retina keep developing.'],
+    ['body', 'The second trimester ends at 27w 6d.', 195]]],
+  [37.6, 'ch', 1005, [
+    ['body', 'The third trimester begins.', 196],
+    ['sensory', 'The eyes open and close, and eyelashes have grown.'],
+    ['nervous', 'The brain surface folds rapidly into grooves (sulci) and ridges (gyri).']]],
+  [38.6, 'ch', 1153, [
+    ['skeletal', 'Bones take up large amounts of calcium as they harden.'],
+    ['nervous', 'The head grows to make room for the fast-growing brain.'],
+    ['skin', 'Fat builds up under the skin and smooths out wrinkles.']]],
+  [39.9, 'ch', 1319, [
+    ['skeletal', 'Bone marrow is now the main site of red blood cell production.'],
+    ['sensory', 'The pupils respond to light.'],
+    ['skin', 'Lanugo begins to thin out.']]],
+  [41.1, 'ch', 1502, [
+    ['skin', 'Weight gain speeds up as fat is laid down.'],
+    ['nervous', 'Nerve connections multiply and the brain processes input from all the senses.'],
+    ['skeletal', 'Movements are strong: kicks, stretches and rolls.']]],
+  [42.4, 'ch', 1702, [
+    ['skin', 'Toenails and fingernails are fully formed.'],
+    ['respiratory', 'The fetus practices breathing, swallowing and sucking.'],
+    ['body', 'Many fetuses settle head-down between about 32 and 36 weeks.']]],
+  [43.7, 'ch', 1918, [
+    ['skeletal', 'The skull bones stay separate so the head can mold during birth.'],
+    ['support', 'Antibodies cross the placenta, giving early protection after birth.'],
+    ['nervous', 'The brain keeps growing quickly.']]],
+  [45, 'ch', 2146, [
+    ['respiratory', 'The lungs are well developed and surfactant levels are rising.'],
+    ['skin', 'Fat layers build up that will help regulate body temperature after birth.'],
+    ['skin', 'The fingernails reach the fingertips.']]],
+  [46.2, 'ch', 2383, [
+    ['urogenital', 'The kidneys are fully developed.'],
+    ['digestive', 'The liver can process some waste products.'],
+    ['nervous', 'Brain weight is increasing rapidly.']]],
+  [47.4, 'ch', 2622, [
+    ['skin', 'Most lanugo has shed, and the vernix coating is thick.'],
+    ['digestive', 'Sucking and swallowing are coordinated enough for feeding.'],
+    ['support', 'Group B strep screening is usually done between 36 and 37 weeks.']]],
+  [48.6, 'ch', 2859, [
+    ['body', 'Early term begins at 37w 0d.', 259],
+    ['respiratory', 'The fetus practices inhaling and exhaling amniotic fluid.'],
+    ['body', 'The head may settle (engage) into the pelvis.']]],
+  [49.8, 'ch', 3083, [
+    ['nervous', 'The brain and nervous system continue to mature.'],
+    ['digestive', 'Meconium keeps collecting in the intestines.'],
+    ['skeletal', 'The grasp is firm.']]],
+  [50.7, 'ch', 3288, [
+    ['body', 'Full term begins at 39w 0d.', 273],
+    ['respiratory', 'Surfactant production is high and the lungs are ready for air.'],
+    ['skin', 'Body fat makes up roughly 15% of body weight.']]],
+  [51.2, 'ch', 3462, [
+    ['body', 'The due date is 40w 0d; only about 1 in 20 babies arrives on that exact day.', 280],
+    ['heart', 'At birth the foramen ovale and ductus arteriosus begin to close as the lungs take over.'],
+    ['skeletal', 'Fontanelles (soft spots) let the skull plates overlap during birth.']]],
+];
+
+const WEEKS = RAW_WEEKS.map(([len, kind, g, notes], i) => ({
+  w: i + 1, len, kind, g, obj: OBJECT_OF_WEEK[i],
+  notes: notes.map(([sys, text, day]) => ({ sys, text, day, w: i + 1 })),
+}));
+
+const weekOf = d => clamp(Math.floor(d / 7), 1, 40);
+const dayIndex = d => d - 7 * Math.floor(d / 7);
+const gaLabel = d => `${Math.floor(d / 7)}w ${d % 7}d`;
+const monthOfWeek = w => MONTHS.findIndex(([a, b]) => w >= a && w <= b) + 1;
+const monthFirstWeek = m => MONTHS[m - 1][0];
+const trimesterOfWeek = w => (w <= 13 ? 1 : w <= 27 ? 2 : 3);
+const row = w => WEEKS[clamp(w, 1, 40) - 1];
+
+function stageAt(d) {
+  if (d < 14) return { key: 'pre', label: 'Before conception', noun: 'Egg (oocyte)' };
+  if (d < 21) {
+    const f = d - 14;
+    return { key: 'cleave', label: 'Fertilization to blastocyst', noun: f < 1 ? 'Zygote' : f < 3 ? 'Cleaving embryo' : f < 4.5 ? 'Morula' : 'Blastocyst' };
+  }
+  if (d < 35) return { key: 'implant', label: 'Implantation & germ layers', noun: 'Embryonic disc' };
+  if (d < 70) return { key: 'embryo', label: 'Embryonic period', noun: 'Embryo' };
+  return { key: 'fetus', label: 'Fetal period', noun: 'Fetus' };
+}
+
+function lengthAt(d) {
+  d = clamp(d, DAY_MIN, DUE_DAY);
+  const w = weekOf(d), f = (d - 7 * w) / 7, a = row(w);
+  let next = a.len;
+  if (w < 40 && SERIES[row(w + 1).kind] === SERIES[a.kind]) next = row(w + 1).len;
+  else if (w > 1 && SERIES[row(w - 1).kind] === SERIES[a.kind]) next = a.len * a.len / row(w - 1).len;
+  return { cm: a.len * Math.pow(next / a.len, f), kind: a.kind };
+}
+
+function weightAt(d) {
+  d = clamp(d, DAY_MIN, DUE_DAY);
+  const w = weekOf(d), f = (d - 7 * w) / 7, a = row(w);
+  if (a.g == null) return null;
+  const next = w < 40 ? row(w + 1).g : a.g;
+  return a.g * Math.pow(next / a.g, f);
+}
+
+const HR_KEYS = [[36, 85], [42, 110], [49, 130], [56, 155], [63, 170], [70, 170], [84, 160], [98, 152], [140, 146], [280, 140], [286, 140]];
+function heartRateAt(d) {
+  if (d < HR_KEYS[0][0]) return null;
+  for (let i = 0; i < HR_KEYS.length - 1; i++) {
+    const [d0, h0] = HR_KEYS[i], [d1, h1] = HR_KEYS[i + 1];
+    if (d <= d1) return lerp(h0, h1, (d - d0) / (d1 - d0));
+  }
+  return HR_KEYS[HR_KEYS.length - 1][1];
+}
+
+const reached = (note, d) => note.w < weekOf(d) || (note.w === weekOf(d) && (note.day == null || d >= note.day));
+
+/* ================= Anatomy ================= */
+// The embryo/fetus is a smooth union of signed-distance primitives laid along a curled spine,
+// with proportions keyframed on gestational day (Carnegie stages up to 10w 0d, fetal growth after).
+const KEYS = [34, 40, 42, 47, 51, 56, 63, 70, 84, 112, 140, 196, 252, 286];
+const PARAMS = {
+  curl:   [2.4, 3.8, 3.9, 3.5, 3.0, 2.5, 2.1, 1.9, 1.7, 1.5, 1.2, 1.7, 2.1, 2.2],
+  headR:  [0.16, 0.24, 0.28, 0.33, 0.37, 0.40, 0.43, 0.44, 0.42, 0.37, 0.34, 0.32, 0.31, 0.31],
+  trunkR: [0.08, 0.11, 0.13, 0.15, 0.16, 0.17, 0.18, 0.19, 0.20, 0.20, 0.21, 0.25, 0.29, 0.30],
+  heart:  [0.06, 0.13, 0.15, 0.16, 0.15, 0.13, 0.10, 0.06, 0.02, 0, 0, 0, 0, 0],
+  belly:  [0.7, 0.85, 0.9, 1.0, 1.05, 1.1, 1.1, 1.05, 1.0, 1.0, 1.0, 1.1, 1.2, 1.25],
+  tail:   [0.28, 0.35, 0.35, 0.3, 0.26, 0.2, 0.12, 0.03, 0, 0, 0, 0, 0, 0],
+  arm:    [0, 0.05, 0.09, 0.14, 0.2, 0.27, 0.36, 0.45, 0.52, 0.56, 0.58, 0.6, 0.62, 0.62],
+  leg:    [0, 0, 0.05, 0.09, 0.13, 0.19, 0.27, 0.36, 0.46, 0.5, 0.55, 0.8, 0.86, 0.88],
+  limbR:  [0.04, 0.04, 0.045, 0.05, 0.05, 0.052, 0.055, 0.058, 0.06, 0.06, 0.065, 0.08, 0.095, 0.1],
+  flex:   [0, 0, 0, 0.1, 0.3, 0.5, 0.8, 1, 1, 1, 1, 1, 1, 1],
+  somite: [1, 1, 1, 1, 1, 0.5, 0, 0, 0, 0, 0, 0, 0, 0],
+  neck:   [1, 1, 1, 1, 1, 1, 0.95, 0.85, 0.7, 0.5, 0.45, 0.5, 0.55, 0.55],
+  face:   [0, 0, 0, 0, 0, 0, 0.5, 0.8, 1, 1, 1, 1, 1, 1],
+  eye:    [0, 0, 0, 0, 1, 1, 1, 1, 0.65, 0.65, 0.65, 0.8, 1, 1],
+  hern:   [0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+};
+
+function paramsAt(d) {
+  d = clamp(d, KEYS[0], KEYS[KEYS.length - 1]);
+  let i = 0;
+  while (i < KEYS.length - 2 && d > KEYS[i + 1]) i++;
+  const t = sstep(KEYS[i], KEYS[i + 1], d), p = {};
+  for (const k in PARAMS) p[k] = lerp(PARAMS[k][i], PARAMS[k][i + 1], t);
+  return p;
+}
+
+const V = (x, y, z) => [x, y, z];
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const mul = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const len = a => Math.sqrt(dot(a, a));
+const norm = a => mul(a, 1 / (len(a) || 1));
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const comb = (...terms) => terms.reduce((acc, [v, s]) => add(acc, mul(v, s)), [0, 0, 0]);
+
+function buildModel(d) {
+  const p = paramsAt(d);
+  const curl = Math.max(p.curl, 0.35), Rc = 1 / curl;
+  const { headR, trunkR, limbR } = p;
+  const X = V(1, 0, 0);
+  // Spine is a circular arc of length 1 in the y-z plane; +z is ventral, s = 0 is the rump, s = 1 the neck.
+  const spine = s => {
+    const phi = Math.PI + curl / 2 - s * curl;
+    return { P: V(0, Rc * Math.sin(phi), Rc * Math.cos(phi)), T: V(0, -Math.cos(phi), Math.sin(phi)), N: V(0, -Math.sin(phi), -Math.cos(phi)) };
+  };
+  const raw = [];
+  const rc = (a, b, ra, rb, k) => raw.push({ t: 0, a, b, ra, rb, k });
+  const sp = (c, r, k) => raw.push({ t: 2, c, r, k });
+  const el = (c, u, v, w, rx, ry, rz, k) => raw.push({ t: 1, c, u, v, w, rx, ry, rz, k });
+
+  const prof = s => trunkR * (s < 0.25 ? lerp(0.8, 1, s / 0.25) : s < 0.6 ? 1 : s < 0.85 ? lerp(1, 0.92, (s - 0.6) / 0.25) : lerp(0.92, 0.62, (s - 0.85) / 0.15));
+  const NS = 10;
+  for (let i = 0; i < NS; i++) {
+    const s0 = i / NS, s1 = (i + 1) / NS;
+    rc(spine(s0).P, spine(s1).P, prof(s0), prof(s1), 0.03);
+  }
+
+  const top = spine(1), T1 = top.T, N1 = top.N;
+  const Hc = comb([top.P, 1], [T1, headR * 0.72], [N1, headR * (0.1 + 0.3 * p.neck)]);
+  const A = norm(add(T1, mul(N1, 0.35 * p.neck)));
+  const Nh = norm(sub(N1, mul(A, dot(N1, A))));
+  rc(top.P, Hc, trunkR * 0.62, headR * 0.5, 0.08);
+  el(Hc, X, A, Nh, headR * 0.92, headR * 1.06, headR * 0.98, 0.05);
+  if (p.face > 0.01) {
+    const fc = comb([Hc, 1], [Nh, headR * 0.5], [A, -headR * 0.38]);
+    el(fc, X, A, Nh, headR * 0.5 * p.face, headR * 0.42 * p.face, headR * 0.48 * p.face, headR * 0.12);
+  }
+
+  if (p.heart > 0.01) {
+    const s = spine(0.74);
+    sp(add(s.P, mul(s.N, trunkR * 0.55 + p.heart * 0.45)), p.heart, 0.05);
+  }
+  const sb = spine(0.4);
+  el(add(sb.P, mul(sb.N, trunkR * 0.4)), X, sb.T, sb.N, trunkR * 0.95 * p.belly, trunkR * 1.2 * p.belly, trunkR * 0.9 * p.belly, 0.06);
+  const sc2 = spine(0.72);
+  el(add(sc2.P, mul(sc2.N, trunkR * 0.2)), X, sc2.T, sc2.N, trunkR * 0.95, trunkR * 1.0, trunkR * 0.85, 0.06);
+  const sr = spine(0.06);
+  for (const sg of [-1, 1]) sp(comb([sr.P, 1], [X, sg * trunkR * 0.35], [sr.N, -trunkR * 0.15]), trunkR * 0.75, 0.05);
+
+  const s0 = spine(0);
+  if (p.tail > 0.01) {
+    let pos = s0.P, dir = mul(s0.T, -1);
+    const n = 6, ds = p.tail / n, r0 = trunkR * 0.65;
+    for (let j = 0; j < n; j++) {
+      const next = add(pos, mul(dir, ds));
+      const ra = r0 * Math.pow(1 - j / n, 0.8) + 0.008, rb = r0 * Math.pow(1 - (j + 1) / n, 0.8) + 0.008;
+      rc(pos, next, ra, rb, 0.03);
+      pos = next;
+      const ang = ds * curl * 1.8, c = Math.cos(ang), sn = Math.sin(ang);
+      const inward = norm(sub(s0.N, mul(dir, dot(s0.N, dir))));
+      dir = norm(add(mul(dir, c), mul(inward, sn)));
+    }
+  }
+
+  if (p.somite > 0.01) {
+    for (let s = 0.12; s < 0.92; s += 0.07) {
+      const q = spine(s);
+      for (const sg of [-1, 1]) sp(comb([q.P, 1], [q.N, -trunkR * 0.62], [X, sg * trunkR * 0.28]), trunkR * 0.3 * p.somite, 0.02);
+    }
+  }
+
+  const bellyBase = add(spine(0.32).P, mul(spine(0.32).N, trunkR * p.belly * 0.9));
+  if (p.hern > 0.01) sp(add(bellyBase, mul(spine(0.32).N, trunkR * 0.25)), trunkR * 0.32 * p.hern, 0.04);
+
+  const anchors = {}; for (const k of SYSTEM_KEYS) anchors[k] = [];
+  const anchor = (sys, c, r) => anchors[sys].push([c[0], c[1], c[2], r]);
+  const eyes = [], limbs = [];
+
+  for (const sg of [-1, 1]) {
+    const Xs = mul(X, sg);
+    const sh = spine(0.82);
+    if (p.arm > 0.01) {
+      const S = comb([sh.P, 1], [Xs, trunkR * 0.75], [sh.N, trunkR * 0.15]);
+      const up = norm(comb([Xs, lerp(0.55, 0.35, p.flex)], [sh.N, lerp(0.7, 0.75, p.flex)], [sh.T, lerp(-0.35, -0.45, p.flex)]));
+      const fore = norm(comb([Xs, lerp(0.55, -0.35, p.flex)], [sh.N, lerp(0.7, 0.35, p.flex)], [sh.T, lerp(-0.35, 0.85, p.flex)]));
+      const E = add(S, mul(up, p.arm * 0.5)), W = add(E, mul(fore, p.arm * 0.5));
+      const bud = p.arm < 0.12;
+      rc(S, E, limbR * (bud ? 1.35 : 1.15), limbR, 0.04);
+      rc(E, W, limbR, limbR * 0.85, 0.03);
+      if (!bud) sp(add(W, mul(fore, limbR * 0.6)), limbR * 1.3, 0.03);
+      limbs.push(S, E, W);
+    }
+    const hp = spine(0.1);
+    if (p.leg > 0.01) {
+      const H = comb([hp.P, 1], [Xs, trunkR * 0.7], [hp.N, trunkR * 0.2]);
+      const th = norm(comb([Xs, lerp(0.5, 0.25, p.flex)], [hp.N, lerp(0.6, 0.85, p.flex)], [hp.T, lerp(-0.6, 0.45, p.flex)]));
+      const sh2 = norm(comb([Xs, lerp(0.5, -0.3, p.flex)], [hp.N, lerp(0.6, 0.1, p.flex)], [hp.T, lerp(-0.6, -0.9, p.flex)]));
+      const K = add(H, mul(th, p.leg * 0.5)), Ank = add(K, mul(sh2, p.leg * 0.5));
+      const bud = p.leg < 0.12;
+      rc(H, K, limbR * (bud ? 1.45 : 1.5), limbR * 1.15, 0.05);
+      rc(K, Ank, limbR * 1.1, limbR * 0.8, 0.03);
+      if (!bud) {
+        const fd = norm(comb([hp.N, 0.8], [Xs, -0.2], [hp.T, 0.2]));
+        const footLen = Math.max(limbR * 1.2, p.leg * 0.17);
+        const fu = norm(cross(fd, X)), fw = norm(cross(fd, fu));
+        el(add(Ank, mul(fd, footLen * 0.6)), fw, fd, fu, limbR * 0.8, footLen, limbR * 0.6, 0.03);
+      }
+      limbs.push(H, K, Ank);
+    }
+    if (p.eye > 0.01) {
+      const ed = norm(comb([Nh, 0.55], [Xs, lerp(0.75, 0.42, p.face)], [A, -0.05]));
+      eyes.push({ c: add(Hc, mul(ed, headR * 0.93)), r: headR * 0.12 * p.eye, n: ed });
+      anchor('sensory', add(Hc, mul(ed, headR * 0.93)), headR * 0.22);
+    }
+    anchor('sensory', comb([Hc, 1], [Xs, headR * 0.92], [Nh, -headR * 0.1], [A, -headR * 0.15]), headR * 0.2);
+    const ch = spine(0.72);
+    anchor('respiratory', comb([ch.P, 1], [Xs, trunkR * 0.5], [ch.N, trunkR * 0.25]), trunkR * 0.42);
+    const kd = spine(0.35);
+    anchor('urogenital', comb([kd.P, 1], [Xs, trunkR * 0.4], [kd.N, -trunkR * 0.3]), trunkR * 0.26);
+  }
+
+  // Normalize so crown–rump length is exactly 1 model unit.
+  const rump = add(s0.P, mul(s0.T, -trunkR * 0.8));
+  const crl = len(sub(Hc, rump)) + headR;
+  const chExtended = 2.1 * headR + 0.25 * headR + 1 + trunkR * 0.8 + p.leg + limbR * 0.8;
+  const k = 1 / crl;
+
+  const heartC = p.heart > 0.01 ? add(spine(0.74).P, mul(spine(0.74).N, trunkR * 0.55 + p.heart * 0.45)) : add(spine(0.72).P, mul(spine(0.72).N, trunkR * 0.35));
+  anchor('heart', heartC, Math.max(p.heart, trunkR * 0.38));
+  anchor('nervous', Hc, headR * 0.85);
+  for (let s = 0; s <= 1.001; s += 0.1) { const q = spine(s); anchor('nervous', add(q.P, mul(q.N, -trunkR * 0.5)), trunkR * 0.32); }
+  anchor('sensory', comb([Hc, 1], [Nh, headR * 0.8], [A, -headR * 0.3]), headR * 0.25);
+  for (let s = 0.05; s <= 0.96; s += 0.15) { const q = spine(s); anchor('skeletal', add(q.P, mul(q.N, -trunkR * 0.7)), trunkR * 0.28); }
+  for (let i = 0; i + 2 < limbs.length; i += 3) {
+    const [a, b, c] = limbs.slice(i, i + 3);
+    for (const q of [a, mul(add(a, b), 0.5), b, mul(add(b, c), 0.5), c]) anchor('skeletal', q, limbR * 1.6);
+  }
+  const lv = spine(0.55);
+  anchor('digestive', add(lv.P, mul(lv.N, trunkR * 0.55)), trunkR * 0.5);
+  anchor('digestive', add(spine(0.32).P, mul(spine(0.32).N, trunkR * 0.5)), trunkR * 0.45);
+  anchor('urogenital', add(spine(0.1).P, mul(spine(0.1).N, trunkR * 0.45)), trunkR * 0.25);
+  anchor('skin', Hc, headR * 1.3);
+  anchor('skin', spine(0.5).P, trunkR * 1.8);
+  anchor('body', Hc, headR * 1.1);
+  anchor('body', add(spine(0.45).P, mul(spine(0.45).N, trunkR * 0.3)), trunkR * 1.5);
+  anchor('support', bellyBase, trunkR * 0.45);
+
+  const tX = v => mul(v, k);
+  const prims = raw.map(r => {
+    if (r.t === 0) return finalizeRC(tX(r.a), tX(r.b), r.ra * k, r.rb * k, r.k * k);
+    if (r.t === 1) return finalizeEL(tX(r.c), r.u, r.v, r.w, r.rx * k, r.ry * k, r.rz * k, r.k * k);
+    return finalizeSP(tX(r.c), r.r * k, r.k * k);
+  });
+  for (const sys of SYSTEM_KEYS) anchors[sys] = anchors[sys].map(([x, y, z, r]) => [x * k, y * k, z * k, r * k]);
+
+  const bb = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+  for (const pr of prims) for (let i = 0; i < 3; i++) { bb[i] = Math.min(bb[i], pr.lo[i]); bb[i + 3] = Math.max(bb[i + 3], pr.hi[i]); }
+  const center = [(bb[0] + bb[3]) / 2, (bb[1] + bb[4]) / 2, (bb[2] + bb[5]) / 2];
+  const ext = Math.max(bb[3] - bb[0], bb[4] - bb[1], bb[5] - bb[2]);
+  const cordN = spine(0.32).N, cordT = spine(0.32).T;
+
+  return {
+    d, p, prims, anchors, bbox: bb, center, extent: ext,
+    fit: { c: center, k: 1.72 / (ext + 0.06) },
+    crlOverCh: crl / chExtended,
+    eyes: eyes.map(e => ({ c: tX(e.c), r: e.r * k, n: e.n })),
+    cord: { base: tX(bellyBase), N: cordN, T: cordT, X, r: trunkR * 0.2 * k },
+    crown: tX(add(Hc, mul(norm(sub(Hc, rump)), headR))), rump: tX(rump),
+  };
+}
+
+function finalizeRC(a, b, r1, r2, k) {
+  const ba = sub(b, a), l2 = dot(ba, ba), rr = r1 - r2;
+  const lo = [0, 1, 2].map(i => Math.min(a[i] - r1, b[i] - r2));
+  const hi = [0, 1, 2].map(i => Math.max(a[i] + r1, b[i] + r2));
+  if (l2 - rr * rr < 1e-8) return finalizeSP(r1 >= r2 ? a : b, Math.max(r1, r2), k);
+  return { t: 0, ax: a[0], ay: a[1], az: a[2], bax: ba[0], bay: ba[1], baz: ba[2], l2, rr, a2: l2 - rr * rr, il2: 1 / l2, r1, r2, k, lo, hi };
+}
+function finalizeEL(c, u, v, w, rx, ry, rz, k) {
+  const m = Math.max(rx, ry, rz);
+  return { t: 1, cx: c[0], cy: c[1], cz: c[2], u, v, w, rx, ry, rz, k, lo: c.map(x => x - m), hi: c.map(x => x + m) };
+}
+function finalizeSP(c, r, k) {
+  return { t: 2, cx: c[0], cy: c[1], cz: c[2], r, k, lo: c.map(x => x - r), hi: c.map(x => x + r) };
+}
+
+// Inigo Quilez's exact round-cone and approximate ellipsoid distances.
+function sdPrim(pr, x, y, z) {
+  if (pr.t === 2) { const dx = x - pr.cx, dy = y - pr.cy, dz = z - pr.cz; return Math.sqrt(dx * dx + dy * dy + dz * dz) - pr.r; }
+  if (pr.t === 1) {
+    const dx = x - pr.cx, dy = y - pr.cy, dz = z - pr.cz;
+    const qx = (dx * pr.u[0] + dy * pr.u[1] + dz * pr.u[2]), qy = (dx * pr.v[0] + dy * pr.v[1] + dz * pr.v[2]), qz = (dx * pr.w[0] + dy * pr.w[1] + dz * pr.w[2]);
+    const k0 = Math.sqrt((qx / pr.rx) ** 2 + (qy / pr.ry) ** 2 + (qz / pr.rz) ** 2);
+    const k1 = Math.sqrt((qx / (pr.rx * pr.rx)) ** 2 + (qy / (pr.ry * pr.ry)) ** 2 + (qz / (pr.rz * pr.rz)) ** 2);
+    return k1 < 1e-9 ? -Math.min(pr.rx, pr.ry, pr.rz) : k0 * (k0 - 1) / k1;
+  }
+  const pax = x - pr.ax, pay = y - pr.ay, paz = z - pr.az;
+  const yv = pax * pr.bax + pay * pr.bay + paz * pr.baz, zv = yv - pr.l2;
+  const qx = pax * pr.l2 - pr.bax * yv, qy = pay * pr.l2 - pr.bay * yv, qz = paz * pr.l2 - pr.baz * yv;
+  const x2 = qx * qx + qy * qy + qz * qz, y2 = yv * yv * pr.l2, z2 = zv * zv * pr.l2;
+  const kk = Math.sign(pr.rr) * pr.rr * pr.rr * x2;
+  if (Math.sign(zv) * pr.a2 * z2 > kk) return Math.sqrt(x2 + z2) * pr.il2 - pr.r2;
+  if (Math.sign(yv) * pr.a2 * y2 < kk) return Math.sqrt(x2 + y2) * pr.il2 - pr.r1;
+  return (Math.sqrt(x2 * pr.a2 * pr.il2) + yv * pr.rr) * pr.il2 - pr.r1;
+}
+
+const smin = (a, b, k) => { const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.min(a, b) - h * h * k * 0.25; };
+
+// Samples the model's signed distance into a res^3 grid spanning [-1, 1] (MarchingCubes local space).
+// Each primitive only visits its own padded bounding box, which is exact for a smooth union.
+function fillField(model, res, dist) {
+  const half = res / 2, { c, k: kf } = model.fit, s = kf * half, inv = 1 / s;
+  dist.fill(1e3);
+  for (const pr of model.prims) {
+    const m = pr.k + 2.5 * inv;
+    const i0 = Math.max(1, Math.floor((pr.lo[0] - m - c[0]) * s + half)), i1 = Math.min(res - 2, Math.ceil((pr.hi[0] + m - c[0]) * s + half));
+    const j0 = Math.max(1, Math.floor((pr.lo[1] - m - c[1]) * s + half)), j1 = Math.min(res - 2, Math.ceil((pr.hi[1] + m - c[1]) * s + half));
+    const l0 = Math.max(1, Math.floor((pr.lo[2] - m - c[2]) * s + half)), l1 = Math.min(res - 2, Math.ceil((pr.hi[2] + m - c[2]) * s + half));
+    for (let z = l0; z <= l1; z++) {
+      const pz = (z - half) * inv + c[2];
+      for (let y = j0; y <= j1; y++) {
+        const py = (y - half) * inv + c[1], off = z * res * res + y * res;
+        for (let x = i0; x <= i1; x++) {
+          const idx = off + x;
+          dist[idx] = smin(dist[idx], sdPrim(pr, (x - half) * inv + c[0], py, pz), pr.k);
+        }
+      }
+    }
+  }
+}
+
+// Centimetres represented by one model unit (the crown–rump length). From week 20 the chart gives
+// crown–heel, so the model's own extended-length ratio converts it back.
+function crlCm3D(d, model) {
+  const L = lengthAt(d);
+  return L.kind === 'ch' ? L.cm * model.crlOverCh : L.cm;
+}
+
+// Pre-embryo stages are drawn in units of the conceptus diameter. From week 3 the metric is the
+// embryonic disc, which fills a growing share of that sphere.
+const discShare = d => (d < 28 ? 0.3 : lerp(0.3, 0.45, clamp((d - 28) / 7, 0, 1)));
+const cellsDiameterCm = d => (d < 21 ? lengthAt(d).cm : lengthAt(d).cm / discShare(d));
+const yolkSacCm = d => (d < 35 || d > 90 ? 0 : lerp(0.3, 0.5, sstep(35, 56, d)) * (1 - sstep(70, 90, d)));
+
+/* ================= Scene ================= */
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const stageEl = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+stageEl.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 512;
+  const g = c.getContext('2d'), grd = g.createRadialGradient(236, 200, 10, 256, 256, 380);
+  grd.addColorStop(0, '#1f3561'); grd.addColorStop(0.45, '#0f1d3a'); grd.addColorStop(1, '#040912');
+  g.fillStyle = grd; g.fillRect(0, 0, 512, 512);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(30, 1, 0.05, 500);
+camera.position.set(1.5, 4.2, 24);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.maxPolarAngle = Math.PI * 0.49;
+controls.target.set(0, 2, 0);
+controls.enablePan = false;
+
+scene.add(new THREE.HemisphereLight(0xbcd6ff, 0x1a2238, 0.7));
+const key = new THREE.DirectionalLight(0xfff1e6, 1.7); key.position.set(6, 10, 8); scene.add(key);
+const rim = new THREE.DirectionalLight(0x7fc8ff, 1.6); rim.position.set(-8, 5, -9); scene.add(rim);
+const fill = new THREE.DirectionalLight(0xffc6d8, 0.5); fill.position.set(-6, 2, 8); scene.add(fill);
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.32, 0.5, 0.95);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+const VIEW = 10;          // world units the composition is fitted into
+const TRUE_FRAME = 80;    // cm shown in "True size" mode: fits a term fetus and the week-40 object
+const specimen = new THREE.Group(); scene.add(specimen);
+
+function rimMaterial(color, strength = 1, power = 2.4) {
+  return new THREE.ShaderMaterial({
+    uniforms: { uColor: { value: new THREE.Color(color) }, uStrength: { value: strength }, uPower: { value: power } },
+    vertexShader: `varying vec3 vN; varying vec3 vV;
+      void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `uniform vec3 uColor; uniform float uStrength; uniform float uPower; varying vec3 vN; varying vec3 vV;
+      void main(){ float f = pow(1.0 - clamp(abs(dot(normalize(vN), normalize(vV))), 0.0, 1.0), uPower) * uStrength; gl_FragColor = vec4(uColor * f, f); }`,
+    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+}
+
+const glowTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d'), grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.25, 'rgba(255,255,255,0.55)'); grd.addColorStop(0.6, 'rgba(255,255,255,0.12)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+})();
+const shadowTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d'), grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grd.addColorStop(0, 'rgba(0,0,0,0.55)'); grd.addColorStop(0.5, 'rgba(0,0,0,0.25)'); grd.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+})();
+function contactShadow() {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2; m.position.y = 0.002; m.renderOrder = 1;
+  return m;
+}
+
+/* ---------- Glow sets (organ-system highlights) ---------- */
+class GlowSet {
+  constructor(parent) { this.group = new THREE.Group(); this.group.renderOrder = 10; parent.add(this.group); this.sprites = {}; for (const k of SYSTEM_KEYS) this.sprites[k] = []; }
+  update(anchors) {
+    for (const sys of SYSTEM_KEYS) {
+      const list = anchors[sys] || [], pool = this.sprites[sys];
+      while (pool.length < list.length) {
+        const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: SYSTEMS[sys].color, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false, transparent: true, opacity: 0 }));
+        s.renderOrder = 10; this.group.add(s); pool.push(s);
+      }
+      pool.forEach((s, i) => {
+        const a = list[i];
+        s.visible = !!a;
+        if (a) { s.position.set(a[0], a[1], a[2]); s.userData.base = a[3] * 2.2; s.scale.setScalar(s.userData.base); }
+      });
+    }
+  }
+  render(levels, fade, pulse) {
+    for (const sys of SYSTEM_KEYS) {
+      const lv = levels[sys] * fade, pz = (sys === 'heart' ? 1 + 0.35 * pulse : 1) * (1 + 0.5 * levels[sys]);
+      for (const s of this.sprites[sys]) {
+        if (!s.visible) continue;
+        s.material.opacity = Math.min(1, lv * (sys === 'skin' || sys === 'body' ? 0.25 : 1));
+        // Push a spotlighted system above 1.0 so the bloom pass picks it up.
+        s.material.color.set(SYSTEMS[sys].color).multiplyScalar(1 + 1.6 * levels[sys] * levels[sys]);
+        s.scale.setScalar(s.userData.base * pz);
+      }
+    }
+  }
+}
+
+/* ---------- Embryo / fetus ---------- */
+const RES = 72;
+const fetusPivot = new THREE.Group(); specimen.add(fetusPivot);
+const anat = new THREE.Group(); fetusPivot.add(anat);
+const mcHolder = new THREE.Group(); anat.add(mcHolder);
+const bodyMat = new THREE.MeshPhysicalMaterial({ color: 0xf2b4a6, roughness: 0.5, metalness: 0, sheen: 0.6, sheenColor: new THREE.Color(0xffd9d0),
+  sheenRoughness: 0.45, clearcoat: 0.3, clearcoatRoughness: 0.45, transparent: true, opacity: 0.9, envMapIntensity: 0.7 });
+const mc = new MarchingCubes(RES, bodyMat, false, false, 48000);
+mc.isolation = 0; mc.frustumCulled = false; mcHolder.add(mc);
+const bodyRimMat = rimMaterial('#ff9fb8', 0.45, 2.8);
+const bodyRim = new THREE.Mesh(mc.geometry, bodyRimMat); bodyRim.frustumCulled = false; bodyRim.renderOrder = 2; mc.add(bodyRim);
+const dist = new Float32Array(RES * RES * RES);
+
+const eyeMat = new THREE.MeshStandardMaterial({ color: 0x241826, roughness: 0.3, transparent: true });
+const eyeMeshes = [0, 1].map(() => { const m = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), eyeMat); anat.add(m); return m; });
+
+const cordMat = new THREE.MeshPhysicalMaterial({ color: 0xc9b7e6, roughness: 0.35, transparent: true, sheen: 0.6, sheenColor: new THREE.Color(0xe7d8ff), depthWrite: false,
+  alphaMap: (() => { const c = document.createElement('canvas'); c.width = 256; c.height = 4; const g = c.getContext('2d'), grd = g.createLinearGradient(0, 0, 256, 0);
+    grd.addColorStop(0, '#fff'); grd.addColorStop(0.55, '#aaa'); grd.addColorStop(1, '#000'); g.fillStyle = grd; g.fillRect(0, 0, 256, 4); return new THREE.CanvasTexture(c); })() });
+const cordMesh = new THREE.Mesh(new THREE.BufferGeometry(), cordMat); anat.add(cordMesh);
+const yolkMat = new THREE.MeshPhysicalMaterial({ color: 0xf2c878, roughness: 0.35, transparent: true, opacity: 0.6, emissive: 0x6a3f10, emissiveIntensity: 0.12, depthWrite: false });
+const yolk = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), yolkMat); anat.add(yolk);
+const fetusGlow = new GlowSet(anat);
+const fetusShadow = contactShadow(); specimen.add(fetusShadow);
+
+const SKIN_EARLY = new THREE.Color('#d6807b'), SKIN_LATE = new THREE.Color('#dc9582');
+let model = null, bodyBaseOpacity = 0.9, eyeBaseOpacity = 0.9;
+function rebuildFetus(d) {
+  model = buildModel(d);
+  fillField(model, RES, dist);
+  const f = mc.field;
+  for (let i = 0; i < f.length; i++) f[i] = -dist[i];
+  mc.normal_cache.fill(0);
+  mc.update();
+  // MarchingCubes flags whole buffers dirty; upload only the triangles actually written.
+  for (const name of ['position', 'normal']) {
+    const attr = mc.geometry.getAttribute(name);
+    attr.clearUpdateRanges(); attr.addUpdateRange(0, mc.count * 3);
+  }
+  mcHolder.position.set(...model.center);
+  mcHolder.scale.setScalar(1 / model.fit.k);
+
+  model.eyes.forEach((e, i) => { eyeMeshes[i].position.set(...e.c); eyeMeshes[i].scale.setScalar(e.r); eyeMeshes[i].visible = e.r > 1e-4; });
+  for (let i = model.eyes.length; i < 2; i++) eyeMeshes[i].visible = false;
+  eyeBaseOpacity = d >= 70 && d < 182 ? 0.55 : 0.9;
+
+  const { base, N, T, X, r } = model.cord;
+  // The cord leaves the belly and curves behind the body, away from the viewer, toward an off-screen placenta.
+  const pts = [base, comb([base, 1], [N, 0.16]), comb([base, 1], [N, 0.26], [X, 0.16], [T, -0.08]), comb([base, 1], [N, 0.3], [X, 0.42], [T, -0.18]),
+    comb([base, 1], [N, 0.24], [X, 0.72], [T, -0.2]), comb([base, 1], [N, 0.16], [X, 1.02], [T, -0.12])].map(v => new THREE.Vector3(...v));
+  const curve = new THREE.CatmullRomCurve3(pts);
+  cordMesh.geometry.dispose();
+  cordMesh.geometry = new THREE.TubeGeometry(curve, 60, Math.max(r, 0.012), 12, false);
+
+  const ys = yolkSacCm(d), crl = crlCm3D(d, model);
+  yolk.visible = ys > 0;
+  if (ys > 0) {
+    const yr = (ys / 2) / crl, at = curve.getPoint(0.8), out = curve.getTangent(0.8);
+    yolk.scale.setScalar(yr);
+    yolk.position.copy(at).addScaledVector(out, yr * 1.05);
+  }
+  fetusGlow.update(model.anchors);
+  const early = 1 - sstep(56, 112, d);
+  bodyMat.color.lerpColors(SKIN_LATE, SKIN_EARLY, early);
+  bodyBaseOpacity = lerp(0.93, 0.8, early);
+}
+
+/* ---------- Pre-embryo cell stages ---------- */
+const cellGroup = new THREE.Group(); specimen.add(cellGroup);
+const cellsInner = new THREE.Group(); cellGroup.add(cellsInner);
+const cellMat = new THREE.MeshPhysicalMaterial({ color: 0xe0ab98, roughness: 0.4, transparent: true, opacity: 0.62, sheen: 0.5, sheenColor: new THREE.Color(0xffd9cc), envMapIntensity: 0.5, depthWrite: false });
+const MAXC = 90;
+const cells = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 3), cellMat, MAXC); cells.frustumCulled = false; cellsInner.add(cells);
+const coronaMat = new THREE.MeshStandardMaterial({ color: 0xe8d7c4, roughness: 0.7, transparent: true, opacity: 0.85 });
+const corona = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), coronaMat, 110); corona.frustumCulled = false; cellsInner.add(corona);
+const nucleusMat = new THREE.MeshBasicMaterial({ color: 0xffd79a, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+const nuclei = [0, 1].map(() => { const m = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), nucleusMat); cellsInner.add(m); return m; });
+const zona = new THREE.Mesh(new THREE.SphereGeometry(0.56, 48, 32), rimMaterial('#bfe7ff', 1.1, 2.0)); cellsInner.add(zona);
+const zonaFill = new THREE.Mesh(new THREE.SphereGeometry(0.555, 48, 32), new THREE.MeshPhysicalMaterial({ color: 0xcfe6ff, transparent: true, opacity: 0.08, roughness: 0.2, depthWrite: false }));
+cellsInner.add(zonaFill);
+const polar = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 12), cellMat); cellsInner.add(polar);
+const tissue = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 32), new THREE.MeshPhysicalMaterial({ color: 0xd98791, roughness: 0.6, transparent: true, opacity: 0.55, sheen: 1, sheenColor: new THREE.Color(0xffc0c8), depthWrite: false }));
+tissue.scale.set(0.95, 0.2, 0.95); cellGroup.add(tissue);
+const discGroup = new THREE.Group(); cellsInner.add(discGroup);
+const discLayer = (color, y) => { const m = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 16), new THREE.MeshStandardMaterial({ color, roughness: 0.4, transparent: true, emissive: color, emissiveIntensity: 0.25 })); m.position.y = y; discGroup.add(m); return m; };
+const epiblast = discLayer(0x6fb7ff, 0.018), mesoderm = discLayer(0xff6f7f, 0), hypoblast = discLayer(0xffd36a, -0.018);
+const streak = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 1, 8), new THREE.MeshBasicMaterial({ color: 0xa6f0ff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+streak.rotation.x = Math.PI / 2; streak.position.y = 0.04; discGroup.add(streak);
+const cellGlow = new GlowSet(cellsInner);
+const cellShadow = contactShadow(); specimen.add(cellShadow);
+{
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
+  for (let i = 0; i < 110; i++) {
+    const u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, rr = 0.64 + Math.random() * 0.16, sq = Math.sqrt(1 - u * u);
+    p.set(sq * Math.cos(th) * rr, u * rr, sq * Math.sin(th) * rr);
+    q.setFromEuler(new THREE.Euler(Math.random() * 3, Math.random() * 3, 0));
+    const r = 0.045 + Math.random() * 0.025; s.set(r, r * 0.8, r);
+    corona.setMatrixAt(i, m.compose(p, q, s));
+  }
+}
+const fib = (n, i) => { const y = 1 - (i + 0.5) / n * 2, r = Math.sqrt(1 - y * y), th = i * 2.399963; return new THREE.Vector3(Math.cos(th) * r, y, Math.sin(th) * r); };
+
+function layoutCells(d) {
+  const f = d - 14, m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+  const place = [];
+  if (f >= 0) {
+    if (f < 1) {
+      // zygote: one cell, pronuclei drawn separately
+    } else if (f < 4.5) {
+      const n = f < 2 ? 2 : f < 2.5 ? 4 : f < 3 ? 8 : f < 3.8 ? 16 : 32;
+      const r = 0.44 * Math.cbrt(1 / n) * (n >= 16 ? 1.05 : 1.12);
+      if (n === 2) { place.push([new THREE.Vector3(-0.2, 0, 0), r], [new THREE.Vector3(0.2, 0, 0), r]); }
+      else if (n === 4) { [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]].forEach(v => place.push([new THREE.Vector3(...v).multiplyScalar(0.13), r])); }
+      else if (n === 8) { for (const a of [-1, 1]) for (const b of [-1, 1]) for (const c of [-1, 1]) place.push([new THREE.Vector3(a, b, c).multiplyScalar(0.12), r]); }
+      else { for (let i = 0; i < n; i++) place.push([fib(n, i).multiplyScalar(0.3 - (n === 32 ? 0.03 : 0)), r]); }
+    } else {
+      const R = lerp(0.46, 0.5, clamp((f - 4.5) / 1.5, 0, 1));
+      const n = 64;
+      for (let i = 0; i < n; i++) {
+        const v = fib(n, i);
+        if (v.y < -0.72) continue;
+        place.push([v.multiplyScalar(R), 0.085, 'flat']);
+      }
+      for (let i = 0; i < 12; i++) place.push([fib(12, i).multiplyScalar(0.1).add(new THREE.Vector3(0, -0.3, 0)), 0.08]);
+    }
+  }
+  cells.count = place.length || 1;
+  if (!place.length) { cells.setMatrixAt(0, m.makeScale(0.47, 0.47, 0.47)); }
+  place.forEach(([p, r, flat], i) => {
+    if (flat) { q.setFromUnitVectors(up, p.clone().normalize()); s.set(r, r * 0.42, r); }
+    else { q.identity(); s.set(r, r, r); }
+    cells.setMatrixAt(i, m.compose(p, q, s));
+  });
+  cells.instanceMatrix.needsUpdate = true;
+}
+
+let cellsKey = '';
+function updateCells(d) {
+  const f = d - 14;
+  const k = f < 0 ? 'o' : f < 1 ? 'z' : f < 2 ? 'c2' : f < 2.5 ? 'c4' : f < 3 ? 'c8' : f < 3.8 ? 'm16' : f < 4.5 ? 'm32' : 'b';
+  if (k !== cellsKey) { cellsKey = k; layoutCells(d); }
+  const coronaA = 1 - sstep(14, 16, d);
+  corona.visible = coronaA > 0.01; coronaMat.opacity = 0.85 * coronaA;
+  const zonaA = 1 - sstep(18.8, 19.6, d);
+  zona.visible = zonaFill.visible = zonaA > 0.01; zona.material.uniforms.uStrength.value = 1.1 * zonaA;
+  polar.visible = d < 16; polar.position.set(0.3, 0.37, 0.1);
+  nuclei[0].visible = d < 15; nuclei[1].visible = d >= 14 && d < 15;
+  if (d < 14) { nuclei[0].position.set(0.08, 0.05, 0.1); nuclei[0].scale.setScalar(0.1); }
+  else { nuclei[0].position.set(-0.08, 0.02, 0.05); nuclei[0].scale.setScalar(0.07); nuclei[1].position.set(0.09, -0.02, 0.04); nuclei[1].scale.setScalar(0.065); }
+  // Implantation: the blastocyst sinks, embryonic pole first, into the uterine lining.
+  const imp = sstep(19.5, 24, d);
+  tissue.visible = imp > 0.01; tissue.material.opacity = 0.55 * imp;
+  tissue.position.y = 0.1; cellsInner.position.y = lerp(0.62, 0.3, imp);
+  const disc = sstep(21, 23, d);
+  discGroup.visible = disc > 0.01;
+  const dl = discShare(d);
+  discGroup.position.set(0, -0.26, 0);
+  discGroup.scale.set(dl, 1, dl * (d >= 28 ? lerp(0.6, 0.42, clamp((d - 28) / 7, 0, 1)) : 0.62));
+  epiblast.scale.set(0.5, 0.02, 0.5); hypoblast.scale.set(0.5, 0.02, 0.5); mesoderm.scale.set(0.47, 0.018, 0.47);
+  [epiblast, hypoblast].forEach(m => { m.material.opacity = disc; });
+  mesoderm.visible = d >= 29; mesoderm.material.opacity = sstep(29, 31, d);
+  streak.visible = d >= 29; streak.scale.set(1, lerp(0.2, 0.8, clamp((d - 29) / 5, 0, 1)), 1);
+  streak.material.opacity = sstep(29, 30, d);
+  // Before organs exist, glows mark the whole conceptus, the implanting shell and the embryonic disc.
+  const anchors = { body: [[0, 0, 0, 0.3]], urogenital: [[0, 0, 0, 0.26]], support: [[0, -0.3, 0, 0.22]],
+    nervous: [[0, -0.24, 0, 0.12]], heart: [[0, -0.25, 0.05, 0.08]], skeletal: [[0, -0.25, -0.05, 0.1]] };
+  cellGlow.update(anchors);
+}
+
+/* ---------- Comparison objects ---------- */
+function objectProfile(s, t) {
+  const q = Math.max(0, t * (1 - t));
+  switch (s.shape) {
+    case 'lemon': return 0.5 * Math.pow(Math.sin(Math.PI * t), 0.72);
+    case 'teardrop': return Math.sqrt(q) * (1.18 - 0.62 * t);
+    case 'heart': return 0.52 * Math.pow(t, 0.55) * Math.sqrt(Math.max(0, 1 - Math.pow(t, 5)));
+    case 'pear': return Math.sqrt(q) * (1.2 - 0.4 * t) * (1 - (s.neck ?? 0.4) * sstep(0.35, 0.8, t));
+    case 'apple': return 0.5 * Math.pow(4 * q, 0.4) * (1.02 - 0.1 * t);
+    case 'pepper': return 0.5 * Math.pow(4 * q, 0.3) * (0.86 + 0.16 * t);
+    case 'cone': return 0.5 * Math.pow(t, 1.1) * Math.sqrt(clamp((1 - t) / 0.05, 0, 1));
+    case 'cyl': { const e = Math.abs(2 * t - 1); return 0.5 * Math.pow(Math.max(0, 1 - Math.pow(e, 5)), 0.3) * (1 - (s.taper ?? 0) * t); }
+    case 'banana': return 0.5 * Math.pow(4 * q, 0.55);
+    default: return Math.sqrt(q);
+  }
+}
+
+function buildObject(key) {
+  const s = OBJECTS[key], root = new THREE.Group(), body = new THREE.Group();
+  const col = s.c.map(c => new THREE.Color(c));
+  const mat = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: s.rough ?? 0.5, clearcoat: s.clear ?? 0, clearcoatRoughness: 0.25,
+    sheen: s.sheen ?? 0, sheenColor: new THREE.Color(0xffffff), sheenRoughness: 0.6, envMapIntensity: 0.8 });
+  let geo, topY = 0.5;
+  if (s.shape === 'cube') {
+    geo = new THREE.BoxGeometry(1, 0.86, 0.94);
+    const n = geo.attributes.position.count, colors = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { const c = col[0].clone().lerp(col[1], Math.random() * 0.6); colors.set([c.r, c.g, c.b], i * 3); }
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    mat.transmission = 0.3; mat.thickness = 0.5;
+  } else {
+    const pts = [];
+    for (let i = 0; i <= 72; i++) { const t = i / 72; pts.push(new THREE.Vector2(i === 0 || i === 72 ? 0 : objectProfile(s, t) / (s.aspect ?? 1), t - 0.5)); }
+    geo = new THREE.LatheGeometry(pts, 80);
+    geo.deleteAttribute('normal'); geo.deleteAttribute('uv');
+    geo = mergeVertices(geo, 1e-5);
+    const pos = geo.attributes.position, n = pos.count, colors = new Float32Array(n * 3), tmp = new THREE.Color();
+    const rMax = 0.5 / (s.aspect ?? 1);
+    for (let i = 0; i < n; i++) {
+      let x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      const t = y + 0.5, th = Math.atan2(z, x);
+      let r = Math.hypot(x, z);
+      const pole = sstep(0, 0.18, r / rMax);
+      if (s.ribs) r *= 1 - s.ribs[1] * (1 - Math.abs(Math.cos(s.ribs[0] * th / 2)));
+      if (s.crease) { const a = Math.atan2(Math.sin(th), Math.cos(th)); r *= 1 - s.crease * Math.exp(-((a / 0.16) ** 2)); }
+      let bump = 0;
+      if (s.drupe) {
+        const [nt, nr, amp] = s.drupe, rowi = Math.floor(t * nr);
+        bump = (0.5 + 0.5 * Math.cos(nt * th + Math.PI * (rowi % 2))) * Math.sin(Math.PI * ((t * nr) % 1));
+        r += amp * (s.round ? Math.sqrt(bump) : Math.pow(bump, 1.4)) * pole * rMax * 2;
+      }
+      if (s.pores) r += s.pores * Math.sin(th * 90) * Math.sin(t * 140) * pole;
+      if (s.leafy) r += s.leafy * (Math.sin(th * 5 + t * 9) * Math.sin(t * 14 - th * 3) + 0.4 * Math.sin(th * 13 + t * 25)) * pole;
+      if (s.fiber) r += s.fiber * Math.sin(th * 60 + Math.sin(t * 9) * 2) * pole;
+      if (s.florets) r += s.florets * Math.pow(Math.abs(Math.sin(th * 7) * Math.sin(t * 9)), 0.6) * sstep(0.3, 0.6, t) * pole;
+      if (s.rings) r -= s.rings * Math.pow(Math.abs(Math.sin(t * 70)), 8) * pole;
+      const net = s.pattern === 'net' ? Math.max(1 - Math.abs(Math.sin(th * 12 + Math.sin(t * 20) * 0.8)) / 0.22, 1 - Math.abs(Math.sin(t * 30 + Math.sin(th * 9) * 0.8)) / 0.22, 0) : 0;
+      if (net > 0) r += 0.008 * net * pole;
+      if (s.dimple) { const [dt, db] = s.dimple, g = Math.exp(-((r / 0.14) ** 2)); if (t > 0.5) y -= dt * g; else y += db * g; }
+      x = r * Math.cos(th); z = r * Math.sin(th);
+      if (s.flat) z *= s.flat;
+      if (s.bend) x += s.bend * y * y;
+      pos.setXYZ(i, x, y, z);
+
+      tmp.copy(col[0]);
+      switch (s.grad) {
+        case 'blush': tmp.lerp(col[1], clamp(0.5 + 0.5 * Math.cos(th) * (0.6 + 0.4 * t), 0, 1)); break;
+        case 'streak': tmp.lerp(col[1], clamp(0.15 + 0.35 * (0.5 + 0.5 * Math.sin(th * 11 + Math.sin(t * 7) * 2)) * (1 - t) + 0.25 * (1 - t), 0, 1)); break;
+        case 'bloom': tmp.lerp(col[1], 0.3 + 0.2 * Math.sin(th * 5 + t * 4)); break;
+        case 'along': tmp.lerp(col[1], sstep(0.35, 0.75, t)); break;
+        case 'flat': break;
+        default: tmp.lerp(col[1], t * 0.6);
+      }
+      switch (s.pattern) {
+        case 'seeds': { const sd = Math.abs(Math.sin(th * 11 + Math.floor(t * 9) * 1.3) * Math.sin(t * 9 * Math.PI)); if (sd > 0.93 && t > 0.08 && t < 0.9) tmp.set('#f3d45c'); break; }
+        case 'net': tmp.lerp(col[1], net); break;
+        case 'stripes': tmp.copy(col[0]).lerp(col[1], sstep(-0.15, 0.25, Math.sin(th * 8 + 0.7 * Math.sin(t * 12)))); break;
+        case 'softstripes': tmp.lerp(col[1], 0.3 * (0.5 + 0.5 * Math.sin(th * 10))); break;
+        case 'veins': tmp.lerp(col[1], clamp(0.5 + 0.35 * Math.sin(th * 5 + t * 9) * Math.sin(t * 14 - th * 3), 0, 1)); break;
+        case 'speckle': if (Math.sin(th * 37 + t * 91) * Math.sin(th * 23 - t * 57) > 0.82) tmp.set('#cfe3bf'); break;
+        case 'diamond': tmp.copy(col[1]).lerp(col[0], clamp(bump * 1.3, 0, 1)); break;
+        case 'tips': if (t < 0.05 || t > 0.95) tmp.set('#4f3a1e'); break;
+      }
+      colors.set([tmp.r, tmp.g, tmp.b], i * 3);
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    if (s.dimple) topY = 0.5 - s.dimple[0];
+  }
+  geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo, mat); body.add(mesh);
+  const shell = new THREE.Mesh(geo, rimMaterial('#7fdcff', 0.4, 2.6)); shell.scale.setScalar(1.012); shell.renderOrder = 2; body.add(shell);
+
+  const green = new THREE.MeshStandardMaterial({ color: 0x3e8a2e, roughness: 0.55 });
+  const brown = new THREE.MeshStandardMaterial({ color: 0x5a3b1e, roughness: 0.7 });
+  const leaf = (w, h, dth, tilt, y, m = green) => {
+    const g = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), m);
+    g.scale.set(h, 0.018, w * h); g.position.x = h * 0.85; g.rotation.z = tilt;
+    const piv = new THREE.Group(); piv.add(g); piv.rotation.y = -dth; piv.position.y = y; return piv;
+  };
+  for (const ex of s.extras || []) {
+    if (ex === 'stem' || ex === 'nub') {
+      const st = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.026, ex === 'nub' ? 0.05 : 0.14, 10), brown);
+      st.position.y = topY + (ex === 'nub' ? 0.01 : 0.05); st.rotation.z = 0.25; body.add(st);
+    } else if (ex === 'fatstem') {
+      const st = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.075, 0.16, 12), new THREE.MeshStandardMaterial({ color: key === 'pumpkin' ? 0x6b5a2a : 0x4f7f2a, roughness: 0.6 }));
+      st.position.y = topY + 0.05; st.rotation.z = 0.15; body.add(st);
+    } else if (ex === 'longstem') {
+      const c = new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, topY, 0), new THREE.Vector3(0.05, topY + 0.35, 0), new THREE.Vector3(0.22, topY + 0.62, 0));
+      body.add(new THREE.Mesh(new THREE.TubeGeometry(c, 20, 0.014, 8), new THREE.MeshStandardMaterial({ color: 0x6f7c2e, roughness: 0.5 })));
+    } else if (ex === 'calyx' || ex === 'star') {
+      const n = ex === 'star' ? 5 : 6, h = ex === 'star' ? 0.07 : key === 'eggplant' ? 0.16 : 0.14;
+      const m = ex === 'star' ? new THREE.MeshStandardMaterial({ color: 0x2a2f55, roughness: 0.6 }) : green;
+      for (let i = 0; i < n; i++) body.add(leaf(0.35, h, i / n * Math.PI * 2, -0.35, topY - 0.01, m));
+      if (ex === 'calyx') { const st = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.03, 0.1, 8), green); st.position.y = topY + 0.05; body.add(st); }
+    } else if (ex === 'tops') {
+      for (let i = 0; i < 6; i++) {
+        const st = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.012, 0.35, 6), green);
+        const a = i / 6 * Math.PI * 2; st.position.set(Math.cos(a) * 0.03, 0.5 + 0.16, Math.sin(a) * 0.03); st.rotation.set(Math.sin(a) * 0.35, 0, Math.cos(a) * 0.35); body.add(st);
+      }
+    } else if (ex === 'crown') {
+      const cm = new THREE.MeshStandardMaterial({ color: 0x3d7a35, roughness: 0.5 });
+      for (let i = 0; i < 18; i++) {
+        const l = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.42 + (i % 3) * 0.08, 6), cm);
+        const a = i * 2.4, tilt = 0.15 + (i % 4) * 0.14; l.scale.z = 0.35;
+        const piv = new THREE.Group(); piv.position.y = 0.46; piv.rotation.y = a; l.rotation.z = -tilt; l.position.set(Math.sin(tilt) * 0.2, 0.2, 0); piv.add(l); body.add(piv);
+      }
+    } else if (ex === 'baseleaves') {
+      for (let i = 0; i < 7; i++) body.add(leaf(0.5, 0.36, i / 7 * Math.PI * 2, 0.9, -0.28, green));
+    }
+  }
+  if (s.lie) body.rotation.z = Math.PI / 2;
+  root.add(body);
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(body), size = box.getSize(new THREE.Vector3());
+  const unit = 1 / Math.max(size.x, size.y, size.z);
+  const inner = new THREE.Group(); root.remove(body); inner.add(body);
+  body.position.set(-(box.min.x + box.max.x) / 2, -box.min.y, -(box.min.z + box.max.z) / 2);
+  inner.scale.setScalar(unit); root.add(inner);
+  root.userData = { spec: s, height: size.y * unit, width: size.x * unit, depth: size.z * unit, rim: shell.material };
+  return root;
+}
+
+const objCache = new Map();
+const objSlot = new THREE.Group(); specimen.add(objSlot);
+const objShadow = contactShadow(); specimen.add(objShadow);
+let objCurrent = null, objAnim = 1;
+function getObject(k) {
+  if (!objCache.has(k)) { const o = buildObject(k); o.userData.key = k; objCache.set(k, o); }
+  return objCache.get(k);
+}
+function setObject(k) {
+  if (objCurrent && objCurrent.userData.key === k) return;
+  if (objCurrent) objSlot.remove(objCurrent);
+  objCurrent = getObject(k); objSlot.add(objCurrent); objAnim = 0;
+}
+// Build the remaining objects in idle time so scrubbing never waits on geometry generation.
+const whenIdle = window.requestIdleCallback || (cb => setTimeout(cb, 120));
+const prebuildQueue = [...new Set(OBJECT_OF_WEEK)];
+(function prebuild() { const k = prebuildQueue.shift(); if (!k) return; getObject(k); whenIdle(prebuild); })();
+
+/* ---------- Ruler + grid ---------- */
+const gridMat = new THREE.ShaderMaterial({
+  uniforms: { uStep: { value: 1 }, uSize: { value: 100 }, uColor: { value: new THREE.Color(0x6f8fc4) } },
+  vertexShader: `uniform float uSize; varying vec2 vP; varying vec2 vUv; void main(){ vP = position.xz * uSize; vUv = position.xz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `uniform float uStep; uniform vec3 uColor; varying vec2 vP; varying vec2 vUv;
+    float line(float s){ vec2 c = vP / s; vec2 g = abs(fract(c - 0.5) - 0.5) / fwidth(c); return 1.0 - min(min(g.x, g.y), 1.0); }
+    void main(){ float fade = 1.0 - smoothstep(0.12, 0.5, length(vUv)); float a = (line(uStep) * 0.32 + line(uStep / 5.0) * 0.1) * fade; gl_FragColor = vec4(uColor, a); }`,
+  transparent: true, depthWrite: false,
+});
+const grid = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), gridMat); specimen.add(grid);
+const rulerGeo = new THREE.BufferGeometry(); rulerGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(600 * 6), 3));
+const ruler = new THREE.LineSegments(rulerGeo, new THREE.LineBasicMaterial({ color: 0x9fb8e0, transparent: true, opacity: 0.75 })); ruler.frustumCulled = false; specimen.add(ruler);
+
+const labelsEl = document.getElementById('labels');
+const mkLabel = cls => { const el = document.createElement('div'); el.className = `lbl ${cls}`; labelsEl.appendChild(el); return el; };
+const lblFetus = mkLabel('lbl-obj'), lblObj = mkLabel('lbl-obj');
+const tickLabels = Array.from({ length: 24 }, () => mkLabel('lbl-tick'));
+let rulerState = { frame: 0, step: 0, ticks: [] };
+
+function niceStep(frame, ticks) {
+  const target = frame / ticks, p = Math.pow(10, Math.floor(Math.log10(target))), m = target / p;
+  return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+}
+function fmtLen(cm, digits) {
+  if (cm === 0) return '0';
+  if (cm < 1) { const mm = cm * 10; return `${mm.toFixed(digits ?? (mm < 0.1 ? 3 : mm < 1 ? 2 : 1)).replace(/\.?0+$/, '')} mm`; }
+  return `${cm.toFixed(digits ?? (cm < 10 ? 1 : 0)).replace(/\.0$/, '')} cm`;
+}
+function updateRuler(frame, zFront) {
+  const step = niceStep(frame, clamp(Math.round(view.freeW / 110), 3, 7));
+  const half = frame * 0.47, x0 = Math.ceil(-half / step) * step;
+  const arr = rulerGeo.attributes.position.array; let n = 0;
+  const seg = (ax, az, bx, bz) => { arr.set([ax, 0.003, az, bx, 0.003, bz], n * 6); n++; };
+  seg(-half, zFront, half, zFront);
+  const ticks = [], minor = step / 5;
+  for (let x = Math.ceil(-half / minor) * minor, i = 0; x <= half + 1e-9 && n < 590; x += minor, i++) {
+    const major = Math.abs(Math.round(x / step) * step - x) < minor * 0.1;
+    seg(x, zFront, x, zFront + (major ? 0.045 : 0.02) * frame);
+    if (major) ticks.push(x);
+  }
+  rulerGeo.setDrawRange(0, n * 2); rulerGeo.attributes.position.needsUpdate = true;
+  gridMat.uniforms.uStep.value = step;
+  grid.scale.setScalar(frame * 2.6); gridMat.uniforms.uSize.value = frame * 2.6;
+  rulerState = { frame, step, ticks: ticks.map(x => ({ x, z: zFront + 0.075 * frame, text: fmtLen(Math.abs(x - x0)) })) };
+}
+
+/* ---------- Layout / camera ---------- */
+const hudEl = document.getElementById('hud'), tlEl = document.getElementById('timeline');
+let view = { w: 1, h: 1, dist: 0, freeW: 800 };
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h); composer.setSize(w, h); bloom.setSize(w / 2, h / 2);
+  const desktop = w >= 1024;
+  const L = 0, R = desktop ? hudEl.offsetWidth + 24 : 0;
+  const T = desktop ? 70 : (hudEl.offsetHeight + 16), B = tlEl.offsetHeight + 16;
+  const cx = (L + (w - R)) / 2, cy = (T + (h - B)) / 2;
+  const fw = 2 * Math.max(cx, w - cx), fh = 2 * Math.max(cy, h - cy);
+  const base = 30;
+  camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(base / 2)) * fh / h));
+  camera.aspect = fw / fh;
+  camera.setViewOffset(fw, fh, fw / 2 - cx, fh / 2 - cy, w, h);
+  camera.updateProjectionMatrix();
+  const freeW = Math.max(200, w - L - R), freeH = Math.max(160, h - T - B), tan = Math.tan(THREE.MathUtils.degToRad(base / 2));
+  const dist = Math.max(VIEW * 1.18 * h / (freeW * 2 * tan), VIEW * 0.62 * h / (freeH * 2 * tan));
+  // Keep the user's zoom relative to the fitted distance when the layout changes.
+  if (view.dist) {
+    const off = camera.position.clone().sub(controls.target);
+    camera.position.copy(controls.target).addScaledVector(off, dist / view.dist);
+  }
+  view = { w, h, dist, freeW };
+  controls.minDistance = dist * 0.3; controls.maxDistance = dist * 2.5;
+}
+function resetView() {
+  const dir = new THREE.Vector3(0.1, 0.2, 1).normalize();
+  controls.target.set(0, targetY, 0);
+  camera.position.copy(controls.target).addScaledVector(dir, view.dist);
+  controls.update();
+}
+
+/* ================= UI ================= */
+const $ = id => document.getElementById(id);
+const state = { day: 140, dayF: 140, playing: false, autoFit: true, glow: true, rotate: false, focus: null };
+const scrub = $('scrub');
+
+(function buildTimelineUI() {
+  const span = DAY_MAX - DAY_MIN, pct = d => ((d - DAY_MIN) / span) * 100;
+  const bands = [[DAY_MIN, 98, 'var(--t1)'], [98, 196, 'var(--t2)'], [196, DAY_MAX, 'var(--t3)']];
+  $('bands').innerHTML = bands.map(([a, b, c]) => `<div style="width:${pct(b) - pct(a)}%;background:${c}"></div>`).join('');
+  $('ticks').innerHTML = [1, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40].map(w => `<span class="${w % 8 && w !== 1 ? 'hidden sm:block' : ''}" style="left:${pct(w * 7)}%">${w}</span>`).join('');
+  $('months').innerHTML = MONTHS.map((_, i) => `<button data-m="${i + 1}" aria-pressed="false" title="Month ${i + 1}: weeks ${MONTHS[i][0]}–${MONTHS[i][1]}">${i + 1}</button>`).join('');
+  $('selWeek').innerHTML = WEEKS.map(w => `<option value="${w.w}">Week ${w.w}</option>`).join('');
+  $('selDay').innerHTML = [1, 2, 3, 4, 5, 6, 7].map(n => `<option value="${n}">Day ${n}</option>`).join('');
+  $('hSys').innerHTML = SYSTEM_KEYS.map(k => `<button class="sys" data-sys="${k}" aria-pressed="false" style="color:${SYSTEMS[k].color}">
+      <span class="dot" style="background:${SYSTEMS[k].color}"></span>
+      <span class="text-[12.5px] text-ink">${SYSTEMS[k].name}</span>
+      <span class="font-mono text-[10.5px] text-faint" data-count></span>
+      <span class="bar"><i style="background:${SYSTEMS[k].color}"></i></span></button>`).join('');
+})();
+
+function setDay(d, fromPlay = false) {
+  d = clamp(Math.round(d), DAY_MIN, DAY_MAX);
+  if (!fromPlay) state.dayF = d;
+  if (d === state.day && fromPlay) return;
+  state.day = d;
+  renderHUD();
+}
+function stopPlay() { state.playing = false; $('bPlay').textContent = '▶'; $('bPlay').setAttribute('aria-label', 'Play timeline'); }
+function togglePlay() {
+  if (state.playing) return stopPlay();
+  if (state.day >= DAY_MAX) setDay(DAY_MIN);
+  state.playing = true; state.dayF = state.day; $('bPlay').textContent = '❚❚'; $('bPlay').setAttribute('aria-label', 'Pause timeline');
+}
+
+scrub.addEventListener('input', () => { stopPlay(); setDay(+scrub.value); });
+$('bDayBack').onclick = () => { stopPlay(); setDay(state.day - 1); };
+$('bDayFwd').onclick = () => { stopPlay(); setDay(state.day + 1); };
+$('bWkBack').onclick = () => { stopPlay(); setDay(state.day - 7); };
+$('bWkFwd').onclick = () => { stopPlay(); setDay(state.day + 7); };
+$('bPlay').onclick = togglePlay;
+$('months').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { stopPlay(); setDay(monthFirstWeek(+b.dataset.m) * 7); } });
+$('selWeek').addEventListener('change', e => { stopPlay(); setDay(+e.target.value * 7 + dayIndex(state.day)); });
+$('selDay').addEventListener('change', e => { stopPlay(); setDay(weekOf(state.day) * 7 + (+e.target.value - 1)); });
+$('scFit').onclick = () => { state.autoFit = true; $('scFit').setAttribute('aria-pressed', 'true'); $('scTrue').setAttribute('aria-pressed', 'false'); };
+$('scTrue').onclick = () => { state.autoFit = false; $('scTrue').setAttribute('aria-pressed', 'true'); $('scFit').setAttribute('aria-pressed', 'false'); };
+$('tGlow').onchange = e => { state.glow = e.target.checked; };
+$('tRotate').onchange = e => { state.rotate = e.target.checked; controls.autoRotate = state.rotate; };
+$('bReset').onclick = resetView;
+$('hSys').addEventListener('click', e => { const b = e.target.closest('.sys'); if (b) setFocus(state.focus === b.dataset.sys ? null : b.dataset.sys); });
+$('sysClear').onclick = () => setFocus(null);
+$('hudToggle').onclick = () => {
+  const open = hudEl.dataset.open !== 'true';
+  hudEl.dataset.open = String(open); $('hudToggle').setAttribute('aria-expanded', String(open)); $('hudToggle').textContent = open ? 'Less' : 'Details';
+  resize();
+};
+let hoverSys = null;
+$('hNow').addEventListener('pointerover', e => { const li = e.target.closest('[data-sys]'); hoverSys = li ? li.dataset.sys : null; });
+$('hNow').addEventListener('pointerleave', () => { hoverSys = null; });
+window.addEventListener('keydown', e => {
+  const el = e.target instanceof Element ? e.target : null;
+  if (el?.closest('select, input:not(#scrub)') || e.metaKey || e.ctrlKey || e.altKey) return;
+  const step = e.shiftKey ? 7 : 1;
+  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+    e.preventDefault(); stopPlay(); setDay(state.day + (e.key === 'ArrowRight' ? step : -step));
+  } else if (e.key === ' ' && !el?.closest('button')) { e.preventDefault(); togglePlay(); }
+  else if (e.key === 'Home') { stopPlay(); setDay(DAY_MIN); } else if (e.key === 'End') { stopPlay(); setDay(DAY_MAX); }
+});
+
+function setFocus(sys) {
+  state.focus = sys;
+  document.querySelectorAll('.sys').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.sys === sys)));
+  $('sysClear').classList.toggle('hidden', !sys);
+}
+
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmtWeight = g => (g == null ? '< 1 g' : g >= 1000 ? `${(g / 1000).toFixed(2)} kg` : `${g < 10 ? g.toFixed(1) : Math.round(g)} g`);
+const ordinal = n => ['1st', '2nd', '3rd'][n - 1];
+
+function renderHUD() {
+  const d = state.day, w = weekOf(d), wk = row(w), m = monthOfWeek(w), tri = trimesterOfWeek(w), st = stageAt(d);
+  const L = lengthAt(d), g = weightAt(d), hr = heartRateAt(d), obj = OBJECTS[wk.obj];
+  scrub.value = d;
+  const pct = (d - DAY_MIN) / (DAY_MAX - DAY_MIN);
+  $('fill').style.width = `calc((100% - var(--thumb)) * ${pct})`;
+  scrub.setAttribute('aria-valuetext', `Week ${w}, day ${dayIndex(d) + 1} (${gaLabel(d)})`);
+  $('hWeek').textContent = `Week ${w}`;
+  $('hDay').textContent = `Day ${dayIndex(d) + 1} of 7`;
+  $('hGA').textContent = `${gaLabel(d)} · gestational day ${d}`;
+  $('hMonth').textContent = `Month ${m}`;
+  $('hTri').textContent = `${ordinal(tri)} trimester`;
+  $('hStage').textContent = st.label;
+  $('tGA').textContent = gaLabel(d);
+  $('tTri').textContent = `Month ${m} · T${tri}`;
+  document.querySelectorAll('#months button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.m === m)));
+  $('selWeek').value = w; $('selDay').value = dayIndex(d) + 1;
+
+  $('mLen').textContent = fmtLen(L.cm);
+  $('mLenKind').textContent = KIND_LABEL[L.kind];
+  $('mWt').textContent = fmtWeight(g);
+  $('mWtNote').textContent = g == null ? 'too light to weigh' : d > DUE_DAY ? 'held at 40w average' : 'average';
+  $('mHr').textContent = hr == null ? '·' : `≈ ${Math.round(hr)}`;
+  const due = DUE_DAY - d;
+  $('mDue').textContent = due > 0 ? `${due} days` : due === 0 ? 'Today' : `+${-due} days`;
+  $('mDueNote').textContent = due >= 0 ? 'until 40w 0d' : 'past 40w 0d';
+
+  const [c0, c1] = obj.c;
+  $('cSwatch').style.background = `radial-gradient(circle at 35% 30%, ${c1}, ${c0} 70%)`;
+  $('cName').textContent = `About the size of a ${obj.name.toLowerCase()}`;
+  $('cNote').textContent = `Object shown at a typical ~${fmtLen(obj.cm)} · ${st.noun.toLowerCase()} ${fmtLen(L.cm)}`;
+
+  const now = wk.notes;
+  $('nowCount').textContent = `${now.filter(n => reached(n, d)).length}/${now.length}`;
+  $('hNow').innerHTML = now.map(n => {
+    const ok = reached(n, d), c = SYSTEMS[n.sys].color;
+    const when = n.day != null ? `<span class="font-mono text-[10.5px] text-faint ml-1">${gaLabel(n.day)}</span>` : '';
+    return `<li class="ms ${ok ? '' : 'pending'}" data-sys="${n.sys}">
+      <span class="box" style="border-color:${c};${ok ? `background:${c}` : ''}">${ok ? '<svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5.2l2 2L8 3" fill="none" stroke="#06111f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' : ''}</span>
+      <span><span class="text-[12.5px] text-ink">${esc(n.text)}</span>${when}
+      <span class="block text-[10.5px] mt-0.5" style="color:${c}">${SYSTEMS[n.sys].name}${ok ? '' : ' · later this week'}</span></span></li>`;
+  }).join('');
+
+  const all = WEEKS.flatMap(x => x.notes), live = new Set(now.filter(n => reached(n, d)).map(n => n.sys));
+  document.querySelectorAll('.sys').forEach(b => {
+    const k = b.dataset.sys, tot = all.filter(n => n.sys === k), got = tot.filter(n => reached(n, d)).length;
+    b.querySelector('[data-count]').textContent = `${got}/${tot.length}`;
+    b.querySelector('.bar i').style.width = `${(got / tot.length) * 100}%`;
+    b.classList.toggle('live', live.has(k));
+  });
+  state.live = live;
+
+  const past = all.filter(n => n.w < w);
+  $('pastCount').textContent = `${past.length + now.filter(n => reached(n, d)).length}`;
+  if ($('hPast').open || !renderHUD.pastW || renderHUD.pastW !== w) {
+    renderHUD.pastW = w;
+    const byWeek = [];
+    for (let i = w - 1; i >= 1; i--) byWeek.push(`<div class="mt-2 mb-1 px-1 eyebrow">Week ${i}</div>` + row(i).notes.map(n =>
+      `<div class="flex gap-2 px-1 py-1 text-[12px] text-mute"><span class="mt-[5px] w-2 h-2 rounded-full shrink-0" style="background:${SYSTEMS[n.sys].color}"></span><span>${esc(n.text)}</span></div>`).join(''));
+    $('pastList').innerHTML = byWeek.join('') || '<div class="px-1 py-2 text-[12px] text-faint">Nothing yet: this is the first week.</div>';
+  }
+  setObject(wk.obj);
+  dirty = true;
+}
+
+/* ================= Loop ================= */
+let dirty = true, lastBuild = 0, frameCur = 20, targetY = 2, lastT = performance.now(), fetusFade = 1, xray = 0;
+const levels = {}; for (const k of SYSTEM_KEYS) levels[k] = 0;
+const v3 = new THREE.Vector3();
+
+function place(el, pos, dy = 0) {
+  v3.copy(pos).project(camera);
+  if (v3.z > 1) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  const x = (v3.x * 0.5 + 0.5) * view.w, y = (-v3.y * 0.5 + 0.5) * view.h + dy;
+  el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
+}
+
+function animate(now) {
+  const dt = clamp((now - lastT) / 1000, 0, 0.05); lastT = Math.max(lastT, now);
+  if (state.playing) {
+    state.dayF += dt * 5;
+    if (state.dayF >= DAY_MAX) { state.dayF = DAY_MAX; stopPlay(); }
+    setDay(Math.floor(state.dayF), true);
+    dirty = true;
+  }
+  const dF = state.playing ? state.dayF : state.day;
+
+  if (dirty && now - lastBuild > 30) {
+    dirty = false; lastBuild = now;
+    fetusFade = sstep(33, 35.5, dF);
+    if (fetusFade > 0) rebuildFetus(Math.max(dF, 33));
+    if (fetusFade < 1) updateCells(dF);
+  }
+  fetusPivot.visible = fetusFade > 0.001;
+  cellGroup.visible = fetusFade < 0.999;
+
+  // Composition in centimetres, before the specimen group maps it to world units.
+  const crl = fetusFade > 0 && model ? crlCm3D(Math.max(dF, 33), model) : 0;
+  const Fe = fetusFade > 0 && model ? model.extent * crl + yolkSacCm(dF) * 1.2 : 0;
+  const Fc = cellsDiameterCm(Math.min(dF, 35.5)) * (dF >= 19.5 ? 1.9 : 1.25);
+  const F = Math.max(1e-4, lerp(Fc, Fe, fetusFade));
+  const O = objCurrent ? objCurrent.userData.spec.cm : 1;
+  const Ow = objCurrent ? objCurrent.userData.width * O : 1;
+  const gap = 0.3 * Math.max(F, Ow), W = F + gap + Ow;
+  const fx = -W / 2 + F / 2, ox = W / 2 - Ow / 2;
+  const frameTarget = state.autoFit ? W * 1.05 : TRUE_FRAME;
+  frameCur = Math.exp(lerp(Math.log(frameCur), Math.log(frameTarget), 1 - Math.exp(-dt * 5)));
+  specimen.scale.setScalar(VIEW / frameCur);
+  specimen.position.x = 0;
+
+  const t = now / 1000;
+  const hr = heartRateAt(dF);
+  const beat = hr && !reduceMotion ? Math.pow(Math.max(0, Math.sin(t * Math.PI * 2 * hr / 60)), 6) : 0;
+  let fetusH = 0;
+  if (model && fetusFade > 0) {
+    anat.scale.setScalar(crl);
+    const c = model.center, bb = model.bbox;
+    anat.position.set(-c[0] * crl, -c[1] * crl, -c[2] * crl);
+    const lift = (c[1] - bb[1]) * crl + 0.06 * F;
+    const bob = reduceMotion ? 0 : Math.sin(t * 0.8) * 0.015 * F;
+    fetusPivot.position.set(fx, lift + bob, 0);
+    fetusPivot.rotation.y = Math.PI / 2 - 0.35 + (reduceMotion ? 0 : Math.sin(t * 0.3) * 0.06);
+    fetusH = (bb[4] - bb[1]) * crl + 0.06 * F;
+    fetusShadow.position.set(fx, 0.002, 0); fetusShadow.scale.setScalar(F * 0.9);
+  }
+  fetusShadow.visible = fetusFade > 0.05;
+  // Spotlighting a system turns the body into a translucent x-ray so the glowing organs read through it.
+  xray = lerp(xray, state.focus || hoverSys ? 1 : 0, 1 - Math.exp(-dt * 6));
+  bodyMat.opacity = bodyBaseOpacity * fetusFade * (1 - 0.62 * xray);
+  bodyRimMat.uniforms.uStrength.value = (0.45 + 0.7 * xray) * fetusFade;
+  cordMat.opacity = 0.85 * fetusFade * (1 - sstep(200, 286, dF) * 0.2);
+  yolkMat.opacity = 0.6 * fetusFade;
+  eyeMat.opacity = eyeBaseOpacity * fetusFade;
+
+  if (fetusFade < 1) {
+    const D = cellsDiameterCm(Math.min(dF, 35.5));
+    cellGroup.scale.setScalar(D);
+    cellGroup.position.set(fx, 0, 0);
+    cellsInner.rotation.y = reduceMotion ? 0.4 : t * 0.25;
+    const a = 1 - fetusFade;
+    cellMat.opacity = 0.62 * a * (1 - 0.5 * xray); nucleusMat.opacity = a;
+    cellShadow.visible = true; cellShadow.position.set(fx, 0.002, 0); cellShadow.scale.setScalar(D * 1.2);
+    fetusH = Math.max(fetusH, D * 1.15);
+  } else cellShadow.visible = false;
+
+  if (objCurrent) {
+    objAnim = Math.min(1, objAnim + dt * 3);
+    const e = reduceMotion ? 1 : 1 - Math.pow(1 - objAnim, 3);
+    objSlot.position.set(ox, 0, 0);
+    objCurrent.scale.setScalar(O * lerp(0.82, 1, e));
+    objCurrent.rotation.y = -0.5;
+    objCurrent.userData.rim.uniforms.uStrength.value = 0.4 + (1 - e) * 1.2;
+    objShadow.position.set(ox, 0.002, 0); objShadow.scale.setScalar(Math.max(Ow, objCurrent.userData.depth * O) * 1.2);
+  }
+
+  const zFront = Math.max(F, objCurrent ? objCurrent.userData.depth * O : 0) * 0.7;
+  if (Math.abs(rulerState.frame - frameCur) / frameCur > 0.002) updateRuler(frameCur, zFront);
+
+  const S = VIEW / frameCur;
+  targetY = lerp(targetY, Math.max(0.6, Math.max(fetusH, objCurrent ? objCurrent.userData.height * O : 0) * S * 0.45), 1 - Math.exp(-dt * 4));
+  controls.target.y = targetY;
+
+  const pick = state.focus || hoverSys;
+  for (const k of SYSTEM_KEYS) {
+    const want = pick ? (k === pick ? 1 : 0.04) : state.glow && state.live?.has(k) ? 0.45 : 0;
+    levels[k] = lerp(levels[k], want, 1 - Math.exp(-dt * 6));
+  }
+  const shimmer = reduceMotion ? 1 : 0.85 + 0.15 * Math.sin(t * 2.2);
+  fetusGlow.render(levels, fetusFade * shimmer, beat);
+  cellGlow.render(levels, (1 - fetusFade) * shimmer, beat);
+
+  controls.update();
+  composer.render();
+
+  const st = stageAt(state.day), L = lengthAt(state.day);
+  lblFetus.innerHTML = `${st.noun}<small>${fmtLen(L.cm)}</small>`;
+  place(lblFetus, v3.set(fx * S, fetusH * S + 0.25, 0), -6);
+  if (objCurrent) { lblObj.innerHTML = `${objCurrent.userData.spec.name}<small>~${fmtLen(O)}</small>`; place(lblObj, v3.set(ox * S, objCurrent.userData.height * O * S + 0.25, 0), -6); }
+  tickLabels.forEach((el, i) => {
+    const tk = rulerState.ticks[i];
+    if (!tk) { el.style.display = 'none'; return; }
+    el.textContent = tk.text;
+    place(el, v3.set(tk.x * S, 0, tk.z * S), 14);
+  });
+
+  requestAnimationFrame(animate);
+}
+
+window.addEventListener('resize', resize);
+resize();
+setDay(state.day);
+resetView();
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

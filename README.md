@@ -1,6 +1,6 @@
 # Interactive 3D Lab
 
-Ten interactive Three.js explorers covering chips, AI, anatomy, energy, space and U.S. immigration law. Each one is a single self-contained HTML file.
+Eleven interactive Three.js explorers covering chips, AI, anatomy, embryology, energy, space and U.S. immigration law. Each one is a single self-contained HTML file.
 
 **Live site:** https://eshaanjain26.github.io/interactive-3d-lab/
 
@@ -14,6 +14,7 @@ Ten interactive Three.js explorers covering chips, AI, anatomy, energy, space an
 | [Microgrid Flow](https://eshaanjain26.github.io/interactive-3d-lab/microgrid-flow/) | Smart-city microgrid supply and demand, shown live |
 | [Cardiac Flow Lab](https://eshaanjain26.github.io/interactive-3d-lab/cardiac-flow-lab/) | Four chambers, four valves, one cardiac cycle |
 | [Glass Body Atlas](https://eshaanjain26.github.io/interactive-3d-lab/glass-body-atlas/) | A see-through anatomy atlas of the organ systems |
+| [Fetal Growth Timeline Lab](https://eshaanjain26.github.io/interactive-3d-lab/fetal-growth-timeline/) | Embryo and fetus from week 1 to 40 by day: length and weight, a real-scale comparison object, and organ-system milestones |
 | [EB-1 Adjudication Lab](https://eshaanjain26.github.io/interactive-3d-lab/eb1-adjudication-lab/) | The EB-1A petition in 3D: lifecycle timeline, the ten criteria, USCIS two-step adjudication with outcome simulation, and AAO review |
 | [Heliocentric Orrery](https://eshaanjain26.github.io/interactive-3d-lab/heliocentric-orrery/) | A 3D solar system simulator |
 
