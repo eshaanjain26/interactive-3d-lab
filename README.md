@@ -20,6 +20,7 @@ Sixteen interactive Three.js explorers covering chips, quantum computing, AI, ro
 | [EB-1 Adjudication Lab](https://eshaanjain26.github.io/interactive-3d-lab/eb1-adjudication-lab/) | The EB-1A petition in 3D: lifecycle timeline, the ten criteria, USCIS two-step adjudication with outcome simulation, and AAO review |
 | [Heliocentric Orrery](https://eshaanjain26.github.io/interactive-3d-lab/heliocentric-orrery/) | A 3D solar system simulator |
 | [Drone Swarm Boids](https://eshaanjain26.github.io/interactive-3d-lab/drone-swarm-boids/) | Reynolds flocking across up to 600 quadcopters, with click-placed beacons, hazards and obstacles, three camera modes and live swarm telemetry |
+| [AMR Fulfillment Floor](https://eshaanjain26.github.io/interactive-3d-lab/amr-fulfillment-floor/) | A goods-to-person warehouse: 4 to 20 robots lift racks, queue at picking stations, yield in the aisles and recharge, with live KPIs, route overlays and a traffic heat map |
 | [Audio Spectrum Matrix](https://eshaanjain26.github.io/interactive-3d-lab/audio-spectrum-matrix/) | A neon wireframe terrain driven by live FFT data from a built-in synth, microphone or audio file |
 | [Warehouse Dock Twin](https://eshaanjain26.github.io/interactive-3d-lab/warehouse-dock-twin/) | A six-bay warehouse dock as a digital twin: trucks run their own arrive, dock, unload, load and depart timelines while pallets flow from truck to conveyor to racking and forklifts work the aisles |
 
