@@ -1,6 +1,6 @@
 # Interactive 3D Lab
 
-Seventeen interactive Three.js explorers covering chips, quantum computing, AI, robotics, logistics, audio, anatomy, embryology, energy, building safety, space and U.S. immigration law. Each one is a single self-contained HTML file.
+Sixteen interactive Three.js explorers covering chips, quantum computing, AI, robotics, audio, anatomy, cardiology, embryology, energy, logistics, space and U.S. immigration law. Each one is a single self-contained HTML file.
 
 **Live site:** https://eshaanjain26.github.io/interactive-3d-lab/
 
@@ -22,7 +22,7 @@ Seventeen interactive Three.js explorers covering chips, quantum computing, AI, 
 | [Drone Swarm Boids](https://eshaanjain26.github.io/interactive-3d-lab/drone-swarm-boids/) | Reynolds flocking across up to 600 quadcopters, with click-placed beacons, hazards and obstacles, three camera modes and live swarm telemetry |
 | [AMR Fulfillment Floor](https://eshaanjain26.github.io/interactive-3d-lab/amr-fulfillment-floor/) | A goods-to-person warehouse: 4 to 20 robots lift racks, queue at picking stations, yield in the aisles and recharge, with live KPIs, route overlays and a traffic heat map |
 | [Audio Spectrum Matrix](https://eshaanjain26.github.io/interactive-3d-lab/audio-spectrum-matrix/) | A neon wireframe terrain driven by live FFT data from a built-in synth, microphone or audio file |
-| [Fire Evacuation Drill](https://eshaanjain26.github.io/interactive-3d-lab/fire-evacuation-drill/) | A five-floor office in a fire drill: up to 200 occupants pick the nearest safe exit, queue in corridors and spiral down stairwells while fire and smoke spread, block routes and force reroutes |
+| [Warehouse Dock Twin](https://eshaanjain26.github.io/interactive-3d-lab/warehouse-dock-twin/) | A six-bay warehouse dock as a digital twin: trucks run their own arrive, dock, unload, load and depart timelines while pallets flow from truck to conveyor to racking and forklifts work the aisles |
 
 ## Run locally
 
