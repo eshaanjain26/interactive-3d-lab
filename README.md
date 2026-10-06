@@ -1,6 +1,6 @@
 # Interactive 3D Lab
 
-Fifteen interactive Three.js explorers covering chips, quantum computing, AI, robotics, logistics, audio, anatomy, embryology, energy, space and U.S. immigration law. Each one is a single self-contained HTML file.
+Seventeen interactive Three.js explorers covering chips, quantum computing, AI, robotics, logistics, audio, anatomy, embryology, energy, building safety, space and U.S. immigration law. Each one is a single self-contained HTML file.
 
 **Live site:** https://eshaanjain26.github.io/interactive-3d-lab/
 
