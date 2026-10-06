@@ -1,6 +1,6 @@
 # Interactive 3D Lab
 
-Fifteen interactive Three.js explorers covering chips, quantum computing, AI, robotics, logistics, audio, anatomy, embryology, energy, space and U.S. immigration law. Each one is a single self-contained HTML file.
+Eighteen interactive Three.js explorers covering chips, quantum computing, AI, AI sustainability, robotics, logistics, audio, anatomy, embryology, energy, space and U.S. immigration law. Each one is a single self-contained HTML file.
 
 **Live site:** https://eshaanjain26.github.io/interactive-3d-lab/
 
@@ -23,6 +23,7 @@ Fifteen interactive Three.js explorers covering chips, quantum computing, AI, ro
 | [AMR Fulfillment Floor](https://eshaanjain26.github.io/interactive-3d-lab/amr-fulfillment-floor/) | A goods-to-person warehouse: 4 to 20 robots lift racks, queue at picking stations, yield in the aisles and recharge, with live KPIs, route overlays and a traffic heat map |
 | [Audio Spectrum Matrix](https://eshaanjain26.github.io/interactive-3d-lab/audio-spectrum-matrix/) | A neon wireframe terrain driven by live FFT data from a built-in synth, microphone or audio file |
 | [Fire Evacuation Drill](https://eshaanjain26.github.io/interactive-3d-lab/fire-evacuation-drill/) | A five-floor office in a fire drill: up to 200 occupants pick the nearest safe exit, queue in corridors and spiral down stairwells while fire and smoke spread, block routes and force reroutes |
+| [TokenLens 3D: CAIR Explorer](https://eshaanjain26.github.io/interactive-3d-lab/tokenlens-3d/) | An LLM request through ten layers: a TokenLens gateway (proxy, token-waste analyzer, kill switches and quotas) and CAIR carbon-aware routing (complexity scorer, live carbon formula, budget state machine, router, audit log), with ablation modes and simulated traffic |
 
 ## Run locally
 
