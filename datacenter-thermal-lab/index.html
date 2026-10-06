@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data Center Thermal Twin</title>
+<style>
+  :root {
+    --bg: #04070c;
+    --glass: rgba(10, 18, 28, 0.58);
+    --glass-strong: rgba(10, 18, 28, 0.78);
+    --stroke: rgba(34, 211, 238, 0.18);
+    --stroke-soft: rgba(255, 255, 255, 0.07);
+    --text: #d9e7f1;
+    --muted: #7d93a7;
+    --cyan: #22d3ee;
+    --amber: #f59e0b;
+    --red: #ff3b4e;
+    --green: #34d399;
+    --yellow: #facc15;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font: 13px/1.45 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased; }
+  canvas#gl { position: fixed; inset: 0; display: block; }
+  .glass { background: var(--glass); border: 1px solid var(--stroke); border-radius: 14px;
+    backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%);
+    box-shadow: 0 10px 40px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04); }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+  .eyebrow { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 650; }
+
+  /* ---------- top bar ---------- */
+  .topbar { position: fixed; top: 16px; left: 16px; right: 16px; z-index: 5; display: flex; align-items: center;
+    gap: 18px; padding: 10px 14px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: .02em; white-space: nowrap; }
+  .brand .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 10px var(--cyan);
+    animation: pulse 2s infinite; }
+  .brand small { color: var(--muted); font-weight: 500; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .kpis { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+  .kpi { padding: 5px 10px; border-radius: 9px; background: rgba(255,255,255,.035); border: 1px solid var(--stroke-soft);
+    min-width: 82px; }
+  .kpi .v { font: 650 15px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+  .kpi .v.warn { color: var(--amber); } .kpi .v.bad { color: var(--red); } .kpi .v.ok { color: var(--cyan); }
+
+  /* ---------- control panel ---------- */
+  .controls { position: fixed; left: 16px; top: 84px; width: 286px; max-height: calc(100vh - 100px); overflow: auto;
+    z-index: 4; padding: 14px; scrollbar-width: thin; }
+  .controls h3 { margin: 0 0 10px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--cyan); }
+  .section + .section { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--stroke-soft); }
+  .slider { margin-bottom: 12px; }
+  .slider .row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .slider .row b { font: 600 12px ui-monospace, Menlo, monospace; color: var(--amber); }
+  .slider .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 4px;
+    background: linear-gradient(90deg, var(--cyan) var(--p, 50%), rgba(255,255,255,.12) var(--p, 50%)); outline: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%;
+    background: #0b1520; border: 2px solid var(--cyan); box-shadow: 0 0 10px rgba(34,211,238,.6); cursor: pointer; }
+  input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border-radius: 50%; background: #0b1520;
+    border: 2px solid var(--cyan); cursor: pointer; }
+  input[type=range]:focus-visible::-webkit-slider-thumb { outline: 2px solid #fff; }
+  .btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  button { font: inherit; color: var(--text); background: rgba(255,255,255,.05); border: 1px solid var(--stroke-soft);
+    border-radius: 9px; padding: 7px 10px; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+  button:hover { background: rgba(34,211,238,.1); border-color: var(--stroke); }
+  button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+  button.danger { color: #ffb4bb; border-color: rgba(255,59,78,.35); background: rgba(255,59,78,.08); }
+  button.danger:hover { background: rgba(255,59,78,.18); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .layers { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .layers button { display: flex; align-items: center; gap: 7px; text-align: left; font-size: 12px; padding: 7px 8px; }
+  .layers button .sw { width: 8px; height: 8px; border-radius: 2px; background: var(--muted); flex: none; }
+  .layers button.on { border-color: rgba(34,211,238,.45); background: rgba(34,211,238,.1); }
+  .layers button.on .sw { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+  .layers button kbd { margin-left: auto; font: 600 10px ui-monospace, Menlo, monospace; color: var(--muted); }
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 3px; border-radius: 10px;
+    background: rgba(0,0,0,.25); border: 1px solid var(--stroke-soft); }
+  .seg button { border: 0; background: transparent; padding: 7px 4px; font-size: 12px; }
+  .seg button.on { background: rgba(245,158,11,.16); color: #ffd58a; box-shadow: inset 0 0 0 1px rgba(245,158,11,.4); }
+  .log { list-style: none; margin: 0; padding: 0; font-size: 11.5px; }
+  .log li { padding: 4px 0; border-bottom: 1px dashed var(--stroke-soft); color: var(--muted); display: flex; gap: 8px; }
+  .log li time { font-family: ui-monospace, Menlo, monospace; color: #50677c; flex: none; }
+  .log li.bad { color: #ff9aa4; } .log li.ok { color: #8ff0cf; } .log li.warn { color: #ffd58a; }
+  .collapse { display: none; }
+
+  /* ---------- rack side panel ---------- */
+  .rackpanel { position: fixed; right: 16px; top: 84px; width: 280px; z-index: 4; padding: 14px;
+    transform: translateX(calc(100% + 24px)); transition: transform .35s cubic-bezier(.2,.8,.2,1); }
+  .rackpanel.open { transform: none; }
+  .rp-head { display: flex; justify-content: space-between; align-items: flex-start; }
+  .rp-id { font: 700 24px/1.1 ui-monospace, Menlo, monospace; letter-spacing: .02em; }
+  .rp-close { padding: 2px 9px; font-size: 16px; line-height: 1.4; }
+  .rp-meta { color: var(--muted); font-size: 12px; margin: 2px 0 12px; }
+  .stat { margin-bottom: 10px; }
+  .stat .row { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+  .stat .row b { color: var(--text); font: 600 13px ui-monospace, Menlo, monospace; }
+  .bar { height: 4px; border-radius: 3px; background: rgba(255,255,255,.08); margin-top: 4px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; border-radius: 3px; background: var(--cyan); transition: width .3s, background .3s; }
+  .sources { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
+  .sources div { display: flex; justify-content: space-between; padding: 2px 0; }
+  .sources .off { color: var(--red); }
+
+  /* ---------- sparkline ---------- */
+  .sparkbox { position: fixed; right: 16px; bottom: 16px; width: 312px; z-index: 4; padding: 10px 12px; }
+  .sparkbox .head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .sparkbox .head span { font-size: 11px; color: var(--muted); }
+  .sparkbox .head .a { color: var(--cyan); } .sparkbox .head .m { color: var(--amber); }
+  #spark { width: 100%; height: 86px; display: block; }
+  .legend { margin-top: 8px; }
+  .legend .grad { height: 6px; border-radius: 3px;
+    background: linear-gradient(90deg, #1f40d9 0%, #05b3d9 22%, #21cc59 44%, #f2cc1a 67%, #fa730f 83%, #f21f26 100%); }
+  .legend .ticks { display: flex; justify-content: space-between; font: 10px ui-monospace, Menlo, monospace; color: var(--muted); margin-top: 3px; }
+
+  /* ---------- floating labels ---------- */
+  #labels { position: fixed; inset: 0; pointer-events: none; z-index: 3; overflow: hidden; }
+  .hotspot { position: absolute; left: 0; top: 0; padding: 4px 8px; border-radius: 6px; white-space: nowrap;
+    font: 700 11px/1 ui-monospace, Menlo, monospace; letter-spacing: .1em; color: #fff;
+    background: rgba(255,59,78,.85); border: 1px solid #ff8c97; box-shadow: 0 0 18px rgba(255,59,78,.8);
+    animation: flash .6s steps(2, start) infinite; display: none; will-change: transform; }
+  .hotspot::after { content: ""; position: absolute; left: 50%; bottom: -6px; width: 1px; height: 6px; background: #ff8c97; }
+  .offline { position: absolute; left: 0; top: 0; padding: 4px 8px; border-radius: 6px; white-space: nowrap; display: none;
+    font: 700 10px/1 ui-monospace, Menlo, monospace; letter-spacing: .12em; color: #ffd0d4;
+    background: rgba(40,6,10,.85); border: 1px solid rgba(255,59,78,.7); will-change: transform; }
+  @keyframes flash { to { visibility: hidden; } }
+  #callout { position: fixed; left: 0; top: 0; z-index: 6; pointer-events: none; padding: 7px 10px; border-radius: 9px;
+    background: var(--glass-strong); border: 1px solid var(--stroke); backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px); font-size: 12px; white-space: nowrap; display: none; }
+  #callout b { color: var(--cyan); font-weight: 650; }
+  #callout .t { font-family: ui-monospace, Menlo, monospace; color: var(--amber); }
+  .hint { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 3; font-size: 11px;
+    color: var(--muted); padding: 6px 12px; border-radius: 999px; white-space: nowrap; }
+  .hint .mono { color: var(--cyan); }
+
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; z-index: 10; background: var(--bg);
+    color: var(--muted); letter-spacing: .14em; font-size: 11px; text-transform: uppercase; transition: opacity .6s; }
+
+  @media (max-width: 860px) {
+    .kpi { min-width: 0; padding: 4px 8px; } .kpi .v { font-size: 13px; }
+    .kpis .kpi.opt { display: none; }
+    .controls { top: auto; bottom: 16px; width: calc(100% - 32px); max-height: 46vh; }
+    .controls.min > .section:not(:first-child) { display: none; }
+    .collapse { display: inline-block; float: right; padding: 2px 9px; }
+    .sparkbox, .hint { display: none; }
+    .rackpanel { top: auto; bottom: 16px; width: calc(100% - 32px); z-index: 7; }
+  }
+</style>
+</head>
+<body>
+<div id="loading">Initializing thermal model</div>
+
+<header class="topbar glass">
+  <div class="brand"><span class="pulse"></span>NOC · Hall 3 <small>Thermal digital twin</small></div>
+  <div class="kpis">
+    <div class="kpi"><div class="eyebrow">Avg temp</div><div class="v ok" id="kAvg">--</div></div>
+    <div class="kpi"><div class="eyebrow">Max temp</div><div class="v" id="kMax">--</div></div>
+    <div class="kpi"><div class="eyebrow">PUE</div><div class="v" id="kPue">--</div></div>
+    <div class="kpi"><div class="eyebrow">Load</div><div class="v" id="kLoad">--</div></div>
+    <div class="kpi opt"><div class="eyebrow">IT power</div><div class="v" id="kIt">--</div></div>
+    <div class="kpi opt"><div class="eyebrow">Cooling</div><div class="v" id="kCool">--</div></div>
+    <div class="kpi opt"><div class="eyebrow">CRAC</div><div class="v" id="kCrac">--</div></div>
+  </div>
+</header>
+
+<aside class="controls glass" id="controls">
+  <div class="section">
+    <button class="collapse" id="collapse" aria-label="Toggle controls">▾</button>
+    <h3>Simulation</h3>
+    <div class="slider">
+      <div class="row"><label for="sLoad">Server load</label><b id="vLoad">62%</b></div>
+      <input type="range" id="sLoad" min="0" max="100" value="62">
+    </div>
+    <div class="slider">
+      <div class="row"><label for="sCool">Cooling capacity</label><b id="vCool">70%</b></div>
+      <input type="range" id="sCool" min="0" max="100" value="70">
+    </div>
+    <div class="slider">
+      <div class="row"><label for="sOut">Outdoor temp</label><b id="vOut">24°C</b></div>
+      <input type="range" id="sOut" min="5" max="45" value="24">
+      <div class="sub">CRAC efficiency <span class="mono" id="vEff">--</span> · supply air <span class="mono" id="vSup">--</span></div>
+    </div>
+    <div class="btns">
+      <button class="danger" id="bFail">Fail a CRAC</button>
+      <button id="bRestore" disabled>Restore all</button>
+    </div>
+  </div>
+  <div class="section">
+    <h3>Layers</h3>
+    <div class="layers" id="layerBtns">
+      <button data-layer="shell" class="on"><span class="sw"></span>Room shell<kbd>1</kbd></button>
+      <button data-layer="racks" class="on"><span class="sw"></span>Racks<kbd>2</kbd></button>
+      <button data-layer="cooling" class="on"><span class="sw"></span>Cooling<kbd>3</kbd></button>
+      <button data-layer="airflow" class="on"><span class="sw"></span>Show airflow<kbd>4</kbd></button>
+      <button data-layer="heat"><span class="sw"></span>Show heat map<kbd>5</kbd></button>
+      <button data-layer="cables"><span class="sw"></span>Show cables<kbd>6</kbd></button>
+    </div>
+  </div>
+  <div class="section">
+    <h3>Camera</h3>
+    <div class="seg" id="camBtns">
+      <button data-cam="overview" class="on">Overview</button>
+      <button data-cam="walk">Aisle walk</button>
+      <button data-cam="cutaway">Cutaway</button>
+    </div>
+  </div>
+  <div class="section">
+    <h3>Event log</h3>
+    <ul class="log" id="log"></ul>
+  </div>
+</aside>
+
+<aside class="rackpanel glass" id="rackPanel" aria-live="polite">
+  <div class="rp-head">
+    <div><div class="eyebrow">Rack</div><div class="rp-id" id="rpId">--</div></div>
+    <button class="rp-close" id="rpClose" aria-label="Close rack panel">×</button>
+  </div>
+  <div class="rp-meta" id="rpMeta"></div>
+  <div class="stat"><div class="row">Temperature<b id="rpTemp">--</b></div><div class="bar"><i id="rpTempBar"></i></div></div>
+  <div class="stat"><div class="row">CPU load<b id="rpLoad">--</b></div><div class="bar"><i id="rpLoadBar"></i></div></div>
+  <div class="stat"><div class="row">Power draw<b id="rpPower">--</b></div><div class="bar"><i id="rpPowerBar"></i></div></div>
+  <div class="stat"><div class="row">Airflow rate<b id="rpAir">--</b></div><div class="bar"><i id="rpAirBar"></i></div></div>
+  <div class="stat"><div class="row">Inlet / exhaust<b id="rpIo">--</b></div></div>
+  <div class="eyebrow" style="margin-top:12px">Cooling sources</div>
+  <div class="sources" id="rpSrc"></div>
+</aside>
+
+<div class="sparkbox glass">
+  <div class="head"><div class="eyebrow">Rack temperature · 60 s</div>
+    <span><span class="a">━ avg</span> &nbsp;<span class="m">━ max</span></span></div>
+  <canvas id="spark"></canvas>
+  <div class="legend"><div class="grad"></div>
+    <div class="ticks"><span>16°</span><span>20°</span><span>24°</span><span>28°</span><span>31°</span><span>34°C</span></div></div>
+</div>
+
+<div class="hint glass">Drag to orbit · scroll to zoom · click a rack · <span class="mono" id="fps">-- fps</span></div>
+<div id="labels"></div>
+<div id="callout"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+(() => {
+'use strict';
+const V3 = THREE.Vector3;
+const $ = (id) => document.getElementById(id);
+const rand = (a = 0, b = 1) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+// Frame-rate independent exponential approach factor for a time constant `tau` seconds.
+const ease = (tau, dt) => 1 - Math.exp(-dt / tau);
+
+// =====================================================================
+// LAYOUT  (room is 30 x 20 units, 1 unit ~ 0.6 m)
+// Rows run along X. Rows A/B face each other across cold aisle 1,
+// rows C/D across cold aisle 2. Backs of B/C share the central hot aisle;
+// A and D exhaust into perimeter hot aisles against the walls.
+// =====================================================================
+const ROOM = { w: 30, d: 20, h: 5, voidDepth: 0.8 };
+const RACK = { w: 1.0, h: 2.2, d: 1.1, pitch: 1.2, perRow: 10 };
+const ROWS = [
+  { z: -6.2, facing: +1, name: 'A', hot: 0 },
+  { z: -2.2, facing: -1, name: 'B', hot: 1 },
+  { z:  2.2, facing: +1, name: 'C', hot: 1 },
+  { z:  6.2, facing: -1, name: 'D', hot: 2 },
+];
+const COLD_AISLES = [
+  { z: -4.2, half: 1.45, name: 'Cold aisle 1', rows: [0, 1] },
+  { z:  4.2, half: 1.45, name: 'Cold aisle 2', rows: [2, 3] },
+];
+const HOT_AISLES = [
+  { z: -8.0, half: 1.25, name: 'Hot aisle 1', rows: [0] },
+  { z:  0.0, half: 1.65, name: 'Hot aisle 2', rows: [1, 2] },
+  { z:  8.0, half: 1.25, name: 'Hot aisle 3', rows: [3] },
+];
+const LEDS_PER_RACK = 12;
+const PDU_X = 6.25;
+
+// =====================================================================
+// RENDERER / SCENE
+// =====================================================================
+const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// Racks and structure are static, so the shadow map is re-rendered only when geometry visibility changes.
+renderer.shadowMap.autoUpdate = false;
+renderer.domElement.id = 'gl';
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x04070c);
+scene.fog = new THREE.FogExp2(0x04070c, 0.016);
+
+const camera = new THREE.PerspectiveCamera(48, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(19, 15, 19);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.8, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.maxPolarAngle = Math.PI * 0.495;
+controls.minDistance = 3;
+controls.maxDistance = 55;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.35;
+
+scene.add(new THREE.HemisphereLight(0x7fa6d6, 0x0a0d12, 0.7));
+scene.add(new THREE.AmbientLight(0x3a4a5e, 0.35));
+const sun = new THREE.DirectionalLight(0xc8ddff, 0.95);
+sun.position.set(7, 22, 9);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -17, right: 17, top: 13, bottom: -13, near: 2, far: 45 });
+sun.shadow.bias = -0.0006;
+sun.shadow.radius = 4;
+scene.add(sun);
+COLD_AISLES.forEach((a) => { const l = new THREE.PointLight(0x2aa8ff, 0.7, 11, 2); l.position.set(0, 2.0, a.z); scene.add(l); });
+const hotLight = new THREE.PointLight(0xff7a2a, 0.55, 12, 2); hotLight.position.set(0, 3.2, 0); scene.add(hotLight);
+
+const layers = {
+  shell: new THREE.Group(), racks: new THREE.Group(), cooling: new THREE.Group(),
+  airflow: new THREE.Group(), heat: new THREE.Group(), cables: new THREE.Group(),
+};
+Object.values(layers).forEach((g) => scene.add(g));
+layers.heat.visible = false;
+layers.cables.visible = false;
+
+// =====================================================================
+// PROCEDURAL TEXTURES (no external assets)
+// =====================================================================
+function canvasTex(w, h, draw) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+}
+const dotTex = canvasTex(64, 64, (g) => {
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.3, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+});
+const solidTileTex = canvasTex(128, 128, (g) => {
+  g.fillStyle = '#1b242e'; g.fillRect(0, 0, 128, 128);
+  for (let i = 0; i < 380; i++) { g.fillStyle = `rgba(255,255,255,${Math.random() * 0.025})`; g.fillRect(Math.random() * 128, Math.random() * 128, 2, 2); }
+  g.strokeStyle = '#33414f'; g.lineWidth = 3; g.strokeRect(1.5, 1.5, 125, 125);
+});
+// Perforated tile: the "alpha map" is simulated by painting hole colours rather than cutting geometry.
+const perfTileTex = canvasTex(128, 128, (g) => {
+  g.fillStyle = '#2b3b4a'; g.fillRect(0, 0, 128, 128);
+  g.fillStyle = '#05090e';
+  for (let y = 9, r = 0; y < 124; y += 10, r++) for (let x = 9 + (r % 2) * 5; x < 122; x += 10) { g.beginPath(); g.arc(x, y, 3, 0, 6.283); g.fill(); }
+  g.strokeStyle = '#4a6175'; g.lineWidth = 4; g.strokeRect(2, 2, 124, 124);
+});
+const serverTex = canvasTex(128, 256, (g, w, h) => {
+  g.fillStyle = '#07090c'; g.fillRect(0, 0, w, h);
+  const u = h / 44; let y = u;
+  while (y < h - u * 2) {
+    const units = [1, 1, 2, 2, 2, 4][Math.floor(Math.random() * 6)];
+    const hh = units * u - 1.2;
+    if (Math.random() < 0.12) { g.fillStyle = '#0e1217'; g.fillRect(6, y, w - 12, hh); }
+    else {
+      g.fillStyle = '#1b232c'; g.fillRect(6, y, w - 12, hh);
+      g.fillStyle = '#2b3746'; g.fillRect(6, y, w - 12, 1);
+      g.fillStyle = '#0a0e13';
+      for (let x = 12; x < w - 42; x += 4) g.fillRect(x, y + 2, 2, Math.max(1, hh - 4));
+      g.fillStyle = '#3b4859'; g.fillRect(w - 36, y + 2, 22, Math.max(1, hh - 4));
+    }
+    y += units * u;
+  }
+  g.strokeStyle = '#2c3845'; g.lineWidth = 3; g.strokeRect(2, 2, w - 4, h - 4);
+});
+const backTex = canvasTex(128, 256, (g, w, h) => {
+  g.fillStyle = '#12181f'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#05080b';
+  for (let y = 6; y < h - 4; y += 5) for (let x = 6 + (y % 2) * 2; x < w - 4; x += 5) g.fillRect(x, y, 2.4, 2.4);
+  g.strokeStyle = '#26313c'; g.lineWidth = 4; g.strokeRect(2, 2, w - 4, h - 4);
+});
+
+// =====================================================================
+// COLOUR SCALES
+// =====================================================================
+const HEAT_STOPS = [
+  [16, 0.12, 0.25, 0.85], [20, 0.02, 0.70, 0.85], [24, 0.13, 0.80, 0.35],
+  [28, 0.95, 0.80, 0.10], [31, 0.98, 0.45, 0.06], [34, 0.95, 0.12, 0.15], [40, 1.0, 0.25, 0.65],
+];
+function heatRGB(t, out) {
+  if (t <= HEAT_STOPS[0][0]) { out[0] = HEAT_STOPS[0][1]; out[1] = HEAT_STOPS[0][2]; out[2] = HEAT_STOPS[0][3]; return out; }
+  for (let i = 1; i < HEAT_STOPS.length; i++) {
+    const b = HEAT_STOPS[i];
+    if (t <= b[0]) {
+      const a = HEAT_STOPS[i - 1], k = (t - a[0]) / (b[0] - a[0]);
+      out[0] = lerp(a[1], b[1], k); out[1] = lerp(a[2], b[2], k); out[2] = lerp(a[3], b[3], k); return out;
+    }
+  }
+  const l = HEAT_STOPS[HEAT_STOPS.length - 1]; out[0] = l[1]; out[1] = l[2]; out[2] = l[3]; return out;
+}
+// Rack LED status thresholds from the spec: green < 25°C, yellow 25–30°C, red > 30°C.
+function statusRGB(t) { return t < 25 ? [0.12, 1.0, 0.42] : t <= 30 ? [1.0, 0.82, 0.08] : [1.0, 0.1, 0.12]; }
+const cssTemp = (t) => (t < 25 ? 'var(--green)' : t <= 30 ? 'var(--yellow)' : 'var(--red)');
+
+// =====================================================================
+// LAYER 1 · ROOM SHELL (semi-transparent walls, ceiling, raised floor)
+// =====================================================================
+const shellFade = { wall: 0.12, ceil: 0.05, floor: 0.8, edge: 0.35 };       // current
+const shellTarget = { ...shellFade };                                       // eased toward
+const wallMat = new THREE.MeshStandardMaterial({ color: 0x113049, transparent: true, opacity: 0.12, side: THREE.DoubleSide, depthWrite: false, roughness: 0.9 });
+const ceilMat = new THREE.MeshStandardMaterial({ color: 0x0f2638, transparent: true, opacity: 0.05, side: THREE.DoubleSide, depthWrite: false });
+const edgeMat = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.35 });
+const gridMat = new THREE.LineBasicMaterial({ color: 0x2a6f8a, transparent: true, opacity: 0.22 });
+const wallH = ROOM.h + ROOM.voidDepth, wallY = (ROOM.h - ROOM.voidDepth) / 2;
+[[ROOM.w, 0, -ROOM.d / 2, 0], [ROOM.w, 0, ROOM.d / 2, Math.PI], [ROOM.d, -ROOM.w / 2, 0, Math.PI / 2], [ROOM.d, ROOM.w / 2, 0, -Math.PI / 2]]
+  .forEach(([len, x, z, ry]) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(len, wallH), wallMat);
+    m.position.set(x, wallY, z); m.rotation.y = ry; m.renderOrder = 6; layers.shell.add(m);
+  });
+const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w, ROOM.d), ceilMat);
+ceiling.rotation.x = Math.PI / 2; ceiling.position.y = ROOM.h; ceiling.renderOrder = 6; layers.shell.add(ceiling);
+{
+  const g = [];
+  for (let x = -ROOM.w / 2; x <= ROOM.w / 2; x += 1.5) g.push(x, ROOM.h - 0.01, -ROOM.d / 2, x, ROOM.h - 0.01, ROOM.d / 2);
+  for (let z = -ROOM.d / 2; z <= ROOM.d / 2; z += 1.5) g.push(-ROOM.w / 2, ROOM.h - 0.01, z, ROOM.w / 2, ROOM.h - 0.01, z);
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(g, 3));
+  layers.shell.add(new THREE.LineSegments(geo, gridMat));
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(ROOM.w, wallH, ROOM.d)), edgeMat);
+  edges.position.y = wallY; layers.shell.add(edges);
+  const slab = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w + 0.4, ROOM.d + 0.4), new THREE.MeshStandardMaterial({ color: 0x06090d, roughness: 1 }));
+  slab.rotation.x = -Math.PI / 2; slab.position.y = -ROOM.voidDepth; layers.shell.add(slab);
+}
+
+// Raised floor: two InstancedMeshes (solid + perforated). Perforated tiles sit only in cold aisles,
+// directly under rack intakes, which is where the CRAC under-floor pressure is released.
+const floorMats = [
+  new THREE.MeshStandardMaterial({ map: solidTileTex, roughness: 0.85, metalness: 0.15, transparent: true, opacity: 0.8, depthWrite: false }),
+  new THREE.MeshStandardMaterial({ map: perfTileTex, roughness: 0.6, metalness: 0.3, transparent: true, opacity: 0.8, depthWrite: false, emissive: 0x0a2236 }),
+];
+{
+  const tiles = [[], []];
+  for (let i = 0; i < ROOM.w; i++) for (let j = 0; j < ROOM.d; j++) {
+    const x = -ROOM.w / 2 + i + 0.5, z = -ROOM.d / 2 + j + 0.5;
+    const perf = Math.abs(x) < 6.5 && COLD_AISLES.some((a) => Math.abs(z - a.z) < 1.0);
+    tiles[perf ? 1 : 0].push([x, z, (i + j) % 2]);
+  }
+  const geo = new THREE.BoxGeometry(0.97, 0.04, 0.97);
+  const d = new THREE.Object3D(), c = new THREE.Color();
+  tiles.forEach((list, k) => {
+    const im = new THREE.InstancedMesh(geo, floorMats[k], list.length);
+    list.forEach(([x, z, alt], n) => {
+      d.position.set(x, -0.02, z); d.updateMatrix(); im.setMatrixAt(n, d.matrix);
+      // Alternating checkerboard tint stands in for an alpha-mapped tile pattern.
+      c.setRGB(alt ? 1 : 0.84, alt ? 1 : 0.9, alt ? 1 : 0.96); im.setColorAt(n, c);
+    });
+    im.receiveShadow = true; im.renderOrder = 2; layers.shell.add(im);
+  });
+}
+
+// =====================================================================
+// LAYER 2 · RACKS (InstancedMesh bodies, doors, glow strips, LEDs) + PDUs
+// =====================================================================
+const racks = [];
+ROWS.forEach((row, r) => {
+  for (let i = 0; i < RACK.perRow; i++) {
+    const x = -((RACK.perRow - 1) * RACK.pitch) / 2 + i * RACK.pitch;
+    const gpu = (r === 1 && i === 3) || (r === 2 && i === 7);   // two high-density GPU racks run hotter
+    racks.push({
+      id: row.name + String(i + 1).padStart(2, '0'), row: r, idx: i, x, z: row.z, f: row.facing, gpu,
+      frontZ: row.z + row.facing * RACK.d / 2, backZ: row.z - row.facing * RACK.d / 2,
+      bias: gpu ? 1.45 : rand(0.75, 1.22), wob: rand(0.15, 0.5), phase: rand(0, 6.28),
+      load: 0, power: 0, temp: 22, inlet: 18, exhaust: 30, airflow: 1, supply: 1, w: [],
+      target: 0, hotLUT: null, hot: false,
+    });
+  }
+});
+const N_RACKS = racks.length;
+const dummy = new THREE.Object3D();
+const _c = new THREE.Color();
+// Places a part given in rack-local coordinates (+z = rack front) into world space.
+function placeLocal(rack, lx, ly, lz) {
+  dummy.position.set(rack.x + rack.f * lx, ly, rack.z + rack.f * lz);
+  dummy.rotation.set(0, rack.f > 0 ? 0 : Math.PI, 0);
+  dummy.updateMatrix();
+  return dummy.matrix;
+}
+const rackMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(RACK.w, RACK.h, RACK.d),
+  new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.55, roughness: 0.45 }), N_RACKS);
+const frontMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.9, 2.08),
+  new THREE.MeshStandardMaterial({ map: serverTex, roughness: 0.55, metalness: 0.35 }), N_RACKS);
+const backMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.9, 2.08),
+  new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.7, metalness: 0.4 }), N_RACKS);
+const stripMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.024, 2.0, 0.02), new THREE.MeshBasicMaterial(), N_RACKS * 2);
+const ledMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.05, 0.024, 0.012), new THREE.MeshBasicMaterial(), N_RACKS * LEDS_PER_RACK);
+racks.forEach((r, n) => {
+  rackMesh.setMatrixAt(n, placeLocal(r, 0, RACK.h / 2, 0));
+  rackMesh.setColorAt(n, _c.setRGB(0.16, 0.19, 0.23));
+  frontMesh.setMatrixAt(n, placeLocal(r, 0, RACK.h / 2, RACK.d / 2 + 0.004));
+  dummy.rotation.y += Math.PI; dummy.position.set(r.x, RACK.h / 2, r.z - r.f * (RACK.d / 2 + 0.004)); dummy.updateMatrix();
+  backMesh.setMatrixAt(n, dummy.matrix);
+  stripMesh.setMatrixAt(n * 2, placeLocal(r, -0.465, RACK.h / 2, RACK.d / 2 + 0.012));
+  stripMesh.setMatrixAt(n * 2 + 1, placeLocal(r, 0.465, RACK.h / 2, RACK.d / 2 + 0.012));
+  stripMesh.setColorAt(n * 2, _c.setRGB(0, 1, 0)); stripMesh.setColorAt(n * 2 + 1, _c);
+  for (let k = 0; k < LEDS_PER_RACK; k++) {
+    const col = k % 2, rowk = Math.floor(k / 2);
+    ledMesh.setMatrixAt(n * LEDS_PER_RACK + k, placeLocal(r, 0.31 + col * 0.075, 0.45 + rowk * 0.3, RACK.d / 2 + 0.012));
+    ledMesh.setColorAt(n * LEDS_PER_RACK + k, _c.setRGB(0, 1, 0));
+  }
+});
+rackMesh.castShadow = true; rackMesh.receiveShadow = true;
+rackMesh.userData.kind = 'rack';
+[rackMesh, frontMesh, backMesh, stripMesh, ledMesh].forEach((m) => layers.racks.add(m));
+// Per-LED blink state: each LED toggles on its own randomized schedule.
+const ledOn = new Uint8Array(N_RACKS * LEDS_PER_RACK);
+const ledNext = new Float32Array(N_RACKS * LEDS_PER_RACK).map(() => Math.random());
+
+const selBox = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(RACK.w + 0.1, RACK.h + 0.1, RACK.d + 0.1)),
+  new THREE.LineBasicMaterial({ color: 0x22d3ee }));
+selBox.visible = false; scene.add(selBox);
+
+// PDUs at both ends of every row. Racks 1–5 feed the left PDU, 6–10 the right.
+const pdus = [];
+ROWS.forEach((row, r) => [-1, 1].forEach((s) => {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.55, 1.9, 0.9), new THREE.MeshStandardMaterial({ color: 0x232c36, metalness: 0.5, roughness: 0.5 }));
+  body.position.y = 0.95; body.castShadow = true;
+  const disp = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.12), new THREE.MeshBasicMaterial({ color: 0xffa21a }));
+  disp.position.set(0, 1.55, 0.452 * row.facing); disp.rotation.y = row.facing > 0 ? 0 : Math.PI;
+  const bars = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.6), new THREE.MeshBasicMaterial({ color: 0x22d3ee }));
+  bars.position.set(0.15 * row.facing, 0.9, 0.452 * row.facing); bars.rotation.y = disp.rotation.y;
+  g.add(body, disp, bars); g.position.set(s * PDU_X, 0, row.z);
+  const pdu = { id: `PDU ${row.name}-${s < 0 ? 'L' : 'R'}`, row: r, side: s, body, x: s * PDU_X, z: row.z };
+  body.userData = { kind: 'pdu', ref: pdu };
+  pdus.push(pdu); layers.racks.add(g);
+}));
+
+// =====================================================================
+// LAYER 3 · COOLING (CRACs, ducts, pipes, under-floor void, containment, sensors)
+// =====================================================================
+const cracs = [];
+[-1, 1].forEach((side) => [-6.5, 0, 6.5].forEach((cz) => {
+  const id = `CRAC-${cracs.length + 1}`;
+  const g = new THREE.Group(); g.position.set(side * 12.2, 4.4, cz);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x2b3642, metalness: 0.6, roughness: 0.4, emissive: 0x000000 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.0, 2.2), bodyMat); body.castShadow = true;
+  const grille = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.8), new THREE.MeshStandardMaterial({ color: 0x0b1118, roughness: 0.9 }));
+  grille.position.x = -side * 1.305; grille.rotation.y = -side * Math.PI / 2;
+  // Fan: ring + 5 blades, spun around the grille normal every frame.
+  const fan = new THREE.Group(); fan.position.x = -side * 1.32; fan.rotation.y = -side * Math.PI / 2;
+  fan.add(new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.03, 6, 28), new THREE.MeshStandardMaterial({ color: 0x5b6b7c, metalness: 0.8, roughness: 0.3 })));
+  const blades = new THREE.Group();
+  for (let b = 0; b < 5; b++) {
+    const bl = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.3, 0.012), new THREE.MeshStandardMaterial({ color: 0x9fb3c6, metalness: 0.7, roughness: 0.35 }));
+    bl.position.y = 0.16; bl.rotation.y = 0.5;
+    const holder = new THREE.Group(); holder.rotation.z = (b / 5) * Math.PI * 2; holder.add(bl); blades.add(holder);
+  }
+  blades.add(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.05, 12).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x22d3ee, emissive: 0x0a4a5a })));
+  fan.add(blades);
+  const led = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), new THREE.MeshBasicMaterial({ color: 0x34d399 }));
+  led.position.set(-side * 1.31, 0.36, 0.85);
+  g.add(body, grille, fan, led);
+  layers.cooling.add(g);
+  // Supply duct carries CRAC discharge down the wall into the raised-floor plenum (translucent so the flow shows).
+  const duct = new THREE.Mesh(new THREE.BoxGeometry(0.8, 5.3, 1.4),
+    new THREE.MeshStandardMaterial({ color: 0x1d4d6e, transparent: true, opacity: 0.28, depthWrite: false, roughness: 0.5 }));
+  duct.position.set(side * 13.9, 1.85, cz); duct.renderOrder = 3; layers.cooling.add(duct);
+  const crac = { id, side, x: side * 12.2, z: cz, failed: false, output: 0.6, cmd: 0.7, returnT: 30, supplyT: 17, body, bodyMat, blades, led, failedAt: 0 };
+  body.userData = { kind: 'crac', ref: crac };
+  cracs.push(crac);
+}));
+// Chilled-water headers along the side walls with stubs into each CRAC.
+{
+  const supMat = new THREE.MeshStandardMaterial({ color: 0x2f7cf6, metalness: 0.6, roughness: 0.35, emissive: 0x06204a });
+  const retMat = new THREE.MeshStandardMaterial({ color: 0xf08a2a, metalness: 0.6, roughness: 0.35, emissive: 0x3a1600 });
+  [-1, 1].forEach((s) => {
+    [[supMat, 4.78, -0.25], [retMat, 4.62, 0.25]].forEach(([mat, y, dx]) => {
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 19.2, 12), mat);
+      p.rotation.x = Math.PI / 2; p.position.set(s * (14.55 + dx * 0.4), y, 0); layers.cooling.add(p);
+    });
+  });
+  cracs.forEach((c) => [[supMat, 4.78, -0.35], [retMat, 4.62, 0.35]].forEach(([mat, y, dz]) => {
+    const curve = new THREE.CatmullRomCurve3([new V3(c.side * 13.0, 4.9, c.z + dz), new V3(c.side * 13.6, y + 0.1, c.z + dz), new V3(c.side * 14.5, y, c.z + dz * 0.5)]);
+    layers.cooling.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 16, 0.06, 8), mat));
+  }));
+}
+// Under-floor void: translucent plenum box, edge lines, and pedestal grid.
+{
+  const v = new THREE.Mesh(new THREE.BoxGeometry(ROOM.w - 0.05, ROOM.voidDepth - 0.06, ROOM.d - 0.05),
+    new THREE.MeshBasicMaterial({ color: 0x0b4a70, transparent: true, opacity: 0.08, depthWrite: false, side: THREE.DoubleSide }));
+  v.position.y = -ROOM.voidDepth / 2 - 0.02; v.renderOrder = 0; layers.cooling.add(v);
+  const e = new THREE.LineSegments(new THREE.EdgesGeometry(v.geometry), new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.3 }));
+  e.position.copy(v.position); layers.cooling.add(e);
+  const ped = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.03, 0.04, ROOM.voidDepth - 0.06, 6), new THREE.MeshStandardMaterial({ color: 0x4a5866, metalness: 0.6 }), (ROOM.w + 1) * (ROOM.d + 1));
+  let n = 0;
+  for (let i = 0; i <= ROOM.w; i++) for (let j = 0; j <= ROOM.d; j++) {
+    dummy.position.set(-ROOM.w / 2 + i, -ROOM.voidDepth / 2 - 0.02, -ROOM.d / 2 + j); dummy.rotation.set(0, 0, 0); dummy.updateMatrix();
+    ped.setMatrixAt(n++, dummy.matrix);
+  }
+  layers.cooling.add(ped);
+}
+// Cold-aisle containment: translucent blue roof + end doors keep supply air from mixing with exhaust.
+{
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x08324f, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide, metalness: 0.2, roughness: 0.15 });
+  const doorMat = roofMat.clone(); doorMat.opacity = 0.1;
+  const frameMat = new THREE.LineBasicMaterial({ color: 0x67d8ff, transparent: true, opacity: 0.55 });
+  COLD_AISLES.forEach((a) => {
+    const roof = new THREE.Mesh(new THREE.PlaneGeometry(12.2, a.half * 2), roofMat);
+    roof.rotation.x = -Math.PI / 2; roof.position.set(0, RACK.h + 0.04, a.z); roof.renderOrder = 4; layers.cooling.add(roof);
+    const fr = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(12.2, RACK.h, a.half * 2)), frameMat);
+    fr.position.set(0, RACK.h / 2 + 0.04, a.z); layers.cooling.add(fr);
+    [-1, 1].forEach((s) => {
+      const door = new THREE.Mesh(new THREE.PlaneGeometry(a.half * 2, RACK.h), doorMat);
+      door.rotation.y = Math.PI / 2; door.position.set(s * 6.1, RACK.h / 2, a.z); door.renderOrder = 4; layers.cooling.add(door);
+    });
+  });
+}
+// Ceiling temperature sensors on drop wires, one pair per aisle. They swing slightly (pendulum).
+const sensors = [];
+[...COLD_AISLES.map((a, k) => ({ a, kind: 'cold', k })), ...HOT_AISLES.map((a, k) => ({ a, kind: 'hot', k }))].forEach(({ a, kind, k }) => {
+  [-3.6, 3.6].forEach((x) => {
+    const pivot = new THREE.Group(); pivot.position.set(x, ROOM.h, a.z);
+    const wireGeo = new THREE.BufferGeometry().setFromPoints([new V3(0, 0, 0), new V3(0, -1.15, 0)]);
+    pivot.add(new THREE.Line(wireGeo, new THREE.LineBasicMaterial({ color: 0x6b7f92 })));
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.22, 0.16), new THREE.MeshStandardMaterial({ color: 0xd5dde5, metalness: 0.3, roughness: 0.5 }));
+    body.position.y = -1.26;
+    const led = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), new THREE.MeshBasicMaterial({ color: kind === 'cold' ? 0x22d3ee : 0xf59e0b }));
+    led.position.set(0, -1.2, 0.085);
+    pivot.add(body, led); layers.cooling.add(pivot);
+    const s = { id: `TS-${sensors.length + 1}`, kind, k, pivot, phase: rand(0, 6.28), freq: rand(0.7, 1.1), amp: rand(0.04, 0.08), temp: 22 };
+    body.userData = { kind: 'sensor', ref: s };
+    sensors.push(s);
+  });
+});
+
+// =====================================================================
+// LAYER 6 · CABLES (TubeGeometry bundles rack → PDU, animated data pulses)
+// =====================================================================
+const CABLE_COLORS = [0x22d3ee, 0xf59e0b, 0xa78bfa, 0x34d399, 0xf472b6];
+const cableMats = CABLE_COLORS.map((c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.18, roughness: 0.5, metalness: 0.2 }));
+const cables = [];
+{
+  const trayMat = new THREE.MeshStandardMaterial({ color: 0x3b4855, metalness: 0.7, roughness: 0.4 });
+  ROWS.forEach((row) => {
+    const tray = new THREE.Mesh(new THREE.BoxGeometry(PDU_X * 2 + 0.6, 0.035, 0.5), trayMat);
+    tray.position.set(0, 2.6, row.z); layers.cables.add(tray);
+  });
+  racks.forEach((r, n) => {
+    const s = r.idx < RACK.perRow / 2 ? -1 : 1;
+    const px = s * PDU_X, zc = r.z + ((r.idx % 5) - 2) * 0.07;
+    const curve = new THREE.CatmullRomCurve3([
+      new V3(r.x + rand(-0.15, 0.15), RACK.h, r.z + rand(-0.15, 0.15)),
+      new V3(r.x + s * 0.15, 2.64, zc),
+      new V3(px - s * 0.5, 2.64, zc),
+      new V3(px, 2.3, zc),
+      new V3(px, 1.9, r.z),
+    ]);
+    const ci = n % CABLE_COLORS.length;
+    layers.cables.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 48, 0.022, 5), cableMats[ci]));
+    cables.push({ rack: n, lut: makeLUT(curve, 48), color: new THREE.Color(CABLE_COLORS[ci]) });
+  });
+}
+const PULSES_PER_CABLE = 3;
+const pulseMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshBasicMaterial(), cables.length * PULSES_PER_CABLE);
+const pulseT = new Float32Array(pulseMesh.count).map((_, i) => (i % PULSES_PER_CABLE) / PULSES_PER_CABLE + rand(0, 0.1));
+const pulseSpd = new Float32Array(pulseMesh.count).map(() => rand(0.8, 1.25));
+for (let i = 0; i < pulseMesh.count; i++) {
+  const c = cables[Math.floor(i / PULSES_PER_CABLE)].color;
+  pulseMesh.setColorAt(i, _c.setRGB(0.5 + c.r, 0.5 + c.g, 0.5 + c.b));
+}
+pulseMesh.frustumCulled = false;
+layers.cables.add(pulseMesh);
+
+// =====================================================================
+// CURVE LOOK-UP TABLES
+// Particles sample pre-baked arc-length LUTs instead of calling getPointAt()
+// per particle per frame — this keeps ~1,900 particles well inside the frame budget.
+// =====================================================================
+function makeLUT(curve, n = 64) {
+  const pts = curve.getSpacedPoints(n), arr = new Float32Array((n + 1) * 3);
+  pts.forEach((p, i) => { arr[i * 3] = p.x; arr[i * 3 + 1] = p.y; arr[i * 3 + 2] = p.z; });
+  return { arr, n, len: curve.getLength() };
+}
+function sampleLUT(l, t, out, o) {
+  const f = clamp(t, 0, 1) * l.n, i = Math.min(Math.floor(f), l.n - 1), a = f - i, A = l.arr, k = i * 3;
+  out[o] = A[k] + (A[k + 3] - A[k]) * a;
+  out[o + 1] = A[k + 1] + (A[k + 4] - A[k + 1]) * a;
+  out[o + 2] = A[k + 2] + (A[k + 5] - A[k + 2]) * a;
+}
+
+// =====================================================================
+// THERMAL SIMULATION
+// ---------------------------------------------------------------------
+// Each rack is a lumped thermal mass. Every tick:
+//   1. Rack load wanders around (server load slider × per-rack bias).
+//   2. Power draw (kW) is linear in load: 3 kW idle + 9 kW at full load.
+//   3. The cold-air supply a rack receives is a Gaussian-distance-weighted
+//      mix of the six CRAC outputs, so losing one CRAC starves nearby racks
+//      while distant racks barely notice — that is what makes hotspots local.
+//   4. If demand (normalised power) exceeds delivered airflow, hot exhaust
+//      recirculates over the rack top and raises the inlet temperature.
+//   5. Equilibrium temp = inlet + ΔT, where ΔT ∝ power / airflow
+//      (the sensible-heat equation Q = ṁ·cp·ΔT, rearranged).
+//   6. Actual temp approaches equilibrium with time constant TAU_RACK, so a
+//      failed CRAC produces a hotspot that visibly forms over ~10 seconds.
+// =====================================================================
+const TAU_RACK = 4.5;      // s, rack thermal mass
+const TAU_CRAC = 2.0;      // s, CRAC fan spin-up / spin-down
+const SIGMA = 4.5;         // units, spatial reach of a CRAC's supply air
+const HOTSPOT_T = 32;
+const sim = {
+  serverLoad: 0.62, cooling: 0.70, outdoor: 24, time: 0,
+  eff: 1, supplyT: 17, avgTemp: 0, maxTemp: 0, itKW: 0, coolKW: 0, pue: 0, avgOut: 0,
+};
+// Static CRAC influence weights per rack (normalised so a fully healthy room delivers 1.0 × output).
+racks.forEach((r) => {
+  r.w = cracs.map((c) => Math.exp(-((r.x - c.x) ** 2 + (r.z - c.z) ** 2) / (2 * SIGMA * SIGMA)));
+  const s = r.w.reduce((a, b) => a + b, 0); r.w = r.w.map((v) => v / s);
+});
+
+function stepSim(dt) {
+  sim.time += dt;
+  // CRAC efficiency falls as outdoor temp rises (condenser rejects heat less effectively).
+  sim.eff = clamp(1.1 - (sim.outdoor - 10) * 0.014, 0.4, 1.1);
+  // Supply-air temperature drifts up with hot outdoor air and with throttled cooling capacity.
+  sim.supplyT = 15.5 + Math.max(0, sim.outdoor - 20) * 0.18 + (1 - sim.cooling) * 2.5;
+
+  // CRAC output eases toward its command (0 when failed) to mimic fan inertia.
+  let outSum = 0, coolKW = 0;
+  cracs.forEach((c) => {
+    c.cmd = c.failed ? 0 : sim.cooling;
+    c.output += (c.cmd * sim.eff - c.output) * ease(TAU_CRAC, dt);
+    c.supplyT = sim.supplyT;
+    outSum += c.output;
+    // Electrical cost: fans + compressor scale with command and work harder in hot weather.
+    coolKW += c.cmd * 14 * (1 + Math.max(0, sim.outdoor - 15) * 0.025);
+  });
+  sim.avgOut = outSum / cracs.length;
+
+  let tSum = 0, tMax = -1e9, it = 0;
+  const kRet = new Float32Array(cracs.length), wRet = new Float32Array(cracs.length);
+  racks.forEach((r) => {
+    // 1. Load: slider × per-rack bias, plus a slow sinusoidal wander.
+    r.load = clamp(sim.serverLoad * r.bias + 0.05 * Math.sin(sim.time * r.wob + r.phase), 0, 1);
+    // 2. Power (kW) and normalised demand p (≈1 at full load).
+    r.power = 3 + 9 * r.load;
+    const p = r.power / 12;
+    // 3. Delivered cold-air supply = Σ weight × CRAC output.
+    let sup = 0; for (let j = 0; j < cracs.length; j++) sup += r.w[j] * cracs[j].output;
+    r.supply = sup;
+    r.airflow = 0.15 + sup;   // 0.15 = baseline mixing from room air even with no CRAC flow
+    // 4. Recirculation penalty when demand exceeds delivered airflow.
+    r.inlet = sim.supplyT + 10 * Math.max(0, p - r.airflow);
+    // 5–6. Relax toward equilibrium.
+    const teq = r.inlet + 8 * p / r.airflow;
+    r.temp += (teq - r.temp) * ease(TAU_RACK, dt);
+    r.exhaust = r.temp + 10 * p / r.airflow * 0.6;
+    tSum += r.temp; tMax = Math.max(tMax, r.temp); it += r.power;
+    for (let j = 0; j < cracs.length; j++) { kRet[j] += r.w[j] * r.exhaust; wRet[j] += r.w[j]; }
+  });
+  cracs.forEach((c, j) => { c.returnT = kRet[j] / wRet[j]; });
+  sim.avgTemp = tSum / N_RACKS; sim.maxTemp = tMax; sim.itKW = it; sim.coolKW = coolKW;
+  // PUE = total facility power / IT power. Overhead covers UPS losses (3.5 % of IT) + lighting/BMS (6 kW).
+  sim.pue = (it + coolKW + it * 0.035 + 6) / it;
+}
+
+// Hot exhaust from a rack is routed to whichever *active* CRAC pulls on it hardest.
+function pickTarget(r) {
+  let best = -1, bw = -1;
+  cracs.forEach((c, j) => { if (!c.failed && r.w[j] > bw) { bw = r.w[j]; best = j; } });
+  if (best < 0) r.w.forEach((w, j) => { if (w > bw) { bw = w; best = j; } });
+  return best;
+}
+// Hot-air path per rack: out the back → into the hot aisle → rise to ceiling → along the
+// ceiling return plenum → into the CRAC return grille. Built as CatmullRomCurve3 per row/rack.
+function buildHotPath(r) {
+  r.target = pickTarget(r);
+  const c = cracs[r.target], hz = HOT_AISLES[ROWS[r.row].hot].z;
+  const curve = new THREE.CatmullRomCurve3([
+    new V3(r.x, 1.0, r.backZ),
+    new V3(r.x, 1.5, lerp(r.backZ, hz, 0.8)),
+    new V3(r.x * 0.92, 3.5, hz),
+    new V3(lerp(r.x, c.x, 0.35), 4.5, lerp(hz, c.z, 0.3)),
+    new V3(lerp(r.x, c.x, 0.75), 4.55, lerp(hz, c.z, 0.85)),
+    new V3(c.side * 10.95, 4.4, c.z),
+  ]);
+  r.hotLUT = makeLUT(curve, 60);
+}
+racks.forEach(buildHotPath);
+// CRAC discharge path: down the wall duct → into the plenum → under the floor toward each cold aisle.
+const voidLUTs = cracs.map((c) => COLD_AISLES.map((a) => makeLUT(new THREE.CatmullRomCurve3([
+  new V3(c.side * 13.1, 4.1, c.z), new V3(c.side * 13.9, 3.3, c.z), new V3(c.side * 13.9, 0.5, c.z),
+  new V3(c.side * 13.4, -0.45, lerp(c.z, a.z, 0.2)), new V3(c.side * 10.5, -0.45, lerp(c.z, a.z, 0.75)),
+  new V3(c.side * 6.5, -0.42, a.z), new V3(c.side * 0.6, -0.42, a.z),
+]), 64)));
+
+// =====================================================================
+// LAYER 4 · AIRFLOW PARTICLES (THREE.Points)
+// =====================================================================
+function makePoints(n, size, order) {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) pos[i * 3 + 1] = -50;
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3).setUsage(THREE.DynamicDrawUsage));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size, map: dotTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  pts.frustumCulled = false; pts.renderOrder = order; layers.airflow.add(pts);
+  return { pos, col, geo, n };
+}
+const N_COLD = 800, N_HOT = 700, N_VOID = 450;
+const coldP = makePoints(N_COLD, 0.34, 3);
+const hotP = makePoints(N_HOT, 0.4, 3);
+const voidP = makePoints(N_VOID, 0.34, 1);
+// Cold particle state (structure-of-arrays for cache-friendly updates).
+const cold = { x: new Float32Array(N_COLD), y: new Float32Array(N_COLD), z: new Float32Array(N_COLD), dir: new Float32Array(N_COLD),
+  aisle: new Uint8Array(N_COLD), life: new Float32Array(N_COLD).fill(-1), seed: new Float32Array(N_COLD).map(() => rand(0, 6.28)) };
+const hot = { t: new Float32Array(N_HOT).map(() => Math.random()), rack: new Uint8Array(N_HOT).map(() => Math.floor(Math.random() * N_RACKS)),
+  lut: new Array(N_HOT), ox: new Float32Array(N_HOT), oy: new Float32Array(N_HOT), oz: new Float32Array(N_HOT), spd: new Float32Array(N_HOT) };
+const vd = { t: new Float32Array(N_VOID).map(() => Math.random()), crac: new Int8Array(N_VOID).fill(-1), aisle: new Uint8Array(N_VOID),
+  ox: new Float32Array(N_VOID), oz: new Float32Array(N_VOID), spd: new Float32Array(N_VOID) };
+for (let i = 0; i < N_HOT; i++) spawnHot(i, Math.random());
+for (let i = 0; i < N_VOID; i++) spawnVoid(i, Math.random());
+
+// Cold spawn: pick a perforated-tile position. Rejection-sample on the local CRAC supply, so tiles
+// near a failed CRAC emit visibly fewer particles (lower under-floor pressure there).
+function spawnCold(i) {
+  const nominal = Math.max(sim.cooling * sim.eff, 0.02);
+  let a, x, z;
+  for (let tries = 0; tries < 5; tries++) {
+    a = Math.random() < 0.5 ? 0 : 1; x = rand(-6, 6); z = COLD_AISLES[a].z + rand(-1.0, 1.0);
+    const ai = COLD_AISLES[a], row = z < ai.z ? ai.rows[0] : ai.rows[1];
+    const ri = row * RACK.perRow + clamp(Math.round((x + 5.4) / RACK.pitch), 0, RACK.perRow - 1);
+    if (Math.random() < clamp(racks[ri].supply / nominal, 0.05, 1)) break;
+  }
+  cold.x[i] = x; cold.y[i] = rand(0.02, 0.1); cold.z[i] = z; cold.aisle[i] = a; cold.life[i] = 0;
+  cold.dir[i] = z < COLD_AISLES[a].z ? -1 : 1;   // head toward the nearer rack face
+}
+// Hot spawn: choose a rack weighted by its power draw (hotter racks shed more exhaust).
+function spawnHot(i, t0 = 0) {
+  let r = 0;
+  for (let tries = 0; tries < 6; tries++) { r = Math.floor(Math.random() * N_RACKS); if (Math.random() < racks[r].power / 12) break; }
+  hot.rack[i] = r; hot.lut[i] = racks[r].hotLUT; hot.t[i] = t0;
+  hot.ox[i] = rand(-0.45, 0.45); hot.oy[i] = rand(-0.25, 0.25); hot.oz[i] = rand(-0.2, 0.2); hot.spd[i] = rand(0.8, 1.2);
+}
+function spawnVoid(i, t0 = 0) {
+  const live = []; cracs.forEach((c, j) => { if (!c.failed) live.push(j); });
+  if (!live.length) { vd.crac[i] = -1; return; }
+  vd.crac[i] = live[Math.floor(Math.random() * live.length)]; vd.aisle[i] = Math.random() < 0.5 ? 0 : 1;
+  vd.t[i] = t0; vd.ox[i] = rand(-0.3, 0.3); vd.oz[i] = rand(-0.55, 0.55); vd.spd[i] = rand(0.8, 1.2);
+}
+
+function updateParticles(dt) {
+  const coolF = clamp(sim.avgOut, 0, 1.1);
+  // --- 1. Cold supply air rising out of perforated tiles ---
+  // Density and speed both scale with delivered CRAC output.
+  const coldActive = Math.floor(N_COLD * (0.12 + 0.88 * clamp(coolF, 0, 1)));
+  const cSpeed = 0.45 + 1.4 * coolF;
+  const P = coldP.pos, C = coldP.col;
+  for (let i = 0; i < N_COLD; i++) {
+    const k = i * 3;
+    if (i >= coldActive) { if (cold.life[i] >= 0) { cold.life[i] = -1; P[k + 1] = -50; C[k] = C[k + 1] = C[k + 2] = 0; } continue; }
+    if (cold.life[i] < 0) spawnCold(i);
+    cold.life[i] += dt;
+    const y = cold.y[i];
+    cold.y[i] += (0.9 - 0.25 * y) * cSpeed * dt;                         // buoyant rise, slowing with height
+    cold.z[i] += cold.dir[i] * (0.15 + 0.55 * y) * cSpeed * dt;          // drawn sideways by server intake fans
+    cold.x[i] += Math.sin(sim.time * 1.7 + cold.seed[i]) * 0.08 * dt;     // small turbulence
+    const a = COLD_AISLES[cold.aisle[i]], dist = Math.abs(cold.z[i] - a.z) / a.half;
+    // Absorbed at the rack face (or at the containment roof): respawn next frame.
+    if (dist > 0.98 || cold.y[i] > RACK.h - 0.05 || cold.life[i] > 6) { cold.life[i] = -1; }
+    const fade = Math.min(1, cold.life[i] * 3) * (1 - smoothstep(0.7, 0.98, dist)) * 0.9;
+    P[k] = cold.x[i]; P[k + 1] = cold.y[i]; P[k + 2] = cold.z[i];
+    C[k] = 0.2 * fade; C[k + 1] = 0.6 * fade; C[k + 2] = 1.0 * fade;
+  }
+  // --- 2. Hot exhaust along per-rack CatmullRom paths to the CRAC returns ---
+  const hotActive = Math.floor(N_HOT * (0.2 + 0.8 * sim.serverLoad));
+  const hSpeed = 1.2 + 3.2 * sim.serverLoad;
+  const HP = hotP.pos, HC = hotP.col;
+  for (let i = 0; i < N_HOT; i++) {
+    const k = i * 3;
+    if (i >= hotActive) { HP[k + 1] = -50; HC[k] = HC[k + 1] = HC[k + 2] = 0; continue; }
+    const l = hot.lut[i];
+    hot.t[i] += dt * hSpeed * hot.spd[i] / l.len;
+    if (hot.t[i] >= 1) { spawnHot(i); continue; }
+    const t = hot.t[i], spread = 0.4 + t * 1.2;
+    sampleLUT(l, t, HP, k);
+    HP[k] += hot.ox[i] * spread; HP[k + 1] += hot.oy[i] * spread; HP[k + 2] += hot.oz[i] * spread;
+    const r = racks[hot.rack[i]], heat = clamp((r.exhaust - 22) / 16, 0.3, 1);
+    const fade = smoothstep(0, 0.06, t) * (1 - smoothstep(0.9, 1, t)) * heat * 0.85;
+    HC[k] = fade; HC[k + 1] = lerp(0.5, 0.16, t) * fade; HC[k + 2] = 0.06 * fade;
+  }
+  // --- 3. CRAC discharge through the wall duct into the under-floor plenum ---
+  const VP = voidP.pos, VC = voidP.col;
+  const voidActive = Math.floor(N_VOID * clamp(coolF, 0, 1));
+  for (let i = 0; i < N_VOID; i++) {
+    const k = i * 3;
+    if (i >= voidActive || vd.crac[i] < 0) { VP[k + 1] = -50; VC[k] = VC[k + 1] = VC[k + 2] = 0; if (i < voidActive) spawnVoid(i); continue; }
+    const c = cracs[vd.crac[i]], l = voidLUTs[vd.crac[i]][vd.aisle[i]];
+    vd.t[i] += dt * (1.5 + 3.5 * c.output) * vd.spd[i] / l.len;
+    if (vd.t[i] >= 1) { spawnVoid(i); continue; }
+    const t = vd.t[i];
+    sampleLUT(l, t, VP, k);
+    VP[k] += vd.ox[i]; VP[k + 2] += vd.oz[i] * smoothstep(0.35, 0.6, t);
+    VP[k + 1] = Math.max(VP[k + 1], -0.75);
+    const fade = smoothstep(0, 0.05, t) * (1 - smoothstep(0.85, 1, t)) * (0.35 + 0.65 * clamp(c.output, 0, 1)) * 0.8;
+    VC[k] = 0.25 * fade; VC[k + 1] = 0.75 * fade; VC[k + 2] = 1.0 * fade;
+  }
+  [coldP, hotP, voidP].forEach((p) => { p.geo.attributes.position.needsUpdate = true; p.geo.attributes.color.needsUpdate = true; });
+}
+
+// =====================================================================
+// LAYER 5 · HEAT MAP (floor texture + rack body tint)
+// The floor field is inverse-distance-weighted from 120 samples (rack inlet,
+// body, exhaust) blended with a room ambient. Recomputed at ~4 Hz because the
+// thermal field evolves on a seconds timescale.
+// =====================================================================
+const HM_W = 120, HM_H = 80;
+const hmCanvas = document.createElement('canvas'); hmCanvas.width = HM_W; hmCanvas.height = HM_H;
+const hmCtx = hmCanvas.getContext('2d'), hmImg = hmCtx.createImageData(HM_W, HM_H);
+const hmTex = new THREE.CanvasTexture(hmCanvas);
+const hmPlane = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w, ROOM.d),
+  new THREE.MeshBasicMaterial({ map: hmTex, transparent: true, opacity: 0.82, depthWrite: false }));
+hmPlane.rotation.x = -Math.PI / 2; hmPlane.position.y = 0.015; hmPlane.renderOrder = 3; layers.heat.add(hmPlane);
+const hmSrc = new Float32Array(N_RACKS * 3 * 3);
+const _rgb = [0, 0, 0];
+function updateHeatMap() {
+  let n = 0, amb = 0;
+  racks.forEach((r) => {
+    hmSrc[n++] = r.x; hmSrc[n++] = r.frontZ + r.f * 0.4; hmSrc[n++] = r.inlet;
+    hmSrc[n++] = r.x; hmSrc[n++] = r.z; hmSrc[n++] = r.temp;
+    hmSrc[n++] = r.x; hmSrc[n++] = r.backZ - r.f * 0.4; hmSrc[n++] = r.exhaust;
+    amb += (r.inlet + r.exhaust) / 2;
+  });
+  amb /= N_RACKS;
+  const D = hmImg.data;
+  for (let j = 0; j < HM_H; j++) {
+    const wz = -ROOM.d / 2 + (j + 0.5) / HM_H * ROOM.d;
+    for (let i = 0; i < HM_W; i++) {
+      const wx = -ROOM.w / 2 + (i + 0.5) / HM_W * ROOM.w;
+      let num = amb * 0.004, den = 0.004;
+      for (let s = 0; s < n; s += 3) {
+        const dx = wx - hmSrc[s], dz = wz - hmSrc[s + 1], d2 = dx * dx + dz * dz + 0.25;
+        const w = 1 / (d2 * d2); num += w * hmSrc[s + 2]; den += w;
+      }
+      heatRGB(num / den, _rgb);
+      const p = (j * HM_W + i) * 4;
+      D[p] = _rgb[0] * 255; D[p + 1] = _rgb[1] * 255; D[p + 2] = _rgb[2] * 255; D[p + 3] = 190;
+    }
+  }
+  hmCtx.putImageData(hmImg, 0, 0);
+  hmTex.needsUpdate = true;
+}
+
+// =====================================================================
+// HOVER / SELECTION
+// =====================================================================
+const aisleGroup = new THREE.Group(); scene.add(aisleGroup);
+{
+  const inv = new THREE.MeshBasicMaterial({ visible: false });
+  COLD_AISLES.forEach((a, k) => { const m = new THREE.Mesh(new THREE.BoxGeometry(12, RACK.h, a.half * 2 - 0.06), inv); m.position.set(0, RACK.h / 2, a.z); m.userData = { kind: 'cold', k }; aisleGroup.add(m); });
+  HOT_AISLES.forEach((a, k) => { const m = new THREE.Mesh(new THREE.BoxGeometry(12, 2.6, a.half * 2 - 0.06), inv); m.position.set(0, 1.3, a.z); m.userData = { kind: 'hot', k }; aisleGroup.add(m); });
+}
+const aisleIntake = (k) => { const a = COLD_AISLES[k]; let s = 0, n = 0; racks.forEach((r) => { if (a.rows.includes(r.row)) { s += r.inlet; n++; } }); return s / n; };
+const aisleExhaust = (k) => { const a = HOT_AISLES[k]; let s = 0, n = 0; racks.forEach((r) => { if (a.rows.includes(r.row)) { s += r.exhaust; n++; } }); return s / n; };
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2(), mousePx = { x: 0, y: 0 };
+let mouseIn = false, hoverDirty = false, selected = -1;
+const callout = $('callout');
+function hoverTargets() {
+  const t = [...aisleGroup.children];
+  if (layers.racks.visible) t.push(rackMesh, ...pdus.map((p) => p.body));
+  if (layers.cooling.visible) t.push(...cracs.map((c) => c.body), ...sensors.map((s) => s.pivot.children[1]));
+  return t;
+}
+function pick(list) {
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(list, false);
+  return hits.length ? hits[0] : null;
+}
+const f1 = (v) => v.toFixed(1);
+function describe(hit) {
+  const u = hit.object.userData;
+  if (u.kind === 'rack') { const r = racks[hit.instanceId]; return `<b>Rack ${r.id}</b>${r.gpu ? ' · GPU' : ''} — <span class="t">${f1(r.temp)}°C</span> · load ${Math.round(r.load * 100)}%`; }
+  if (u.kind === 'cold') return `<b>${COLD_AISLES[u.k].name}</b> — <span class="t">${f1(aisleIntake(u.k))}°C</span> intake`;
+  if (u.kind === 'hot') return `<b>${HOT_AISLES[u.k].name}</b> — <span class="t">${f1(aisleExhaust(u.k))}°C</span> exhaust`;
+  if (u.kind === 'crac') {
+    const c = u.ref;
+    if (c.failed) return `<b>${c.id}</b> — <span style="color:var(--red)">OFFLINE</span> · fan ${Math.round(c.output * 100)}%`;
+    return `<b>${c.id}</b> — supply <span class="t">${f1(c.supplyT)}°C</span> · return <span class="t">${f1(c.returnT)}°C</span> · ${Math.round(c.output * 100)}% output`;
+  }
+  if (u.kind === 'pdu') {
+    const p = u.ref; let kw = 0;
+    racks.forEach((r) => { if (r.row === p.row && (r.idx < RACK.perRow / 2) === (p.side < 0)) kw += r.power; });
+    return `<b>${p.id}</b> — <span class="t">${f1(kw)} kW</span> · 5 racks`;
+  }
+  if (u.kind === 'sensor') { const s = u.ref; return `<b>${s.id}</b> ${s.kind === 'cold' ? 'cold' : 'hot'} aisle — <span class="t">${f1(s.temp)}°C</span>`; }
+  return '';
+}
+function doHover() {
+  hoverDirty = false;
+  if (!mouseIn) { callout.style.display = 'none'; renderer.domElement.style.cursor = ''; return; }
+  const hit = pick(hoverTargets());
+  if (!hit) { callout.style.display = 'none'; renderer.domElement.style.cursor = ''; return; }
+  callout.innerHTML = describe(hit);
+  callout.style.display = 'block';
+  const w = callout.offsetWidth;
+  const x = Math.min(mousePx.x + 16, innerWidth - w - 8);
+  callout.style.transform = `translate(${x}px, ${mousePx.y + 16}px)`;
+  renderer.domElement.style.cursor = hit.object === rackMesh ? 'pointer' : '';
+}
+const el = renderer.domElement;
+el.addEventListener('pointermove', (e) => {
+  mousePx.x = e.clientX; mousePx.y = e.clientY;
+  mouse.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  mouseIn = true; hoverDirty = true;
+});
+el.addEventListener('pointerleave', () => { mouseIn = false; hoverDirty = true; });
+let downAt = null;
+el.addEventListener('pointerdown', (e) => { downAt = { x: e.clientX, y: e.clientY }; });
+el.addEventListener('pointerup', (e) => {
+  if (!downAt || Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 5) return;
+  mouse.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  const hit = layers.racks.visible ? pick([rackMesh]) : null;
+  selectRack(hit ? hit.instanceId : -1);
+});
+
+const rp = $('rackPanel');
+function selectRack(i) {
+  selected = i;
+  if (i < 0) { rp.classList.remove('open'); selBox.visible = false; return; }
+  const r = racks[i];
+  selBox.position.set(r.x, RACK.h / 2, r.z); selBox.visible = true;
+  $('rpId').textContent = r.id;
+  $('rpMeta').textContent = `Row ${ROWS[r.row].name} · position ${r.idx + 1} · faces ${COLD_AISLES[r.row < 2 ? 0 : 1].name.toLowerCase()}${r.gpu ? ' · high-density GPU' : ''}`;
+  rp.classList.add('open');
+  updateRackPanel();
+}
+$('rpClose').onclick = () => selectRack(-1);
+function setBar(id, frac, color) { const b = $(id); b.style.width = `${clamp(frac, 0, 1) * 100}%`; if (color) b.style.background = color; }
+function updateRackPanel() {
+  if (selected < 0) return;
+  const r = racks[selected];
+  $('rpTemp').textContent = `${f1(r.temp)}°C`; $('rpTemp').style.color = cssTemp(r.temp);
+  setBar('rpTempBar', (r.temp - 16) / 22, cssTemp(r.temp));
+  $('rpLoad').textContent = `${Math.round(r.load * 100)}%`; setBar('rpLoadBar', r.load);
+  $('rpPower').textContent = `${f1(r.power)} kW`; setBar('rpPowerBar', r.power / 12, 'var(--amber)');
+  // 1 unit of normalised airflow ≈ 1,800 CFM (typical 10–12 kW rack requirement).
+  $('rpAir').textContent = `${Math.round(r.airflow * 1800).toLocaleString()} CFM`; setBar('rpAirBar', r.airflow / 1.25);
+  $('rpIo').textContent = `${f1(r.inlet)}° / ${f1(r.exhaust)}°C`;
+  const top = r.w.map((w, j) => [w, j]).sort((a, b) => b[0] - a[0]).slice(0, 3);
+  $('rpSrc').innerHTML = top.map(([w, j]) => {
+    const c = cracs[j];
+    return `<div class="${c.failed ? 'off' : ''}"><span>${c.id}${c.failed ? ' · offline' : ''}</span><span class="mono">${Math.round(w * 100)}% share</span></div>`;
+  }).join('');
+}
+
+// =====================================================================
+// FLOATING LABELS (hotspots, offline CRACs)
+// =====================================================================
+const labelRoot = $('labels');
+const hotLabels = racks.map(() => { const d = document.createElement('div'); d.className = 'hotspot'; labelRoot.appendChild(d); return d; });
+const offLabels = cracs.map((c) => { const d = document.createElement('div'); d.className = 'offline'; d.textContent = `${c.id} OFFLINE`; labelRoot.appendChild(d); return d; });
+const _p = new V3();
+function placeLabel(node, x, y, z) {
+  _p.set(x, y, z).project(camera);
+  if (_p.z > 1 || Math.abs(_p.x) > 1.1 || Math.abs(_p.y) > 1.1) { node.style.display = 'none'; return; }
+  node.style.display = 'block';
+  node.style.transform = `translate(-50%, -100%) translate(${(_p.x * 0.5 + 0.5) * innerWidth}px, ${(-_p.y * 0.5 + 0.5) * innerHeight - 6}px)`;
+}
+// Only the hottest few racks get a label so a large failure doesn't bury the view in overlapping tags.
+const MAX_HOT_LABELS = 4;
+function updateLabels() {
+  const shown = racks.filter((r) => r.temp > HOTSPOT_T).sort((x, y) => y.temp - x.temp).slice(0, MAX_HOT_LABELS);
+  racks.forEach((r, i) => {
+    const n = hotLabels[i];
+    if (shown.includes(r) && layers.racks.visible) {
+      const txt = `HOTSPOT ${r.id} ${f1(r.temp)}°C`;
+      if (n.textContent !== txt) n.textContent = txt;
+      placeLabel(n, r.x, RACK.h + 0.35, r.z);
+    } else n.style.display = 'none';
+  });
+  cracs.forEach((c, j) => { if (c.failed && layers.cooling.visible) placeLabel(offLabels[j], c.x, 5.2, c.z); else offLabels[j].style.display = 'none'; });
+}
+
+// =====================================================================
+// EVENTS / CRAC FAILURE
+// =====================================================================
+const logEl = $('log');
+function clockStr() { const s = Math.floor(sim.time); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; }
+function logEvent(msg, level = '') {
+  const li = document.createElement('li'); li.className = level;
+  li.innerHTML = `<time>${clockStr()}</time><span>${msg}</span>`;
+  logEl.prepend(li);
+  while (logEl.children.length > 7) logEl.lastChild.remove();
+}
+function refreshCracButtons() {
+  const active = cracs.filter((c) => !c.failed).length;
+  $('bFail').disabled = active === 0;
+  $('bRestore').disabled = active === cracs.length;
+}
+$('bFail').onclick = () => {
+  const live = cracs.filter((c) => !c.failed);
+  if (!live.length) return;
+  const c = live[Math.floor(Math.random() * live.length)];
+  c.failed = true; c.failedAt = sim.time;
+  racks.forEach(buildHotPath);      // exhaust reroutes to the next-nearest active CRAC
+  logEvent(`${c.id} compressor trip · unit offline`, 'bad');
+  refreshCracButtons();
+};
+$('bRestore').onclick = () => {
+  cracs.forEach((c) => { c.failed = false; });
+  racks.forEach(buildHotPath);
+  logEvent('All CRAC units restored', 'ok');
+  refreshCracButtons();
+};
+// Hotspot alerts with 1°C hysteresis so a rack hovering near the threshold doesn't spam the log.
+function checkAlerts() {
+  racks.forEach((r) => {
+    if (!r.hot && r.temp > HOTSPOT_T) { r.hot = true; logEvent(`HOTSPOT ${r.id} at ${f1(r.temp)}°C`, 'bad'); }
+    else if (r.hot && r.temp < HOTSPOT_T - 1) { r.hot = false; logEvent(`${r.id} recovered (${f1(r.temp)}°C)`, 'ok'); }
+  });
+}
+
+// =====================================================================
+// UI WIRING
+// =====================================================================
+function bindSlider(id, valId, fmt, apply) {
+  const s = $(id);
+  const upd = () => {
+    s.style.setProperty('--p', `${((s.value - s.min) / (s.max - s.min)) * 100}%`);
+    $(valId).textContent = fmt(+s.value); apply(+s.value);
+  };
+  s.addEventListener('input', upd); upd();
+}
+bindSlider('sLoad', 'vLoad', (v) => `${v}%`, (v) => { sim.serverLoad = v / 100; });
+bindSlider('sCool', 'vCool', (v) => `${v}%`, (v) => { sim.cooling = v / 100; });
+bindSlider('sOut', 'vOut', (v) => `${v}°C`, (v) => { sim.outdoor = v; });
+
+function setLayer(name, on) {
+  layers[name].visible = on;
+  document.querySelector(`[data-layer="${name}"]`).classList.toggle('on', on);
+  renderer.shadowMap.needsUpdate = true;
+  hoverDirty = true;
+}
+document.querySelectorAll('#layerBtns button').forEach((b) => { b.onclick = () => setLayer(b.dataset.layer, !layers[b.dataset.layer].visible); });
+const LAYER_KEYS = ['shell', 'racks', 'cooling', 'airflow', 'heat', 'cables'];
+addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  const n = +e.key;
+  if (n >= 1 && n <= 6) setLayer(LAYER_KEYS[n - 1], !layers[LAYER_KEYS[n - 1]].visible);
+  if (e.key === 'Escape') selectRack(-1);
+});
+$('collapse').onclick = () => { const c = $('controls'); c.classList.toggle('min'); $('collapse').textContent = c.classList.contains('min') ? '▸' : '▾'; };
+
+// =====================================================================
+// CAMERA MODES
+// =====================================================================
+const CAM = {
+  overview: { pos: new V3(19, 15, 19), target: new V3(0, 0.8, 0), rot: 0.35, shell: { wall: 0.12, ceil: 0.05, floor: 0.8, edge: 0.35 } },
+  cutaway:  { pos: new V3(0, 12.5, 17), target: new V3(0, 0.2, 0), rot: 0.25, shell: { wall: 0.0, ceil: 0.0, floor: 0.28, edge: 0.12 } },
+  walk:     { pos: new V3(-9.5, 1.65, -4.2), target: new V3(-3.5, 1.35, -4.2), rot: 0, shell: { wall: 0.16, ceil: 0.22, floor: 0.95, edge: 0.35 } },
+};
+let camMode = 'overview';
+const tween = { active: false, t: 0, dur: 1.6, p0: new V3(), p1: new V3(), q0: new V3(), q1: new V3() };
+const walk = { phase: 0, look: new V3() };
+function setCamMode(m) {
+  const prevTarget = camMode === 'walk' ? walk.look.clone() : controls.target.clone();
+  camMode = m;
+  document.querySelectorAll('#camBtns button').forEach((b) => b.classList.toggle('on', b.dataset.cam === m));
+  Object.assign(shellTarget, CAM[m].shell);
+  if (m === 'cutaway' && !layers.airflow.visible) setLayer('airflow', true);
+  tween.active = true; tween.t = 0;
+  tween.p0.copy(camera.position); tween.p1.copy(CAM[m].pos);
+  tween.q0.copy(prevTarget); tween.q1.copy(CAM[m].target);
+  controls.enabled = false; controls.autoRotate = false;
+  if (m === 'walk') { walk.phase = 0; walk.look.copy(CAM.walk.target); }
+}
+document.querySelectorAll('#camBtns button').forEach((b) => { b.onclick = () => setCamMode(b.dataset.cam); });
+const easeIO = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const _q = new V3(), _look = new V3();
+function updateCamera(dt) {
+  if (tween.active) {
+    tween.t += dt / tween.dur;
+    const k = easeIO(Math.min(tween.t, 1));
+    camera.position.lerpVectors(tween.p0, tween.p1, k);
+    _q.lerpVectors(tween.q0, tween.q1, k); camera.lookAt(_q);
+    if (tween.t >= 1) {
+      tween.active = false;
+      if (camMode !== 'walk') {
+        controls.target.copy(tween.q1); controls.enabled = true;
+        controls.autoRotate = true; controls.autoRotateSpeed = CAM[camMode].rot;
+      }
+    }
+    return;
+  }
+  if (camMode === 'walk') {
+    // Eye-level walk down cold aisle 1: cosine easing gives a pause and a smooth turn at each end.
+    walk.phase += dt * 0.15;
+    const u = 0.5 - 0.5 * Math.cos(walk.phase);
+    const x = lerp(-9.5, 9.5, u), dir = Math.sin(walk.phase) >= 0 ? 1 : -1;
+    _look.set(x + dir * 6, 1.35, -4.2 + Math.sin(walk.phase * 0.7) * 0.6);
+    walk.look.lerp(_look, ease(0.9, dt));
+    camera.position.set(x, 1.65 + Math.sin(walk.phase * 42) * 0.012, -4.2);
+    camera.lookAt(walk.look);
+    return;
+  }
+  controls.update();
+}
+
+// =====================================================================
+// SPARKLINE
+// =====================================================================
+const spark = $('spark'), sctx = spark.getContext('2d');
+const hist = { avg: [], max: [] }, HIST_N = 120;   // 120 samples × 0.5 s = 60 s window
+function sizeSpark() { const d = Math.min(devicePixelRatio, 2); spark.width = spark.clientWidth * d; spark.height = spark.clientHeight * d; }
+function drawSpark() {
+  const w = spark.width, h = spark.height, d = w / Math.max(spark.clientWidth, 1);
+  sctx.clearRect(0, 0, w, h);
+  const all = hist.avg.concat(hist.max);
+  const lo = Math.min(18, ...all) - 1, hi = Math.max(34, ...all) + 1;
+  const Y = (t) => h - ((t - lo) / (hi - lo)) * h, X = (i) => (i / (HIST_N - 1)) * w;
+  sctx.lineWidth = d; sctx.font = `${9 * d}px ui-monospace, Menlo, monospace`;
+  for (let t = Math.ceil(lo / 5) * 5; t < hi; t += 5) {
+    sctx.strokeStyle = 'rgba(255,255,255,0.06)'; sctx.beginPath(); sctx.moveTo(0, Y(t)); sctx.lineTo(w, Y(t)); sctx.stroke();
+    sctx.fillStyle = 'rgba(125,147,167,.7)'; sctx.fillText(`${t}°`, 2 * d, Y(t) - 2 * d);
+  }
+  sctx.setLineDash([4 * d, 4 * d]); sctx.strokeStyle = 'rgba(255,59,78,.7)';
+  sctx.beginPath(); sctx.moveTo(0, Y(HOTSPOT_T)); sctx.lineTo(w, Y(HOTSPOT_T)); sctx.stroke(); sctx.setLineDash([]);
+  if (hist.avg.length < 2) return;
+  const off = HIST_N - hist.avg.length;
+  const g = sctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, 'rgba(34,211,238,.35)'); g.addColorStop(1, 'rgba(34,211,238,0)');
+  sctx.beginPath(); hist.avg.forEach((v, i) => (i ? sctx.lineTo(X(i + off), Y(v)) : sctx.moveTo(X(i + off), Y(v))));
+  sctx.lineTo(X(HIST_N - 1), h); sctx.lineTo(X(off), h); sctx.closePath(); sctx.fillStyle = g; sctx.fill();
+  [['avg', '#22d3ee'], ['max', '#f59e0b']].forEach(([k, c]) => {
+    sctx.strokeStyle = c; sctx.lineWidth = 1.6 * d; sctx.beginPath();
+    hist[k].forEach((v, i) => (i ? sctx.lineTo(X(i + off), Y(v)) : sctx.moveTo(X(i + off), Y(v)))); sctx.stroke();
+  });
+}
+
+// =====================================================================
+// KPI PANEL
+// =====================================================================
+function setKpi(id, txt, cls) { const n = $(id); n.textContent = txt; n.className = `v ${cls || ''}`; }
+function updateKpis() {
+  setKpi('kAvg', `${f1(sim.avgTemp)}°C`, sim.avgTemp > 30 ? 'bad' : sim.avgTemp > 26 ? 'warn' : 'ok');
+  setKpi('kMax', `${f1(sim.maxTemp)}°C`, sim.maxTemp > HOTSPOT_T ? 'bad' : sim.maxTemp > 28 ? 'warn' : '');
+  setKpi('kPue', sim.pue.toFixed(2), sim.pue > 1.5 ? 'warn' : '');
+  setKpi('kLoad', `${Math.round(sim.serverLoad * 100)}%`);
+  setKpi('kIt', `${Math.round(sim.itKW)} kW`);
+  setKpi('kCool', `${Math.round(sim.coolKW)} kW`);
+  const act = cracs.filter((c) => !c.failed).length;
+  setKpi('kCrac', `${act}/${cracs.length}`, act < cracs.length ? 'bad' : '');
+  $('vEff').textContent = `${Math.round(sim.eff * 100)}%`;
+  $('vSup').textContent = `${f1(sim.supplyT)}°C`;
+  sensors.forEach((s) => { s.temp = s.kind === 'cold' ? aisleIntake(s.k) + rand(-0.2, 0.2) : aisleExhaust(s.k) + rand(-0.3, 0.3); });
+}
+
+// =====================================================================
+// POST-PROCESSING: bloom for LED glow
+// =====================================================================
+const composer = new THREE.EffectComposer(renderer);
+composer.addPass(new THREE.RenderPass(scene, camera));
+const bloom = new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), 0.95, 0.55, 0.62);
+composer.addPass(bloom);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
+  bloom.resolution.set(innerWidth / 2, innerHeight / 2); sizeSpark();
+});
+
+// =====================================================================
+// PER-FRAME VISUALS (LEDs, emissive strips, rack tint, fans, sensors, pulses)
+// =====================================================================
+const _s = new THREE.Color();
+function updateRackVisuals(t) {
+  const heatOn = layers.heat.visible;
+  for (let n = 0; n < N_RACKS; n++) {
+    const r = racks[n], st = statusRGB(r.temp);
+    // Hotspot racks strobe their status LED and strips.
+    const flash = r.temp > HOTSPOT_T ? (Math.sin(t * 14) > 0 ? 1 : 0.15) : 1;
+    // Emissive intensity of the door strips tracks temperature (dim when cool, bright when hot).
+    const glow = (0.12 + 0.88 * clamp((r.temp - 18) / 16, 0, 1)) * flash;
+    _s.setRGB(st[0] * glow, st[1] * glow, st[2] * glow);
+    stripMesh.setColorAt(n * 2, _s); stripMesh.setColorAt(n * 2 + 1, _s);
+    for (let k = 0; k < LEDS_PER_RACK; k++) {
+      const i = n * LEDS_PER_RACK + k;
+      let b;
+      if (k === 0) b = flash;
+      else {
+        // Activity LEDs: random on/off durations, faster toggling at higher CPU load.
+        if (t > ledNext[i]) {
+          ledOn[i] ^= 1;
+          ledNext[i] = t + (ledOn[i] ? rand(0.03, 0.25) : rand(0.05, 0.7) / (0.25 + r.load));
+        }
+        b = ledOn[i] ? 1 : 0.07;
+      }
+      _s.setRGB(st[0] * b, st[1] * b, st[2] * b); ledMesh.setColorAt(i, _s);
+    }
+    if (heatOn) { heatRGB(r.temp, _rgb); _s.setRGB(_rgb[0] * 0.75, _rgb[1] * 0.75, _rgb[2] * 0.75); }
+    else _s.setRGB(0.16, 0.19, 0.23);
+    rackMesh.setColorAt(n, _s);
+  }
+  stripMesh.instanceColor.needsUpdate = true; ledMesh.instanceColor.needsUpdate = true; rackMesh.instanceColor.needsUpdate = true;
+}
+function updateCooling(t, dt) {
+  cracs.forEach((c) => {
+    c.blades.rotation.z += dt * c.output * 22;     // fan speed follows actual output (spins down on failure)
+    if (c.failed) {
+      const on = Math.sin(t * 8) > 0;
+      c.led.material.color.setRGB(on ? 1 : 0.2, 0.05, 0.08);
+      c.bodyMat.emissive.setRGB(0.25 * (0.5 + 0.5 * Math.sin(t * 4)), 0.01, 0.02);
+    } else { c.led.material.color.setRGB(0.2, 1, 0.55); c.bodyMat.emissive.setRGB(0, 0, 0); }
+  });
+  sensors.forEach((s) => {
+    s.pivot.rotation.z = Math.sin(t * s.freq + s.phase) * s.amp;
+    s.pivot.rotation.x = Math.cos(t * s.freq * 0.8 + s.phase) * s.amp * 0.6;
+  });
+}
+const _m = new THREE.Matrix4(), _pv = new Float32Array(3);
+function updatePulses(dt) {
+  // Data pulses travel rack → PDU; speed tracks server load.
+  const spd = 0.12 + sim.serverLoad * 0.9;
+  for (let i = 0; i < pulseMesh.count; i++) {
+    const cab = cables[Math.floor(i / PULSES_PER_CABLE)];
+    pulseT[i] = (pulseT[i] + dt * spd * pulseSpd[i] * (4 / cab.lut.len)) % 1;
+    sampleLUT(cab.lut, pulseT[i], _pv, 0);
+    const s = 0.6 + 0.4 * Math.sin(pulseT[i] * Math.PI);
+    _m.makeScale(s, s, s).setPosition(_pv[0], _pv[1], _pv[2]);
+    pulseMesh.setMatrixAt(i, _m);
+  }
+  pulseMesh.instanceMatrix.needsUpdate = true;
+}
+function updateShell(dt) {
+  const k = ease(0.35, dt);
+  for (const key in shellFade) shellFade[key] += (shellTarget[key] - shellFade[key]) * k;
+  wallMat.opacity = shellFade.wall; ceilMat.opacity = shellFade.ceil;
+  wallMat.visible = shellFade.wall > 0.005; ceilMat.visible = shellFade.ceil > 0.005;
+  floorMats.forEach((m) => { m.opacity = shellFade.floor; });
+  edgeMat.opacity = shellFade.edge; gridMat.opacity = shellFade.edge * 0.6;
+}
+
+// =====================================================================
+// MAIN LOOP
+// =====================================================================
+// Warm-start: integrate 60 s of sim time so the room opens at equilibrium.
+for (let i = 0; i < 600; i++) stepSim(0.1);
+sim.time = 0;
+updateHeatMap(); updateKpis(); sizeSpark();
+renderer.shadowMap.needsUpdate = true;
+logEvent('Telemetry online · 40 racks · 6 CRAC', 'ok');
+$('loading').style.opacity = 0; setTimeout(() => $('loading').remove(), 700);
+
+const clock = new THREE.Clock();
+let acc4 = 0, acc2 = 0, frames = 0, fpsAcc = 0, frameNo = 0;
+function frame() {
+  requestAnimationFrame(frame);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+  frameNo++;
+  stepSim(dt);
+  if (layers.airflow.visible) updateParticles(dt);
+  if (layers.racks.visible) updateRackVisuals(t);
+  if (layers.cooling.visible) updateCooling(t, dt);
+  if (layers.cables.visible) updatePulses(dt);
+  updateShell(dt);
+  updateCamera(dt);
+  if (hoverDirty || frameNo % 10 === 0) doHover();
+  updateLabels();
+  // 4 Hz: KPIs, heat map, side panel, alerts. 2 Hz: sparkline samples.
+  acc4 += dt; acc2 += dt;
+  if (acc4 > 0.25) {
+    acc4 = 0; updateKpis(); updateRackPanel(); checkAlerts();
+    if (layers.heat.visible) updateHeatMap();
+  }
+  if (acc2 > 0.5) {
+    acc2 = 0;
+    hist.avg.push(sim.avgTemp); hist.max.push(sim.maxTemp);
+    if (hist.avg.length > HIST_N) { hist.avg.shift(); hist.max.shift(); }
+    drawSpark();
+  }
+  frames++; fpsAcc += dt;
+  if (fpsAcc > 1) { $('fps').textContent = `${Math.round(frames / fpsAcc)} fps`; frames = 0; fpsAcc = 0; }
+  composer.render();
+}
+frame();
+
+// Exposed for console inspection / automated checks.
+window.dc = { sim, racks, cracs, setLayer, setCamMode, selectRack };
+})();
+</script>
+</body>
+</html>
