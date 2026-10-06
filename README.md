@@ -1,6 +1,6 @@
 # Interactive 3D Lab
 
-Fifteen interactive Three.js explorers covering chips, quantum computing, AI, robotics, audio, anatomy, cardiology, embryology, energy, space and U.S. immigration law. Each one is a single self-contained HTML file.
+Sixteen interactive Three.js explorers covering chips, quantum computing, AI, robotics, audio, anatomy, cardiology, embryology, energy, building safety, space and U.S. immigration law. Each one is a single self-contained HTML file.
 
 **Live site:** https://eshaanjain26.github.io/interactive-3d-lab/
 
@@ -21,6 +21,7 @@ Fifteen interactive Three.js explorers covering chips, quantum computing, AI, ro
 | [Heliocentric Orrery](https://eshaanjain26.github.io/interactive-3d-lab/heliocentric-orrery/) | A 3D solar system simulator |
 | [Drone Swarm Boids](https://eshaanjain26.github.io/interactive-3d-lab/drone-swarm-boids/) | Reynolds flocking across up to 600 quadcopters, with click-placed beacons, hazards and obstacles, three camera modes and live swarm telemetry |
 | [Audio Spectrum Matrix](https://eshaanjain26.github.io/interactive-3d-lab/audio-spectrum-matrix/) | A neon wireframe terrain driven by live FFT data from a built-in synth, microphone or audio file |
+| [Fire Evacuation Drill](https://eshaanjain26.github.io/interactive-3d-lab/fire-evacuation-drill/) | A five-floor office in a fire drill: up to 200 occupants pick the nearest safe exit, queue in corridors and spiral down stairwells while fire and smoke spread, block routes and force reroutes |
 
 ## Run locally
 

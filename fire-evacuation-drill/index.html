@@ -1,0 +1,1904 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fire Evacuation Drill</title>
+<style>
+  :root {
+    --bg: #070b14;
+    --glass: rgba(14, 20, 34, 0.58);
+    --glass-hi: rgba(28, 36, 56, 0.72);
+    --stroke: rgba(255, 255, 255, 0.11);
+    --stroke-hi: rgba(255, 255, 255, 0.22);
+    --text: #e9eef7;
+    --muted: #93a0b8;
+    --red: #ff2d3d;
+    --amber: #ffc400;
+    --green: #2ee66b;
+    --cyan: #35d0ff;
+    --orange: #ff8a1f;
+    --radius: 14px;
+    --ease: cubic-bezier(.2, .8, .2, 1);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font: 13px/1.45 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased; }
+  canvas.gl { position: fixed; inset: 0; display: block; outline: none; }
+  body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1;
+    background: radial-gradient(ellipse at center, transparent 58%, rgba(0,0,0,.5) 100%); }
+  #ui { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+  .glass { pointer-events: auto; background: var(--glass);
+    backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%);
+    border: 1px solid var(--stroke); border-radius: var(--radius);
+    box-shadow: 0 12px 40px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06); }
+  h1 { font-size: 15px; margin: 0; letter-spacing: .01em; }
+  h2 { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; font-weight: 700; }
+  b { font-variant-numeric: tabular-nums; }
+
+  /* ---------- top: banner + counter ---------- */
+  .top { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; width: min(760px, calc(100vw - 32px)); }
+  #banner { pointer-events: none; font-weight: 900; font-size: 20px; letter-spacing: .32em; padding: 6px 26px 6px 32px; border-radius: 10px;
+    border: 2px solid rgba(0,0,0,.35); box-shadow: 0 0 40px rgba(255,45,61,.55); animation: flash .9s steps(1) infinite; display: none; }
+  #banner.on { display: block; }
+  #banner.done { animation: none; background: var(--green); color: #04220f; box-shadow: 0 0 34px rgba(46,230,107,.45); letter-spacing: .14em; font-size: 15px; }
+  #banner.done.warn { background: var(--amber); color: #2a2000; box-shadow: 0 0 34px rgba(255,196,0,.4); }
+  @keyframes flash { 0% { background: var(--red); color: #fff; } 50% { background: var(--amber); color: #1a1200; } }
+  #hud { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; padding: 9px 18px; font-size: 13.5px; }
+  #hud .k { color: var(--muted); }
+  #hud .sep { color: rgba(255,255,255,.18); }
+  #hud .ev b { color: var(--green); } #hud .tr b { color: var(--orange); } #hud .inj b { color: #ff5a7a; } #hud .tm b { color: var(--amber); }
+  #phase { pointer-events: none; font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; font-weight: 700; color: var(--muted);
+    padding: 3px 12px; border-radius: 99px; background: rgba(0,0,0,.35); border: 1px solid var(--stroke); }
+  #phase.alarm { color: #ffd0d0; border-color: rgba(255,45,61,.5); }
+
+  /* ---------- left: controls ---------- */
+  .left { position: absolute; top: 14px; left: 14px; width: 272px; max-height: calc(100vh - 28px); overflow: auto; padding: 0 14px 14px; scrollbar-width: thin; }
+  .hazard-bar { height: 7px; margin: 0 -14px 12px; border-radius: var(--radius) var(--radius) 0 0;
+    background: repeating-linear-gradient(-45deg, var(--amber) 0 10px, #111 10px 20px); }
+  .brand { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
+  .brand .mark { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: linear-gradient(135deg, #ff2d3d, #ff8a1f); font-weight: 900; color: #fff; box-shadow: 0 0 18px rgba(255,80,40,.5); }
+  .brand p { margin: 1px 0 0; color: var(--muted); font-size: 11.5px; }
+  section { border-top: 1px solid var(--stroke); padding-top: 11px; margin-top: 11px; }
+  .row { display: flex; gap: 6px; }
+  .btn { flex: 1; appearance: none; border: 1px solid var(--stroke-hi); background: rgba(255,255,255,.06); color: var(--text); font: inherit; font-weight: 600;
+    padding: 7px 10px; border-radius: 9px; cursor: pointer; transition: background .15s var(--ease), border-color .15s; }
+  .btn:hover { background: rgba(255,255,255,.12); }
+  .btn.wide { width: 100%; margin-bottom: 6px; text-align: left; }
+  .btn.danger { border-color: rgba(255,45,61,.55); background: rgba(255,45,61,.14); }
+  .btn.danger:hover { background: rgba(255,45,61,.26); }
+  .btn.warn { border-color: rgba(255,196,0,.5); background: rgba(255,196,0,.1); }
+  .btn.warn:hover { background: rgba(255,196,0,.2); }
+  .btn.warn.on { background: rgba(255,196,0,.32); color: #fff3c4; }
+  .slider { display: block; margin: 10px 0 2px; }
+  .slider > span { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+  .slider > span b { color: var(--text); }
+  .scale { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); font-style: normal; }
+  .scale i { font-style: normal; }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; background: transparent; margin: 2px 0 0; }
+  input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: linear-gradient(90deg, var(--amber), var(--red)); }
+  input[type=range]::-moz-range-track { height: 4px; border-radius: 4px; background: linear-gradient(90deg, var(--amber), var(--red)); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 15px; height: 15px; margin-top: -5.5px; border-radius: 50%; background: #fff; border: 3px solid #1a1f2c; box-shadow: 0 0 0 1px rgba(255,255,255,.4); }
+  input[type=range]::-moz-range-thumb { width: 11px; height: 11px; border-radius: 50%; background: #fff; border: 3px solid #1a1f2c; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip { font-size: 11px; padding: 3px 8px; border-radius: 99px; border: 1px solid rgba(46,230,107,.45); color: #b9f7cf; background: rgba(46,230,107,.08); }
+  .chip.bad { border-color: rgba(255,45,61,.6); color: #ffc2c7; background: rgba(255,45,61,.15); }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .seg button { appearance: none; font: inherit; font-size: 12px; font-weight: 600; color: var(--text); padding: 7px 6px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--stroke-hi); background: rgba(255,255,255,.05); }
+  .seg button.on { background: rgba(53,208,255,.2); border-color: rgba(53,208,255,.7); color: #dff6ff; }
+  .layers { display: flex; flex-direction: column; gap: 4px; }
+  .layer { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px 6px; border-radius: 7px; user-select: none; }
+  .layer:hover { background: rgba(255,255,255,.05); }
+  .layer input { display: none; }
+  .layer .sw { width: 26px; height: 15px; border-radius: 99px; background: rgba(255,255,255,.15); position: relative; transition: background .15s; flex: none; }
+  .layer .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: #fff; transition: transform .15s var(--ease); }
+  .layer input:checked + .sw { background: var(--green); }
+  .layer input:checked + .sw::after { transform: translateX(11px); }
+  .layer .n { color: var(--muted); font-size: 11px; width: 14px; }
+  .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; font-size: 11px; color: var(--muted); }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .legend i { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+
+  /* ---------- right: floor monitor ---------- */
+  .right { position: absolute; top: 14px; right: 14px; width: 268px; max-height: calc(100vh - 28px); overflow: auto; padding: 12px; scrollbar-width: thin; }
+  .map { margin-bottom: 6px; }
+  .map .lbl { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin: 0 2px 2px; }
+  .map .lbl b { color: var(--text); }
+  .map .lbl .fire { color: var(--orange); font-weight: 700; }
+  .map canvas { width: 100%; height: auto; display: block; border-radius: 8px; background: rgba(0,0,0,.28); border: 1px solid var(--stroke); }
+  .stat { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 11.5px; margin-top: 8px; }
+  .stat dt { color: var(--muted); } .stat dd { margin: 0; text-align: right; font-weight: 600; }
+  .bad { color: #ff7b86; } .ok { color: #8ff0b2; }
+
+  /* ---------- selected avatar card ---------- */
+  #card { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); width: min(420px, calc(100vw - 32px)); padding: 12px 14px; display: none; }
+  #card.on { display: block; }
+  #card .hd { display: flex; align-items: center; gap: 10px; }
+  #card .id { font-weight: 800; font-size: 15px; }
+  #card .st { font-size: 10.5px; font-weight: 800; letter-spacing: .1em; padding: 2px 8px; border-radius: 99px; color: #0b0f18; }
+  #card .x { margin-left: auto; cursor: pointer; color: var(--muted); font-size: 18px; line-height: 1; padding: 2px 6px; border-radius: 6px; }
+  #card .x:hover { background: rgba(255,255,255,.1); color: #fff; }
+  #card .route { margin: 8px 0 6px; font-size: 12px; color: #d5deec; }
+  #card .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  #card .grid div { background: rgba(255,255,255,.05); border-radius: 8px; padding: 5px 7px; }
+  #card .grid small { display: block; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+  #card .grid b { font-size: 14px; }
+  .bar { height: 5px; border-radius: 4px; background: rgba(255,255,255,.1); margin-top: 8px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--cyan), var(--green)); width: 0; }
+  #toast { position: absolute; left: 50%; top: 116px; transform: translateX(-50%); padding: 7px 14px; font-weight: 600; font-size: 12.5px; opacity: 0; transition: opacity .25s; pointer-events: none; }
+  #toast.on { opacity: 1; }
+  #hint { position: absolute; bottom: 14px; right: 16px; font-size: 11px; color: var(--muted); pointer-events: none; }
+  .mtoggle { display: none; }
+
+  @media (max-width: 980px) {
+    .left, .right { top: auto; bottom: 60px; max-height: 58vh; display: none; }
+    .left { left: 16px; right: 16px; width: auto; }
+    .right { left: 16px; right: 16px; width: auto; }
+    .left.open, .right.open { display: block; }
+    .mtoggle { display: flex; position: absolute; bottom: 14px; left: 16px; gap: 6px; }
+    .mtoggle .btn { flex: none; }
+    #hint { display: none; }
+    #card { bottom: 60px; }
+    #banner { font-size: 15px; letter-spacing: .2em; }
+    #hud { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<div id="ui">
+  <div class="top">
+    <div id="banner">⚠ EVACUATE ⚠</div>
+    <div id="hud" class="glass">
+      <span class="ev"><span class="k">Evacuated:</span> <b id="cEv">0</b> / <b id="cTot">0</b></span><span class="sep">|</span>
+      <span class="tr"><span class="k">Trapped:</span> <b id="cTr">0</b></span><span class="sep">|</span>
+      <span class="inj"><span class="k">Injured:</span> <b id="cIn">0</b></span><span class="sep">|</span>
+      <span class="tm"><span class="k">Time:</span> <b id="cTm">0.0s</b></span>
+    </div>
+    <div id="phase">Phase 0 · Normal operations</div>
+  </div>
+
+  <aside class="left glass" id="left">
+    <div class="hazard-bar"></div>
+    <div class="brand"><div class="mark">!</div><div><h1>Fire Evacuation Drill</h1><p>5-floor office · live fire, smoke &amp; crowd model</p></div></div>
+    <section style="border:0;margin:0;padding:0">
+      <h2>Simulation</h2>
+      <div class="row"><button class="btn" id="bPause">Pause</button><button class="btn" id="bReset">Reset</button></div>
+      <label class="slider"><span>Speed <b id="vSpeed">1.0×</b></span><input id="sSpeed" type="range" min="0.5" max="8" step="0.5" value="1"></label>
+      <label class="slider"><span>Fire severity <b id="vSev">5</b></span><input id="sSev" type="range" min="1" max="10" step="1" value="5"><div class="scale"><i>small</i><i>large</i></div></label>
+      <label class="slider"><span>Number of occupants <b id="vOcc">120</b></span><input id="sOcc" type="range" min="20" max="200" step="1" value="120"></label>
+    </section>
+    <section>
+      <h2>Hazards</h2>
+      <button class="btn danger wide" id="bBlock">⛔ Block an exit</button>
+      <button class="btn warn wide" id="bSmoke">☁ Add smoke in stairwell A</button>
+      <div class="chips" id="exitChips"></div>
+    </section>
+    <section>
+      <h2>Camera</h2>
+      <div class="seg" id="camSeg">
+        <button data-cam="orbit" class="on">Isometric</button>
+        <button data-cam="follow">Follow crowd</button>
+        <button data-cam="fire">Fire cam</button>
+        <button data-cam="assembly">Assembly point</button>
+      </div>
+    </section>
+    <section>
+      <h2>Layers</h2>
+      <div class="layers" id="layers"></div>
+    </section>
+    <section>
+      <h2>Occupant states</h2>
+      <div class="legend" id="legend"></div>
+    </section>
+  </aside>
+
+  <aside class="right glass" id="right">
+    <h2>Floor monitor</h2>
+    <div id="maps"></div>
+    <dl class="stat">
+      <dt>Fire origin</dt><dd id="sFire">—</dd>
+      <dt>Elevators</dt><dd id="sElev" class="ok">In service</dd>
+      <dt>Stairwell A smoke</dt><dd id="sStA">0%</dd>
+      <dt>Stairwell B smoke</dt><dd id="sStB">0%</dd>
+      <dt>Sensors triggered</dt><dd id="sSens">0</dd>
+      <dt>In stairwells</dt><dd id="sInSt">0</dd>
+    </dl>
+  </aside>
+
+  <div id="card" class="glass"></div>
+  <div id="toast" class="glass"></div>
+  <div id="hint">Click a person to inspect · drag to orbit · scroll to zoom · Space to pause</div>
+  <div class="mtoggle"><button class="btn glass" id="mLeft">Controls</button><button class="btn glass" id="mRight">Floors</button></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+(function () {
+'use strict';
+
+// ============================================================================
+//  CONSTANTS  (1 scene unit = 1 metre, so 1.4 m/s walking speed = 1.4 units/s)
+// ============================================================================
+const FLOORS = 5, FH = 4;                 // floors, floor-to-floor height
+const HX = 20, HZ = 10, CORR = 1.5;       // footprint half extents, corridor half width
+const WALK_SPEED = 1.4;                   // m/s, mean adult egress walking speed
+const STAIR_FACTOR = 0.72;                // people descend stairs ~28% slower than they walk
+const ESCAPE_FACTOR = 0.66;               // exterior switchback stairs are steeper and narrower
+const QUEUE_HARD = 0.3;                   // spec: within 0.3 units, the rear avatar nearly stops
+const QUEUE_SOFT = 0.75;                  // between 0.3 and 0.75 it slows proportionally
+const MAX_AV = 200;
+const ALARM_T = 3, MOVE_T = 5;            // scenario timeline (sim seconds)
+const HAZARD_DT = 0.5;                    // how often routes are re-costed against fire/smoke
+const ST = { WORKING: 0, ALERTED: 1, MOVING_TO_EXIT: 2, IN_STAIRWELL: 3, EVACUATED: 4, TRAPPED: 5, INJURED: 6 };
+const ST_NAME = ['WORKING', 'ALERTED', 'MOVING_TO_EXIT', 'IN_STAIRWELL', 'EVACUATED', 'TRAPPED', 'INJURED'];
+const ST_HEX = ['#8fa3bf', '#ffc400', '#35d0ff', '#a98bff', '#2ee66b', '#ff8a1f', '#ff2d55'];
+const ST_COL = ST_HEX.map(h => new THREE.Color(h));
+
+const rand = (a, b) => a + Math.random() * (b - a);
+const randi = (a, b) => Math.floor(rand(a, b + 1));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const angLerp = (a, b, t) => { let d = ((b - a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI; return a + d * t; };
+
+// ============================================================================
+//  RENDERER / SCENE / CAMERA / POST
+// ============================================================================
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.domElement.className = 'gl';
+document.body.prepend(renderer.domElement);
+
+const BG = new THREE.Color(0x0a1020), SMOKE_BG = new THREE.Color(0x1e2129);
+const scene = new THREE.Scene();
+scene.background = BG.clone();
+scene.fog = new THREE.FogExp2(BG.getHex(), 0.0045);
+
+const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 700);
+camera.position.set(52, 40, -50);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 6, -6);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.autoRotate = true; controls.autoRotateSpeed = 0.35;
+controls.maxPolarAngle = Math.PI * 0.49; controls.minDistance = 5; controls.maxDistance = 170;
+
+const composer = new THREE.EffectComposer(renderer);
+composer.addPass(new THREE.RenderPass(scene, camera));
+const bloom = new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.0, 0.5, 0.84);
+composer.addPass(bloom);
+
+scene.add(new THREE.HemisphereLight(0xbcd4ff, 0x1a2030, 0.62));
+scene.add(new THREE.AmbientLight(0x404a60, 0.28));
+const sun = new THREE.DirectionalLight(0xfff1dc, 0.75);
+sun.position.set(34, 52, -30); sun.target.position.set(0, 0, -8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -48, right: 48, top: 48, bottom: -48, near: 1, far: 160 });
+sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.03; sun.shadow.radius = 4;
+scene.add(sun, sun.target);
+
+const G = { shell: new THREE.Group(), fire: new THREE.Group(), people: new THREE.Group(), routes: new THREE.Group(), sensors: new THREE.Group() };
+Object.values(G).forEach(g => scene.add(g));
+
+// ============================================================================
+//  CANVAS TEXTURE HELPERS (no external assets)
+// ============================================================================
+function canvasTex(w, h, draw) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+}
+function textSprite(text, bg, fg, sx, sy, sub) {
+  const tex = canvasTex(512, 160, (g, w, h) => {
+    g.fillStyle = bg; g.beginPath();
+    if (g.roundRect) g.roundRect(6, 6, w - 12, h - 12, 26); else g.rect(6, 6, w - 12, h - 12);
+    g.fill(); g.lineWidth = 6; g.strokeStyle = 'rgba(255,255,255,.85)'; g.stroke();
+    g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = '900 ' + (sub ? 62 : 74) + 'px -apple-system, Segoe UI, sans-serif';
+    g.fillText(text, w / 2, sub ? h / 2 - 16 : h / 2 + 3);
+    if (sub) { g.font = '700 34px -apple-system, Segoe UI, sans-serif'; g.fillText(sub, w / 2, h / 2 + 36); }
+  });
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, fog: false, depthWrite: false, transparent: true }));
+  s.scale.set(sx, sy, 1); return s;
+}
+const floorTex = canvasTex(128, 128, (g, w, h) => {
+  g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
+  g.strokeStyle = '#c6cfdc'; g.lineWidth = 3; g.strokeRect(0, 0, w, h);
+});
+floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping; floorTex.repeat.set(0.5, 0.5);
+const stripeTex = canvasTex(128, 32, (g, w, h) => {
+  for (let i = -2; i < 10; i++) { g.fillStyle = i % 2 ? '#ff2d3d' : '#ffffff'; g.beginPath(); g.moveTo(i * 16, 0); g.lineTo(i * 16 + 16, 0); g.lineTo(i * 16 + 32, h); g.lineTo(i * 16 + 16, h); g.fill(); }
+});
+const chevronTex = canvasTex(128, 32, (g, w, h) => {
+  g.fillStyle = 'rgba(255,255,255,0.32)'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#fff';
+  for (let i = 0; i < 2; i++) { const x = i * 64 + 14; g.beginPath(); g.moveTo(x, 2); g.lineTo(x + 26, h / 2); g.lineTo(x, h - 2); g.lineTo(x + 12, h - 2); g.lineTo(x + 38, h / 2); g.lineTo(x + 12, 2); g.fill(); }
+});
+chevronTex.wrapS = chevronTex.wrapT = THREE.RepeatWrapping;
+
+// ============================================================================
+//  ENVIRONMENT: ground, plaza, assembly point, trees
+// ============================================================================
+{
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(320, 320), new THREE.MeshStandardMaterial({ color: 0x111926, roughness: 1 }));
+  ground.rotation.x = -Math.PI / 2; ground.position.y = -0.03; ground.receiveShadow = true; scene.add(ground);
+  const plaza = new THREE.Mesh(new THREE.PlaneGeometry(62, 66), new THREE.MeshStandardMaterial({ color: 0x1c2638, roughness: .95 }));
+  plaza.rotation.x = -Math.PI / 2; plaza.position.set(0, -0.02, -9); plaza.receiveShadow = true; scene.add(plaza);
+  const grid = new THREE.GridHelper(62, 31, 0x26324a, 0x1f2a3e); grid.position.set(0, -0.015, -9); grid.scale.z = 66 / 62; scene.add(grid);
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(10, 72), new THREE.MeshStandardMaterial({ color: 0x0f3d27, roughness: .9 }));
+  disc.rotation.x = -Math.PI / 2; disc.position.set(0, 0.0, -32.5); disc.receiveShadow = true; scene.add(disc);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(9.6, 10, 72), new THREE.MeshBasicMaterial({ color: 0x55ff99, side: THREE.DoubleSide }));
+  ring.rotation.x = -Math.PI / 2; ring.position.set(0, 0.01, -32.5); scene.add(ring);
+  const sign = textSprite('ASSEMBLY', '#0fae4f', '#fff', 6.4, 2, 'POINT');
+  sign.position.set(0, 5.2, -43); scene.add(sign);
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 4.2), new THREE.MeshStandardMaterial({ color: 0x8892a6 }));
+  post.position.set(0, 2.1, -43); scene.add(post);
+  // walkways from each exit to the assembly point
+  const walkMat = new THREE.MeshStandardMaterial({ color: 0x2b3852, roughness: .9 });
+  const strip = (x0, z0, x1, z1) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(x1 - x0) + 1.6, 0.02, Math.abs(z1 - z0) + 1.6), walkMat);
+    m.position.set((x0 + x1) / 2, -0.005, (z0 + z1) / 2); m.receiveShadow = true; scene.add(m);
+  };
+  strip(-23.5, -4, -23.5, -18); strip(-23.5, -18, -6, -22.5); strip(23.5, -4, 23.5, -18); strip(23.5, -18, 6, -22.5);
+  strip(0, -10, 0, -23); strip(10, 12.4, 10, 15.5); strip(10, 15.5, 26, 15.5); strip(26, 15.5, 26, -18);
+  strip(-20, -4, -23.5, -4); strip(20, -4, 23.5, -4);
+  // trees
+  const trunkG = new THREE.CylinderGeometry(0.12, 0.16, 1.4, 6), crownG = new THREE.ConeGeometry(1.1, 2.6, 7);
+  const trunks = new THREE.InstancedMesh(trunkG, new THREE.MeshStandardMaterial({ color: 0x4a3626 }), 26);
+  const crowns = new THREE.InstancedMesh(crownG, new THREE.MeshStandardMaterial({ color: 0x1f5a3a, roughness: .9 }), 26);
+  const m = new THREE.Matrix4(); let k = 0;
+  const treeSpots = [];
+  for (let i = 0; i < 9; i++) treeSpots.push([-30 + i * 7.5, 22]);
+  for (let i = 0; i < 6; i++) treeSpots.push([-31, 14 - i * 8], [31, 14 - i * 8]);
+  for (let i = 0; i < 5; i++) treeSpots.push([-16 + i * 8 > 0 ? -16 + i * 8 + 6 : -16 + i * 8 - 6, -48]);
+  treeSpots.slice(0, 26).forEach(([x, z]) => {
+    const s = rand(0.85, 1.25);
+    m.makeScale(s, s, s).setPosition(x, 0.7 * s, z); trunks.setMatrixAt(k, m);
+    m.makeScale(s, s, s).setPosition(x, 2.6 * s, z); crowns.setMatrixAt(k, m); k++;
+  });
+  trunks.count = crowns.count = k; crowns.castShadow = true;
+  scene.add(trunks, crowns);
+}
+
+// ============================================================================
+//  BUILDING LAYOUT
+//  Each floor: an east-west corridor (|z| < 1.5) with bays north and south.
+//  Stairwell A at the west end, stairwell B at the east end, an elevator bank
+//  north of the corridor centre, and an exterior fire escape on the north face.
+// ============================================================================
+const UPPER_N = [['office', -16, -12], ['office', -12, -8], ['office', -8, -4], ['elev', -4, 4], ['office', 4, 8], ['fe', 8, 12], ['office', 12, 16]];
+const UPPER_S = [['office', -16, -12], ['office', -12, -8], ['meeting', -8, 0], ['open', 0, 8], ['meeting', 8, 12], ['office', 12, 16]];
+const GROUND_N = [['cafe', -16, -4], ['elev', -4, 4], ['office', 4, 8], ['open', 8, 16]];
+const GROUND_S = [['office', -16, -11], ['office', -11, -6], ['lobby', -6, 6], ['office', 6, 11], ['office', 11, 16]];
+const ENCLOSED = { office: true, meeting: true };
+const COL = { desk: 0x8d99ad, panel: 0x56637a, chair: 0x2a3446, table: 0x7d8aa1, counter: 0x66758e, screen: 0x183d60 };
+
+const BAYS = [], SLOTS = [];
+const wallsSolid = [], wallsGlass = [], wallsStair = [], wallLines = [], stairLines = [];
+const furn = [], monitors = [], roundTables = [], planters = [];
+const wallKeys = new Set();
+
+function addWall(list, x0, z0, x1, z1, f, lines) {
+  const key = [x0, z0, x1, z1, f].join('|'); if (wallKeys.has(key)) return; wallKeys.add(key);
+  const y = f * FH, h = FH - 0.24, t = 0.1;
+  list.push({ x: (x0 + x1) / 2, y: y + h / 2, z: (z0 + z1) / 2, sx: Math.abs(x1 - x0) || t, sy: h, sz: Math.abs(z1 - z0) || t });
+  const L = lines || wallLines;
+  L.push(x0, y + h, z0, x1, y + h, z1, x0, y, z0, x0, y + h, z0, x1, y, z1, x1, y + h, z1);
+}
+function F(x, y, z, sx, sy, sz, col) { furn.push({ x, y, z, sx, sy, sz, col }); }
+function addSlot(f, x, z, yaw, kind, sit, bay) { SLOTS.push({ f, pos: V3(x, f * FH, z), yaw, kind, sit, bay, occ: -1 }); }
+
+function deskBlock(b) {
+  const w = b.x1 - b.x0, s = b.s, f = b.f, y = f * FH, cols = Math.max(1, Math.floor(w / 1.9));
+  [3.9, 6.3, 8.7].forEach(rz => {
+    for (let c = 0; c < cols; c++) {
+      const dx = b.x0 + (c + 0.5) * w / cols, dz = s * rz;
+      F(dx, y + 0.73, dz, 1.25, 0.05, 0.62, COL.desk);
+      F(dx, y + 0.36, dz + s * 0.29, 1.2, 0.68, 0.03, COL.panel);
+      monitors.push([dx, y + 1.0, dz + s * 0.16]);
+      F(dx, y + 0.72, dz - s * 0.86, 0.44, 0.6, 0.06, COL.chair);
+      addSlot(f, dx, dz - s * 0.55, s > 0 ? 0 : Math.PI, 'desk', true, b);
+    }
+  });
+}
+
+for (let f = 0; f < FLOORS; f++) {
+  BAYS[f] = [];
+  const y = f * FH;
+  [[1, f ? UPPER_N : GROUND_N], [-1, f ? UPPER_S : GROUND_S]].forEach(([s, list]) => {
+    list.forEach(([type, x0, x1]) => {
+      const b = { f, s, x0, x1, type, enclosed: !!ENCLOSED[type], doorX: x0 + 1.0 };
+      BAYS[f].push(b);
+      if (b.enclosed) {
+        const front = type === 'meeting' ? wallsGlass : wallsSolid;
+        addWall(front, x0, s * CORR, x0 + 0.4, s * CORR, f);
+        addWall(front, x0 + 1.6, s * CORR, x1, s * CORR, f);
+        addWall(wallsSolid, x0, s * CORR, x0, s * HZ, f);
+        addWall(wallsSolid, x1, s * CORR, x1, s * HZ, f);
+      }
+      const w = x1 - x0, cx = (x0 + x1) / 2;
+      if (type === 'office' || type === 'open') deskBlock(b);
+      else if (type === 'meeting') {
+        const cz = s * 5.75, tl = Math.max(1.2, w - 2.6), n = Math.max(1, Math.floor(tl / 0.95));
+        F(cx, y + 0.73, cz, tl, 0.06, 1.5, COL.table);
+        F(cx, y + 1.6, s * 9.85, Math.min(2.4, w - 1), 1.1, 0.05, COL.screen);
+        for (let i = 0; i < n; i++) {
+          const x = cx - tl / 2 + (i + 0.5) * tl / n;
+          addSlot(f, x, cz + 1.15, Math.PI, 'meeting', true, b);
+          addSlot(f, x, cz - 1.15, 0, 'meeting', true, b);
+        }
+      } else if (type === 'cafe') {
+        F(cx, y + 0.5, s * 9.3, w - 2, 1.0, 0.7, COL.counter);
+        for (let c = 0; c < 4; c++) for (const rz of [4.3, 7.4]) {
+          const tx = x0 + (c + 0.5) * w / 4, tz = s * rz;
+          roundTables.push([tx, y + 0.73, tz]);
+          [[0.85, 0], [-0.85, 0], [0, 0.85], [0, -0.85]].forEach(([ox, oz]) =>
+            addSlot(f, tx + ox, tz + oz, Math.atan2(-ox, -oz), 'cafe', true, b));
+        }
+      } else if (type === 'lobby') {
+        F(-3.2, y + 0.55, -6.6, 3.4, 1.1, 0.8, COL.counter);
+        addSlot(f, -4.0, -5.8, Math.PI, 'lobby', false, b);
+        addSlot(f, -2.4, -5.8, Math.PI, 'lobby', false, b);
+        addSlot(f, -3.0, -8.6, 0, 'lobby', false, b);
+        addSlot(f, 3.2, -7.6, -Math.PI / 2, 'lobby', false, b);
+        planters.push([-5, y, -9], [5, y, -9], [4.6, y, -3]);
+      }
+    });
+  });
+  // close off the corner utility zones beside each stairwell
+  [-16, 16].forEach(x => { addWall(wallsSolid, x, 2, x, HZ, f); addWall(wallsSolid, x, -2, x, -HZ, f); });
+  // stairwell enclosures (door into corridor; ground floor gets a south door to the exit vestibule)
+  [[-1, -20, -16], [1, 16, 20]].forEach(([side, x0, x1]) => {
+    const xi = side < 0 ? x1 : x0;
+    addWall(wallsStair, xi, -2, xi, -0.9, f, stairLines); addWall(wallsStair, xi, 0.9, xi, 2, f, stairLines);
+    addWall(wallsStair, x0, 2, x1, 2, f, stairLines);
+    if (f === 0) {
+      if (side < 0) { addWall(wallsStair, -20, -2, -17.6, -2, f, stairLines); addWall(wallsStair, -16.4, -2, -16, -2, f, stairLines); }
+      else { addWall(wallsStair, 16, -2, 16.4, -2, f, stairLines); addWall(wallsStair, 17.6, -2, 20, -2, f, stairLines); }
+    } else addWall(wallsStair, x0, -2, x1, -2, f, stairLines);
+  });
+}
+
+// ---------- slabs with holes for stairwells and elevator shafts ----------
+{
+  const solidMat = (f) => new THREE.MeshStandardMaterial({
+    color: f === FLOORS ? 0x5a6b85 : 0x46546b, map: f === FLOORS ? null : floorTex, roughness: .85, metalness: .05,
+    transparent: f > 0, opacity: f === 0 ? 1 : f === FLOORS ? 0.16 : 0.5, depthWrite: f === 0 });
+  for (let f = 0; f <= FLOORS; f++) {
+    const sh = new THREE.Shape();
+    sh.moveTo(-HX - .2, -HZ - .2); sh.lineTo(HX + .2, -HZ - .2); sh.lineTo(HX + .2, HZ + .2); sh.lineTo(-HX - .2, HZ + .2); sh.lineTo(-HX - .2, -HZ - .2);
+    if (f > 0 && f < FLOORS) {
+      const hole = (x0, z0, x1, z1) => { const p = new THREE.Path(); p.moveTo(x0, -z0); p.lineTo(x0, -z1); p.lineTo(x1, -z1); p.lineTo(x1, -z0); p.lineTo(x0, -z0); sh.holes.push(p); };
+      hole(-19.9, -1.9, -17.2, 1.9); hole(17.2, -1.9, 19.9, 1.9); hole(-2.7, 3.6, 2.7, 6.0);
+    }
+    const geo = new THREE.ExtrudeGeometry(sh, { depth: 0.22, bevelEnabled: false });
+    geo.rotateX(-Math.PI / 2);
+    const slab = new THREE.Mesh(geo, solidMat(f));
+    slab.position.y = f * FH - 0.22;
+    slab.receiveShadow = true; slab.castShadow = f > 0;
+    slab.renderOrder = 1;
+    G.shell.add(slab);
+    if (f > 0 && f < FLOORS) {   // stair landings at the corridor door
+      [-16.6, 16.6].forEach(x => {
+        const land = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.18, 2.0), new THREE.MeshStandardMaterial({ color: 0x8a7a48 }));
+        land.position.set(x, f * FH - 0.09, 0); G.shell.add(land);
+      });
+    }
+    if (f < FLOORS) {   // yellow safety floor markings along the corridor
+      const pts = [];
+      for (const z of [-CORR + 0.15, CORR - 0.15]) pts.push(V3(-16, f * FH + 0.02, z), V3(16, f * FH + 0.02, z));
+      const lg = new THREE.BufferGeometry().setFromPoints(pts);
+      const ln = new THREE.LineSegments(lg, new THREE.LineDashedMaterial({ color: 0xffc400, dashSize: 0.6, gapSize: 0.4, transparent: true, opacity: .55 }));
+      ln.computeLineDistances(); G.shell.add(ln);
+    }
+  }
+}
+
+// ---------- glass facade + structural frame ----------
+{
+  const glass = new THREE.MeshStandardMaterial({ color: 0x8fc8ff, transparent: true, opacity: 0.07, roughness: .1, metalness: .3, depthWrite: false, side: THREE.DoubleSide });
+  const none = new THREE.MeshBasicMaterial({ visible: false });
+  const box = new THREE.Mesh(new THREE.BoxGeometry(HX * 2, FH * FLOORS, HZ * 2), [glass, glass, none, none, glass, glass]);
+  box.position.y = FH * FLOORS / 2; box.renderOrder = 3; G.shell.add(box);
+  const P = [];
+  for (let f = 0; f <= FLOORS; f++) {
+    const y = f * FH;
+    P.push(-HX, y, -HZ, HX, y, -HZ, HX, y, -HZ, HX, y, HZ, HX, y, HZ, -HX, y, HZ, -HX, y, HZ, -HX, y, -HZ);
+  }
+  for (let x = -HX; x <= HX; x += 5) { P.push(x, 0, -HZ, x, FH * FLOORS, -HZ, x, 0, HZ, x, FH * FLOORS, HZ); }
+  for (let z = -HZ + 5; z < HZ; z += 5) { P.push(-HX, 0, z, -HX, FH * FLOORS, z, HX, 0, z, HX, FH * FLOORS, z); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  G.shell.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0x9fb4d0, transparent: true, opacity: .5 })));
+  // floor labels
+  for (let f = 0; f < FLOORS; f++) {
+    const s = textSprite('L' + (f + 1), 'rgba(20,28,44,.9)', '#e9eef7', 1.6, 0.5);
+    s.position.set(-HX - 1.4, f * FH + 2, -HZ - 0.6); G.shell.add(s);
+  }
+}
+
+// ---------- interior walls (instanced) ----------
+function instancedBoxes(list, mat, lines, lineCol, lineOp) {
+  const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mat, Math.max(1, list.length));
+  const m = new THREE.Matrix4();
+  list.forEach((w, i) => { m.makeScale(w.sx, w.sy, w.sz).setPosition(w.x, w.y, w.z); im.setMatrixAt(i, m); });
+  im.count = list.length; im.frustumCulled = false; im.renderOrder = 2; G.shell.add(im);
+  if (lines) {
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3));
+    G.shell.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: lineCol, transparent: true, opacity: lineOp })));
+  }
+  return im;
+}
+const wallMat = o => new THREE.MeshStandardMaterial(Object.assign({ transparent: true, depthWrite: false, roughness: .6 }, o));
+instancedBoxes(wallsSolid, wallMat({ color: 0xd6e2f2, opacity: 0.13 }), wallLines, 0xaebfd8, 0.32);
+instancedBoxes(wallsGlass, wallMat({ color: 0x6fd0ff, opacity: 0.2, metalness: .3 }));
+instancedBoxes(wallsStair, wallMat({ color: 0xffd36a, opacity: 0.14 }), stairLines, 0xffc400, 0.55);
+
+// ---------- furniture (InstancedMesh: desks, panels, chairs, tables, counters) ----------
+{
+  const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ roughness: .7 }), furn.length);
+  const m = new THREE.Matrix4(), c = new THREE.Color();
+  furn.forEach((o, i) => { m.makeScale(o.sx, o.sy, o.sz).setPosition(o.x, o.y, o.z); im.setMatrixAt(i, m); im.setColorAt(i, c.setHex(o.col)); });
+  im.castShadow = true; im.receiveShadow = true; im.frustumCulled = false; G.shell.add(im);
+  const mon = new THREE.InstancedMesh(new THREE.BoxGeometry(0.56, 0.34, 0.04), new THREE.MeshBasicMaterial({ color: 0x3d7fc4 }), monitors.length);
+  monitors.forEach((p, i) => { m.makeTranslation(p[0], p[1], p[2]); mon.setMatrixAt(i, m); });
+  mon.frustumCulled = false; G.shell.add(mon);
+  const rt = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.55, 0.55, 0.05, 20), new THREE.MeshStandardMaterial({ color: COL.table }), Math.max(1, roundTables.length));
+  roundTables.forEach((p, i) => { m.makeTranslation(p[0], p[1], p[2]); rt.setMatrixAt(i, m); });
+  rt.castShadow = true; rt.frustumCulled = false; G.shell.add(rt);
+  const pl = new THREE.InstancedMesh(new THREE.SphereGeometry(0.42, 10, 8), new THREE.MeshStandardMaterial({ color: 0x2f8a55 }), planters.length);
+  planters.forEach((p, i) => { m.makeTranslation(p[0], p[1] + 0.55, p[2]); pl.setMatrixAt(i, m); });
+  pl.frustumCulled = false; G.shell.add(pl);
+}
+
+// ============================================================================
+//  STAIRWELLS: helical stairs. Avatars descend along the same helix.
+// ============================================================================
+const HELIX_R = 1.1;
+const STAIRS = [
+  { name: 'Stair A', cx: -18, cz: 0, theta0: 0, dir: -1 },
+  { name: 'Stair B', cx: 18, cz: 0, theta0: Math.PI, dir: 1 },
+];
+STAIRS.forEach(st => { st.entry = f => V3(st.cx + HELIX_R * Math.cos(st.theta0), f * FH, st.cz + HELIX_R * Math.sin(st.theta0)); });
+
+// A helix descending `floors` storeys: one full turn per floor (4 m drop / turn).
+class HelixCurve extends THREE.Curve {
+  constructor(st, yTop, floors) { super(); this.st = st; this.yTop = yTop; this.floors = floors; }
+  getPoint(t, target = new THREE.Vector3()) {
+    const st = this.st, th = st.theta0 + st.dir * t * this.floors * Math.PI * 2;
+    return target.set(st.cx + HELIX_R * Math.cos(th), this.yTop - t * this.floors * FH, st.cz + HELIX_R * Math.sin(th));
+  }
+}
+{
+  const STEPS = 16, n = STAIRS.length * (FLOORS - 1) * STEPS;
+  const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1.25, 0.06, 0.42), new THREE.MeshStandardMaterial({ color: 0xb8c2d2, roughness: .8 }), n);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s = V3(1, 1, 1);
+  let k = 0; const rail = [];
+  STAIRS.forEach(st => {
+    for (let f = 1; f < FLOORS; f++) for (let i = 0; i < STEPS; i++) {
+      const fr = (i + 0.5) / STEPS, th = st.theta0 + st.dir * fr * Math.PI * 2;
+      m.compose(V3(st.cx + 1.05 * Math.cos(th), f * FH - fr * FH - 0.03, st.cz + 1.05 * Math.sin(th)), q.setFromEuler(e.set(0, -th, 0)), s);
+      im.setMatrixAt(k++, m);
+    }
+    for (const r of [1.78, 0.42]) {
+      let prev = null;
+      for (let i = 0; i <= 4 * 48; i++) {
+        const t = i / (4 * 48), th = st.theta0 + st.dir * t * 4 * Math.PI * 2;
+        const p = [st.cx + r * Math.cos(th), 16 - t * 16 + 1.0, st.cz + r * Math.sin(th)];
+        if (prev) rail.push(...prev, ...p); prev = p;
+      }
+    }
+    const lab = textSprite(st.name.toUpperCase(), '#ffc400', '#111', 3.2, 1);
+    lab.position.set(st.cx, FLOORS * FH + 1.6, 0); G.shell.add(lab);
+  });
+  im.frustumCulled = false; im.receiveShadow = true; G.shell.add(im);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(rail, 3));
+  G.shell.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xffc400, transparent: true, opacity: .7 })));
+}
+
+// ============================================================================
+//  ELEVATOR BANK (cars LOCKED during the fire, red X overlay)
+// ============================================================================
+const ELEV = [];
+{
+  const xTex = canvasTex(256, 256, (g, w, h) => {
+    g.fillStyle = 'rgba(255,45,61,.25)'; g.beginPath(); g.arc(w / 2, h / 2, 118, 0, 7); g.fill();
+    g.strokeStyle = '#ff2d3d'; g.lineWidth = 12; g.stroke();
+    g.lineCap = 'round'; g.lineWidth = 30; g.strokeStyle = '#ffe1e1';
+    g.beginPath(); g.moveTo(70, 70); g.lineTo(186, 186); g.moveTo(186, 70); g.lineTo(70, 186); g.stroke();
+  });
+  [-1.35, 1.35].forEach((x, i) => {
+    const shaft = new THREE.Mesh(new THREE.BoxGeometry(2.4, FH * FLOORS, 2.4), new THREE.MeshStandardMaterial({ color: 0x5ad1ff, transparent: true, opacity: .08, depthWrite: false }));
+    shaft.position.set(x, FH * FLOORS / 2, 4.8); G.shell.add(shaft);
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(shaft.geometry), new THREE.LineBasicMaterial({ color: 0x5ad1ff, transparent: true, opacity: .45 }));
+    edges.position.copy(shaft.position); G.shell.add(edges);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xa9b7cc, metalness: .45, roughness: .4, emissive: 0x000000 });
+    const car = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.5, 2.0), mat);
+    car.castShadow = true; G.shell.add(car);
+    const x_ = new THREE.Sprite(new THREE.SpriteMaterial({ map: xTex, depthTest: false, transparent: true, fog: false }));
+    x_.scale.set(2.2, 2.2, 1); x_.visible = false; x_.renderOrder = 10; G.shell.add(x_);
+    ELEV.push({ car, mat, x: x_, xPos: x, y: rand(0, 16), phase: i * 2.1, locked: false });
+  });
+}
+
+// ============================================================================
+//  EXTERIOR FIRE ESCAPE (north facade, switchback flights)
+// ============================================================================
+function feFlightPts(f) {        // path points from landing on floor f down to landing on floor f-1
+  const y = f * FH;
+  return [V3(9.0, y, 10.75), V3(5.0, y - 2, 10.75), V3(4.25, y - 2, 11.3), V3(5.0, y - 2, 11.85), V3(9.0, y - 4, 11.85), V3(10, y - 4, 11.2)];
+}
+{
+  const mat = new THREE.MeshStandardMaterial({ color: 0xb83a2e, roughness: .6, metalness: .4 });
+  const add = (geo, x, y, z, rz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (rz) m.rotation.z = rz; m.castShadow = true; m.receiveShadow = true; G.shell.add(m); };
+  const slope = Math.atan2(2, 4), flen = Math.hypot(4, 2);
+  const rail = [];
+  for (let f = 0; f < FLOORS; f++) {
+    const y = f * FH;
+    add(new THREE.BoxGeometry(2.4, 0.1, 2.2), 10.2, y - 0.05, 11.3);
+    rail.push(9, y + 1, 12.4, 11.4, y + 1, 12.4, 11.4, y + 1, 12.4, 11.4, y + 1, 10.2);
+    if (f > 0) {
+      add(new THREE.BoxGeometry(1.4, 0.1, 2.2), 4.3, y - 2 - 0.05, 11.3);
+      add(new THREE.BoxGeometry(flen, 0.08, 1.0), 7, y - 1 - 0.04, 10.75, slope);
+      add(new THREE.BoxGeometry(flen, 0.08, 1.0), 7, y - 3 - 0.04, 11.85, -slope);
+      rail.push(5, y - 1, 12.35, 9, y - 3, 12.35, 3.6, y - 1, 10.2, 3.6, y - 1, 12.4, 3.6, y - 1, 12.4, 5, y - 1, 12.4);
+      const door = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.2, 0.06), new THREE.MeshStandardMaterial({ color: 0x1f8f4e }));
+      door.position.set(10, y + 1.1, 10.03); G.shell.add(door);
+    }
+  }
+  for (const x of [3.6, 11.4]) add(new THREE.CylinderGeometry(0.07, 0.07, 16.5), x, 8.25, 12.4);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(rail, 3));
+  G.shell.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xffc400 })));
+  const s = textSprite('FIRE ESCAPE', '#0fae4f', '#fff', 3.6, 1.1);
+  s.position.set(7.5, FLOORS * FH + 0.8, 12); G.shell.add(s);
+}
+
+// ============================================================================
+//  ROUTE GRAPH  (nodes on corridors, stair landings, doors, outdoor waypoints)
+//  Edges are directed. Stair/fire-escape edges only go down. Each hazard update
+//  re-costs every edge and runs Dijkstra backwards from the assembly point, so
+//  D[n] is the cheapest remaining cost from any node and NEXT[n] the next hop.
+// ============================================================================
+const NODES = [], EDGES = [], EDGE = new Map(), INC = [];
+function node(x, y, z, f, kind, extra) { const n = Object.assign({ i: NODES.length, pos: V3(x, y, z), f, kind }, extra || {}); NODES.push(n); INC.push([]); return n.i; }
+function helixLen(floors) { return Math.hypot(HELIX_R * Math.PI * 2 * floors, FH * floors); }
+const FE_LEN = new THREE.CatmullRomCurve3([V3(10, 4, 11.2)].concat(feFlightPts(1)), false, 'centripetal').getLength();
+function edge(a, b, kind) {
+  const A = NODES[a], B = NODES[b];
+  let len, factor = 1;
+  if (kind === 'stair') { len = helixLen(1); factor = STAIR_FACTOR; }
+  else if (kind === 'fe') { len = FE_LEN; factor = ESCAPE_FACTOR; }
+  else len = A.pos.distanceTo(B.pos);
+  const e = { a, b, kind, len, base: len / factor, cost: len / factor, f: A.f >= 0 ? A.f : B.f, samples: null };
+  if (kind === 'stair') e.stair = A.stair;
+  if (A.exit !== undefined) e.exit = A.exit; if (B.exit !== undefined) e.exit = B.exit;
+  if (kind === 'walk' && A.f >= 0 && B.f >= 0) {
+    const n = Math.max(1, Math.ceil(len / 0.8)); e.samples = [];
+    for (let i = 0; i <= n; i++) e.samples.push(A.pos.clone().lerp(B.pos, i / n));
+  }
+  EDGES.push(e); EDGE.set(a + '>' + b, e); INC[b].push(e); return e;
+}
+const biedge = (a, b) => { edge(a, b, 'walk'); edge(b, a, 'walk'); };
+
+const CX = []; for (let x = -15; x <= 15.01; x += 2.5) CX.push(x);
+const C = [], SA = [], SB = [], FD = [], FL = [];
+for (let f = 0; f < FLOORS; f++) {
+  const y = f * FH;
+  C[f] = CX.map(x => node(x, y, 0, f, 'corr'));
+  SA[f] = node(-16.4, y, 0, f, 'stair', { stair: 0 });
+  SB[f] = node(16.4, y, 0, f, 'stair', { stair: 1 });
+  for (let i = 0; i < CX.length - 1; i++) biedge(C[f][i], C[f][i + 1]);
+  biedge(C[f][0], SA[f]); biedge(C[f][CX.length - 1], SB[f]);
+  if (f > 0) {
+    edge(SA[f], SA[f - 1], 'stair'); edge(SB[f], SB[f - 1], 'stair');
+    FD[f] = node(10, y, 9.85, f, 'fedoor'); FL[f] = node(10, y, 11.2, -1, 'fe');
+    biedge(C[f][10], FD[f]); biedge(FD[f], FL[f]);
+  }
+}
+FL[0] = node(10, 0, 11.2, -1, 'fe');
+for (let f = 1; f < FLOORS; f++) edge(FL[f], FL[f - 1], 'fe');
+const ASM = node(0, 0, -23, -1, 'asm');
+const VA = node(-17.0, 0, -3.2, 0, 'corr'), DA = node(-20.25, 0, -4, 0, 'door', { exit: 0 }), OA = node(-23.5, 0, -4, -1, 'out'), OA2 = node(-23.5, 0, -18, -1, 'out');
+const VB = node(17.0, 0, -3.2, 0, 'corr'), DB = node(20.25, 0, -4, 0, 'door', { exit: 1 }), OB = node(23.5, 0, -4, -1, 'out'), OB2 = node(23.5, 0, -18, -1, 'out');
+const LB = node(0, 0, -5, 0, 'corr'), DM = node(0, 0, -10.25, 0, 'door', { exit: 2 }), OM = node(0, 0, -14, -1, 'out');
+const DF = node(10, 0, 12.4, -1, 'door', { exit: 3 }), OF = node(10, 0, 15.5, -1, 'out'), OF2 = node(26, 0, 15.5, -1, 'out'), OF3 = node(26, 0, -18, -1, 'out');
+biedge(SA[0], VA); edge(VA, DA, 'walk'); edge(DA, OA, 'walk'); edge(OA, OA2, 'walk'); edge(OA2, ASM, 'walk');
+biedge(SB[0], VB); edge(VB, DB, 'walk'); edge(DB, OB, 'walk'); edge(OB, OB2, 'walk'); edge(OB2, ASM, 'walk');
+biedge(C[0][6], LB); edge(LB, DM, 'walk'); edge(DM, OM, 'walk'); edge(OM, ASM, 'walk');
+edge(FL[0], DF, 'walk'); edge(DF, OF, 'walk'); edge(OF, OF2, 'walk'); edge(OF2, OF3, 'walk'); edge(OF3, ASM, 'walk');
+const PLAN_NODES = [];   // per floor: nodes an occupant can walk to directly from where they stand
+for (let f = 0; f < FLOORS; f++) PLAN_NODES[f] = NODES.filter(n => n.f === f && ['corr', 'stair', 'fedoor', 'door'].includes(n.kind));
+const D = new Float64Array(NODES.length), NEXT = new Int32Array(NODES.length);
+
+// ============================================================================
+//  EXITS: spring-loaded doors, block-able
+// ============================================================================
+const EXITS = [
+  { id: 'A', name: 'Exit A', node: DA, pos: V3(-20, 0, -4), n: V3(-1, 0, 0), leaves: [{ p: V3(-20, 0, -4.7), axis: 'z', w: 1.4, sign: -1 }] },
+  { id: 'B', name: 'Exit B', node: DB, pos: V3(20, 0, -4), n: V3(1, 0, 0), leaves: [{ p: V3(20, 0, -4.7), axis: 'z', w: 1.4, sign: 1 }] },
+  { id: 'MAIN', name: 'Main', node: DM, pos: V3(0, 0, -10), n: V3(0, 0, -1), leaves: [{ p: V3(-1.2, 0, -10), axis: 'x', w: 1.2, sign: 1 }, { p: V3(1.2, 0, -10), axis: 'x', w: -1.2, sign: -1 }] },
+  { id: 'FE', name: 'Fire escape', node: DF, pos: V3(10, 0, 12.4), n: V3(0, 0, 1), leaves: [{ p: V3(9.3, 0, 12.4), axis: 'x', w: 1.4, sign: -1, h: 1.1 }] },
+];
+{
+  const doorMat = new THREE.MeshStandardMaterial({ color: 0x1f9d57, roughness: .5, emissive: 0x0a3a1e });
+  const barMat = new THREE.MeshBasicMaterial({ map: stripeTex });
+  EXITS.forEach(ex => {
+    ex.open = false; ex.blocked = false; ex.uses = 0;
+    ex.leaves.forEach(L => {
+      const h = L.h || 2.2;
+      L.pivot = new THREE.Group(); L.pivot.position.copy(L.p);
+      const geo = L.axis === 'z' ? new THREE.BoxGeometry(0.08, h, Math.abs(L.w)) : new THREE.BoxGeometry(Math.abs(L.w), h, 0.08);
+      const leaf = new THREE.Mesh(geo, doorMat);
+      if (L.axis === 'z') leaf.position.set(0, h / 2, L.w / 2); else leaf.position.set(L.w / 2, h / 2, 0);
+      leaf.castShadow = true; L.pivot.add(leaf); G.shell.add(L.pivot);
+      L.ang = 0; L.vel = 0;
+    });
+    const sp = ex.pos.clone().addScaledVector(ex.n, 0.45);
+    ex.sign = textSprite(ex.id === 'MAIN' ? 'EXIT' : ex.id === 'FE' ? 'EXIT' : 'EXIT ' + ex.id, '#0fae4f', '#fff', 2.4, 0.75);
+    ex.sign.position.set(sp.x, ex.id === 'FE' ? 1.9 : 2.75, sp.z); scene.add(ex.sign);
+    ex.blockSign = textSprite('BLOCKED', '#ff2d3d', '#fff', 2.6, 0.8); ex.blockSign.position.copy(ex.sign.position).y += 0.9; ex.blockSign.visible = false; scene.add(ex.blockSign);
+    ex.barrier = new THREE.Group();
+    const bp = ex.pos.clone().addScaledVector(ex.n, 1.0);
+    for (const y of [0.55, 1.05]) {
+      const geo = ex.n.x !== 0 ? new THREE.BoxGeometry(0.12, 0.2, 2.6) : new THREE.BoxGeometry(2.6, 0.2, 0.12);
+      const bar = new THREE.Mesh(geo, barMat); bar.position.set(bp.x, y, bp.z); ex.barrier.add(bar);
+    }
+    ex.beacon = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), new THREE.MeshBasicMaterial({ color: 0xff4040 }));
+    ex.beacon.position.set(bp.x, 1.3, bp.z); ex.barrier.add(ex.beacon);
+    ex.barrier.visible = false; scene.add(ex.barrier);
+  });
+}
+
+// ============================================================================
+//  ALARM STROBES (bloom picks up the white-hot cores) + red strobe lights
+// ============================================================================
+const strobeMat = new THREE.MeshBasicMaterial({ color: 0x300808 });
+const STROBE_LIGHTS = [];
+{
+  const pos = [[-12, 1], [-4, -1], [4, 1], [12, -1]];
+  const im = new THREE.InstancedMesh(new THREE.BoxGeometry(0.26, 0.16, 0.1), strobeMat, FLOORS * pos.length);
+  const m = new THREE.Matrix4(); let k = 0;
+  for (let f = 0; f < FLOORS; f++) {
+    pos.forEach(([x, s]) => { m.makeTranslation(x, f * FH + 2.7, s * (CORR - 0.08)); im.setMatrixAt(k++, m); });
+    const L = new THREE.PointLight(0xff1a1a, 0, 30, 2); L.position.set(0, f * FH + 3.1, 0); scene.add(L); STROBE_LIGHTS.push(L);
+  }
+  im.frustumCulled = false; G.shell.add(im);
+}
+
+// ============================================================================
+//  FIRE MODEL
+//  The fire front travels along a random CatmullRomCurve3 across one floor,
+//  spreading both ways from its origin. When it is big enough it breaches the
+//  slab and starts a second front on the floor above.
+// ============================================================================
+const FIRE = { curve: null, samples: [], c: 0, spacing: 0.25, layers: [], origin: V3() };
+const SEV = () => +document.getElementById('sSev').value;
+const fireRadius = () => 1.3 + 0.13 * SEV();
+const spreadSpeed = () => 0.1 + 0.055 * SEV();
+const FIRE_LIGHTS = [0, 1].map(() => { const L = new THREE.PointLight(0xff6a1a, 0, 22, 2); G.fire.add(L); return L; });
+
+function initFire() {
+  const F0 = randi(0, FLOORS - 1);
+  const pts = [];
+  for (let i = 0; i < 7; i++) pts.push(V3(-15 + i * 5 + rand(-1.2, 1.2), 0, rand(-8.2, 8.2)));
+  FIRE.curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+  FIRE.samples = FIRE.curve.getSpacedPoints(159);
+  FIRE.spacing = FIRE.curve.getLength() / 159;
+  FIRE.c = randi(45, 115);
+  FIRE.origin.copy(FIRE.samples[FIRE.c]).setY(F0 * FH);
+  FIRE.layers = [{ floor: F0, active: true, extent: 0.4, lo: FIRE.c, hi: FIRE.c, breach: rand(7, 10) }];
+  if (F0 < FLOORS - 1) FIRE.layers.push({ floor: F0 + 1, active: false, extent: 0, lo: FIRE.c, hi: FIRE.c });
+}
+function updateFire(h) {
+  const L0 = FIRE.layers[0];
+  FIRE.layers.forEach((L, i) => {
+    if (!L.active) { if (i === 1 && L0.extent > L0.breach) { L.active = true; toast('Fire has breached the slab to L' + (L.floor + 1)); } else return; }
+    L.extent += spreadSpeed() * (i === 0 ? 1 : 0.7) * h;
+    const k = Math.floor(L.extent / FIRE.spacing);
+    L.lo = Math.max(0, FIRE.c - k); L.hi = Math.min(FIRE.samples.length - 1, FIRE.c + k);
+  });
+}
+// 0 = clear, 1 = at the burning curve. Only same-floor fire matters (stairwells are fire-rated).
+function fireIntensity(p, f) {
+  let best = 0; const r = fireRadius(), r2 = r * r;
+  for (const L of FIRE.layers) {
+    if (!L.active || L.floor !== f) continue;
+    for (let i = L.lo; i <= L.hi; i += 2) {
+      const s = FIRE.samples[i], dx = p.x - s.x, dz = p.z - s.z, d2 = dx * dx + dz * dz;
+      if (d2 < r2) { const I = 1 - Math.sqrt(d2) / r; if (I > best) best = I; }
+    }
+  }
+  return best;
+}
+function fireCentroid(out) {
+  const L = FIRE.layers.filter(l => l.active).pop() || FIRE.layers[0];
+  const a = FIRE.samples[L.lo], b = FIRE.samples[L.hi], c = FIRE.samples[FIRE.c];
+  return out.set((a.x + b.x + c.x) / 3, L.floor * FH + 1.5, (a.z + b.z + c.z) / 3);
+}
+
+// ---------- particle systems (fire + smoke), one draw call each ----------
+function particleSystem(N, additive, frag) {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), size = new Float32Array(N), alpha = new Float32Array(N);
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('aColor', new THREE.BufferAttribute(col, 3).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('aSize', new THREE.BufferAttribute(size, 1).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('aAlpha', new THREE.BufferAttribute(alpha, 1).setUsage(THREE.DynamicDrawUsage));
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uScale: { value: renderer.domElement.height / 2 } },
+    vertexShader: `attribute vec3 aColor; attribute float aSize; attribute float aAlpha; uniform float uScale;
+      varying vec3 vC; varying float vA;
+      void main(){ vC=aColor; vA=aAlpha; vec4 mv=modelViewMatrix*vec4(position,1.0);
+        gl_PointSize = aAlpha<=0.0 ? 0.0 : aSize*uScale/-mv.z; gl_Position=projectionMatrix*mv; }`,
+    fragmentShader: frag, transparent: true, depthWrite: false,
+    blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+  });
+  const pts = new THREE.Points(geo, mat); pts.frustumCulled = false;
+  return { N, geo, mat, pts, pos, col, size, alpha, vel: new Float32Array(N * 3), life: new Float32Array(N), max: new Float32Array(N), head: 0, acc: 0 };
+}
+const FP = particleSystem(1800, true, `varying vec3 vC; varying float vA;
+  void main(){ float d=length(gl_PointCoord-0.5); float a=smoothstep(0.5,0.0,d); gl_FragColor=vec4(vC, a*vA); }`);
+FP.ceil = new Float32Array(FP.N); FP.pts.renderOrder = 6; G.fire.add(FP.pts);
+const SP = particleSystem(1600, false, `varying vec3 vC; varying float vA;
+  void main(){ vec2 q=gl_PointCoord-0.5; float d=length(q); float a=smoothstep(0.5,0.08,d)*(0.85+0.15*sin(q.x*19.0+q.y*13.0)); gl_FragColor=vec4(vC, a*vA); }`);
+SP.mode = new Uint8Array(SP.N); SP.floor = new Uint8Array(SP.N); SP.tx = new Float32Array(SP.N); SP.tz = new Float32Array(SP.N); SP.stair = new Uint8Array(SP.N); SP.spd = new Float32Array(SP.N);
+SP.pts.renderOrder = 5; G.fire.add(SP.pts);
+
+// glowing scorch decals along the burnt part of the curve
+const EMBERS = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 24).rotateX(-Math.PI / 2),
+  new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }), 120);
+EMBERS.frustumCulled = false; EMBERS.count = 0; EMBERS.setColorAt(0, new THREE.Color(0)); G.fire.add(EMBERS);
+
+const SMOKE = { grid: [], stairCount: [0, 0], stairBand: [[], []], level: [0, 0], manualA: false, alive: 0 };
+function resetSmokeGrid() { for (let f = 0; f < FLOORS; f++) SMOKE.grid[f] = new Float32Array(50); SMOKE.stairBand = [new Float32Array(FLOORS), new Float32Array(FLOORS)]; }
+resetSmokeGrid();
+const cellOf = (x, z) => clamp(Math.floor((x + HX) / 4), 0, 9) + 10 * clamp(Math.floor((z + HZ) / 4), 0, 4);
+const smokeAt = (p, f) => f >= 0 && f < FLOORS ? Math.min(1, SMOKE.grid[f][cellOf(p.x, p.z)] / 30) : 0;
+
+const _c1 = new THREE.Color(1, 0.88, 0.35), _c2 = new THREE.Color(1, 0.42, 0.06), _c3 = new THREE.Color(0.75, 0.08, 0.02), _ct = new THREE.Color();
+function updateFireParticles(dt) {
+  const sev = SEV(), r = fireRadius();
+  // emit: rate scales with severity and with how much of the curve is burning
+  FIRE.layers.forEach(L => {
+    if (!L.active) return;
+    FP.acc += dt * (160 + 30 * sev) * Math.min(2.2, 0.5 + (L.hi - L.lo) / 60);
+    while (FP.acc >= 1) {
+      FP.acc -= 1;
+      const i = FP.head = (FP.head + 1) % FP.N, s = FIRE.samples[randi(L.lo, L.hi)];
+      const a = Math.random() * 6.283, rr = Math.sqrt(Math.random()) * r * 0.55;
+      FP.pos[i * 3] = s.x + Math.cos(a) * rr; FP.pos[i * 3 + 1] = L.floor * FH + 0.05; FP.pos[i * 3 + 2] = s.z + Math.sin(a) * rr;
+      FP.vel[i * 3] = rand(-.25, .25); FP.vel[i * 3 + 1] = rand(1.0, 2.3) * (0.8 + sev * 0.04); FP.vel[i * 3 + 2] = rand(-.25, .25);
+      FP.life[i] = 0; FP.max[i] = rand(0.45, 1.05); FP.ceil[i] = L.floor * FH + 3.7;
+    }
+  });
+  for (let i = 0; i < FP.N; i++) {
+    if (FP.life[i] >= FP.max[i]) { FP.alpha[i] = 0; continue; }
+    FP.life[i] += dt; const t = Math.min(1, FP.life[i] / FP.max[i]);
+    FP.pos[i * 3] += FP.vel[i * 3] * dt; FP.pos[i * 3 + 1] += FP.vel[i * 3 + 1] * dt; FP.pos[i * 3 + 2] += FP.vel[i * 3 + 2] * dt;
+    if (FP.pos[i * 3 + 1] > FP.ceil[i]) { FP.pos[i * 3 + 1] = FP.ceil[i]; FP.vel[i * 3] *= 1.04; FP.vel[i * 3 + 2] *= 1.04; }
+    if (t < 0.45) _ct.copy(_c1).lerp(_c2, t / 0.45); else _ct.copy(_c2).lerp(_c3, (t - 0.45) / 0.55);
+    FP.col[i * 3] = _ct.r; FP.col[i * 3 + 1] = _ct.g; FP.col[i * 3 + 2] = _ct.b;
+    FP.size[i] = (1.25 - 0.85 * t) * (0.8 + sev * 0.05);
+    FP.alpha[i] = t < 0.12 ? t / 0.12 : 1 - (t - 0.12) / 0.88;
+  }
+  for (const k of ['position', 'aColor', 'aSize', 'aAlpha']) FP.geo.attributes[k].needsUpdate = true;
+}
+
+// Smoke: rises to the ceiling, drifts along the corridor towards the stairwells,
+// then climbs the stair shafts (mode 1) and pools under the roof (mode 2).
+function spawnSmoke(x, y, z, mode, floor, stair) {
+  const i = SP.head = (SP.head + 1) % SP.N;
+  SP.pos[i * 3] = x; SP.pos[i * 3 + 1] = y; SP.pos[i * 3 + 2] = z;
+  SP.vel[i * 3] = rand(-.2, .2); SP.vel[i * 3 + 2] = rand(-.2, .2);
+  SP.life[i] = 0; SP.max[i] = rand(16, 26); SP.mode[i] = mode; SP.floor[i] = floor; SP.stair[i] = stair || 0;
+  SP.spd[i] = rand(0.35, 0.8);
+  if (mode === 0) {
+    if (Math.random() < 0.55) { const toA = (x < 0) !== (Math.random() < 0.22); SP.tx[i] = toA ? -16.9 : 16.9; SP.tz[i] = rand(-0.8, 0.8); }
+    else { SP.tx[i] = rand(-18, 18); SP.tz[i] = rand(-9, 9); }
+  }
+}
+function updateSmoke(dt) {
+  const sev = SEV();
+  FIRE.layers.forEach(L => {
+    if (!L.active) return;
+    SP.acc += dt * (6 + 7 * sev);
+    while (SP.acc >= 1) { SP.acc -= 1; const s = FIRE.samples[randi(L.lo, L.hi)]; spawnSmoke(s.x + rand(-1, 1), L.floor * FH + rand(1.2, 2.4), s.z + rand(-1, 1), 0, L.floor); }
+  });
+  if (SMOKE.manualA) { SMOKE.accA = (SMOKE.accA || 0) + dt * 45; while (SMOKE.accA >= 1) { SMOKE.accA -= 1; const a = Math.random() * 6.28; spawnSmoke(-18 + Math.cos(a), rand(0.5, 18), Math.sin(a), 1, 0, 0); } }
+  for (let f = 0; f < FLOORS; f++) SMOKE.grid[f].fill(0);
+  SMOKE.stairBand[0].fill(0); SMOKE.stairBand[1].fill(0);
+  let sc0 = 0, sc1 = 0, alive = 0;
+  const top = FLOORS * FH - 0.5, baseA = 0.18 + 0.025 * sev, grey = 0.44 - 0.018 * sev;
+  for (let i = 0; i < SP.N; i++) {
+    if (SP.life[i] >= SP.max[i]) { SP.alpha[i] = 0; continue; }
+    alive++;
+    SP.life[i] += dt; const t = SP.life[i] / SP.max[i];
+    let x = SP.pos[i * 3], y = SP.pos[i * 3 + 1], z = SP.pos[i * 3 + 2];
+    const wob = Math.sin(SP.life[i] * 1.3 + i) * 0.25;
+    if (SP.mode[i] === 0) {
+      const ceil = SP.floor[i] * FH + 3.5;
+      if (y < ceil) y = Math.min(ceil, y + 0.7 * dt);
+      const dx = SP.tx[i] - x, dz = SP.tz[i] - z, d = Math.hypot(dx, dz) || 1;
+      x += (dx / d * SP.spd[i] + SP.vel[i * 3] * 0.4) * dt; z += (dz / d * SP.spd[i] + wob * 0.3) * dt;
+      if (d < 0.6) { SP.tx[i] = rand(-18, 18); SP.tz[i] = rand(-9, 9); }
+      if (Math.abs(x) > 16.3 && Math.abs(z) < 1.9) { SP.mode[i] = 1; SP.stair[i] = x < 0 ? 0 : 1; }
+      SMOKE.grid[SP.floor[i]][cellOf(x, z)]++;
+    } else if (SP.mode[i] === 1) {
+      const cx = SP.stair[i] ? 18 : -18, ang = Math.atan2(z, x - cx) + dt * 0.9, rr = Math.hypot(x - cx, z) * 0.97 + 0.03 * 1.0;
+      x = cx + Math.cos(ang) * rr; z = Math.sin(ang) * rr; y += 0.85 * dt;
+      if (y > top) { y = top; SP.mode[i] = 2; }
+      if (SP.stair[i]) sc1++; else sc0++;
+      SMOKE.stairBand[SP.stair[i]][clamp(Math.floor(y / FH), 0, FLOORS - 1)]++;
+    } else {
+      x += SP.vel[i * 3] * dt; z += SP.vel[i * 3 + 2] * dt;
+    }
+    SP.pos[i * 3] = clamp(x, -19.6, 19.6); SP.pos[i * 3 + 1] = y; SP.pos[i * 3 + 2] = clamp(z, -9.6, 9.6);
+    const g = grey + (i % 7) * 0.012; SP.col[i * 3] = g; SP.col[i * 3 + 1] = g; SP.col[i * 3 + 2] = g * 1.04;
+    SP.size[i] = 1.4 + 2.4 * t;
+    SP.alpha[i] = baseA * Math.min(1, SP.life[i] / 1.2) * Math.min(1, (SP.max[i] - SP.life[i]) / 3);
+  }
+  SMOKE.stairCount = [sc0, sc1]; SMOKE.alive = alive;
+  // stairwell smoke level 0..1, smoothed; manual hazard pins stairwell A at 1
+  SMOKE.level[0] += ((SMOKE.manualA ? 1 : Math.min(1, sc0 / 110)) - SMOKE.level[0]) * Math.min(1, dt * 2);
+  SMOKE.level[1] += (Math.min(1, sc1 / 110) - SMOKE.level[1]) * Math.min(1, dt * 2);
+  for (const k of ['position', 'aColor', 'aSize', 'aAlpha']) SP.geo.attributes[k].needsUpdate = true;
+}
+
+// ============================================================================
+//  SENSORS: heat detectors (fire within reach) + smoke detectors (particle
+//  density in their cell, or smoke in the stair shaft at their level)
+// ============================================================================
+const SENSORS = [];
+{
+  for (let f = 0; f < FLOORS; f++) {
+    for (const x of [-12, -4, 4, 12]) SENSORS.push({ type: 'smoke', f, x, z: 0 });
+    for (const [x, z] of [[-14, 6], [-6, -6], [6, 6], [14, -6]]) SENSORS.push({ type: 'smoke', f, x, z });
+    for (const [x, z] of [[-10, 6], [-2, -6], [2, 6], [10, -6], [14, 6]]) SENSORS.push({ type: 'heat', f, x, z });
+    SENSORS.push({ type: 'smoke', f, x: -18.8, z: 1.4, stair: 0 }, { type: 'smoke', f, x: 18.8, z: 1.4, stair: 1 });
+  }
+}
+const SENS_MESH = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.17, 0.17, 0.07, 14), new THREE.MeshBasicMaterial(), SENSORS.length);
+const SENS_RING = new THREE.InstancedMesh(new THREE.RingGeometry(0.75, 1, 28).rotateX(Math.PI / 2),
+  new THREE.MeshBasicMaterial({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), SENSORS.length);
+{
+  const m = new THREE.Matrix4();
+  SENSORS.forEach((s, i) => { s.pos = V3(s.x, s.f * FH + 3.72, s.z); m.makeTranslation(s.pos.x, s.pos.y, s.pos.z); SENS_MESH.setMatrixAt(i, m); SENS_RING.setMatrixAt(i, m); SENS_RING.setColorAt(i, new THREE.Color(0)); SENS_MESH.setColorAt(i, new THREE.Color(0)); });
+  SENS_MESH.frustumCulled = SENS_RING.frustumCulled = false;
+  G.sensors.add(SENS_MESH, SENS_RING);
+}
+function updateSensors() {
+  const r = fireRadius();
+  SENSORS.forEach(s => {
+    if (s.on) return;
+    let hit = false;
+    if (s.type === 'heat') hit = fireIntensity(s.pos, s.f) > 0 || FIRE.layers.some(L => L.active && L.floor === s.f && (() => { for (let i = L.lo; i <= L.hi; i += 3) if (Math.hypot(FIRE.samples[i].x - s.x, FIRE.samples[i].z - s.z) < r + 2.5) return true; return false; })());
+    else if (s.stair !== undefined) hit = SMOKE.stairBand[s.stair][s.f] >= 5 || (s.stair === 0 && SMOKE.manualA);
+    else hit = SMOKE.grid[s.f][cellOf(s.x, s.z)] >= 5;
+    if (hit) { s.on = true; s.at = SIM.t; }
+  });
+}
+
+// ============================================================================
+//  ROUTE COSTING + DIJKSTRA
+// ============================================================================
+function segBlocked(a, b, f, skip) {
+  const len = Math.hypot(b.x - a.x, b.z - a.z), n = Math.max(1, Math.ceil(len / 0.7)), p = V3();
+  for (let i = 0; i <= n; i++) {
+    if (i * len / n < (skip || 0)) continue;
+    p.copy(a).lerp(b, i / n);
+    if (fireIntensity(p, f) > 0.35) return true;
+  }
+  return false;
+}
+function updateEdgeCosts() {
+  for (const e of EDGES) {
+    let c = e.base, blocked = false;
+    if (e.samples) {
+      for (const p of e.samples) {
+        const I = fireIntensity(p, e.f);
+        if (I > 0.35) { blocked = true; break; }
+        c += I * 6 + smokeAt(p, e.f) * 3;
+      }
+    }
+    if (e.kind === 'stair') c += SMOKE.level[e.stair] * 45 + (SMOKE.manualA && e.stair === 0 ? 400 : 0);
+    if (e.exit !== undefined) {
+      if (EXITS[e.exit].blocked) blocked = true;
+      // queueing at a busy door: each committed evacuee adds ~0.35 s, so the crowd spreads over exits
+      if (NODES[e.b].exit !== undefined) c += EXITS[e.exit].uses * 0.35;
+    }
+    e.cost = blocked ? Infinity : c;
+  }
+}
+function dijkstra() {
+  const N = NODES.length; D.fill(Infinity); NEXT.fill(-1);
+  const done = new Uint8Array(N); D[ASM] = 0;
+  for (;;) {
+    let u = -1, best = Infinity;
+    for (let i = 0; i < N; i++) if (!done[i] && D[i] < best) { best = D[i]; u = i; }
+    if (u < 0) break;
+    done[u] = 1;
+    for (const e of INC[u]) { const nd = D[u] + e.cost; if (nd < D[e.a]) { D[e.a] = nd; NEXT[e.a] = u; } }
+  }
+}
+
+// ============================================================================
+//  PATH COMPILATION
+//  A node sequence becomes a list of legs, each a THREE.Curve:
+//   - walk legs:   CatmullRomCurve3 (centripetal) through corridor waypoints
+//   - stair legs:  HelixCurve spiralling down the stairwell
+//   - escape legs: CatmullRomCurve3 through the exterior switchbacks
+//  `marks` record the path distance at which each graph node is reached, so a
+//  moving avatar always knows which edges are still ahead of it.
+// ============================================================================
+function lengthAtT(curve, t) {
+  const L = curve.getLengths(), n = L.length - 1, x = t * n, i = Math.floor(x);
+  return i >= n ? L[n] : L[i] + (L[i + 1] - L[i]) * (x - i);
+}
+const edgeKind = (a, b) => { const e = EDGE.get(a + '>' + b); return e ? e.kind : 'walk'; };
+function compilePath(prefix, seq, endPos) {
+  const legs = [], marks = []; let total = 0;
+  let poly = prefix.map(p => ({ p: p.clone(), node: -1 }));
+  const flush = () => {
+    const pts = [];
+    for (const it of poly) { const last = pts[pts.length - 1]; if (last && last.p.distanceToSquared(it.p) < 0.0025) { if (it.node >= 0) last.node = it.node; } else pts.push({ p: it.p, node: it.node }); }
+    poly = [];
+    if (!pts.length) return;
+    if (pts.length === 1) { if (pts[0].node >= 0) marks.push({ node: pts[0].node, d: total }); return; }
+    const curve = new THREE.CatmullRomCurve3(pts.map(o => o.p), false, 'centripetal');
+    const len = curve.getLength();
+    pts.forEach((o, k) => { if (o.node >= 0) marks.push({ node: o.node, d: total + lengthAtT(curve, k / (pts.length - 1)) }); });
+    legs.push({ curve, len, type: 'walk', start: total }); total += len;
+  };
+  for (let i = 0; i < seq.length; i++) {
+    const n = NODES[seq[i]], nk = i + 1 < seq.length ? edgeKind(seq[i], seq[i + 1]) : 'walk';
+    if (nk === 'stair') {
+      let j = i; while (j + 1 < seq.length && edgeKind(seq[j], seq[j + 1]) === 'stair') j++;
+      const st = STAIRS[n.stair], floors = n.f - NODES[seq[j]].f;
+      poly.push({ p: n.pos, node: n.i }, { p: st.entry(n.f), node: -1 }); flush();
+      const curve = new HelixCurve(st, n.pos.y, floors), len = curve.getLength();
+      for (let k = i + 1; k <= j; k++) marks.push({ node: seq[k], d: total + (n.f - NODES[seq[k]].f) / floors * len });
+      legs.push({ curve, len, type: 'stair', start: total, stair: n.stair }); total += len;
+      poly = [{ p: curve.getPoint(1), node: -1 }];
+      i = j; continue;
+    }
+    if (nk === 'fe') {
+      let j = i; while (j + 1 < seq.length && edgeKind(seq[j], seq[j + 1]) === 'fe') j++;
+      poly.push({ p: n.pos, node: n.i }); flush();
+      const pts = [n.pos.clone()];
+      for (let k = i; k < j; k++) pts.push(...feFlightPts(NODES[seq[k]].pos.y / FH | 0));
+      const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal'), len = curve.getLength();
+      for (let k = i + 1; k <= j; k++) marks.push({ node: seq[k], d: total + lengthAtT(curve, (k - i) * 6 / (pts.length - 1)) });
+      legs.push({ curve, len, type: 'escape', start: total }); total += len;
+      poly = [{ p: NODES[seq[j]].pos.clone(), node: -1 }];
+      i = j; continue;
+    }
+    poly.push({ p: n.pos, node: n.i });
+  }
+  poly.push({ p: endPos, node: -1 }); flush();
+  return { legs, marks, total, seq };
+}
+function routeLabel(seq) {
+  const parts = [];
+  if (seq.some((n, k) => k + 1 < seq.length && edgeKind(n, seq[k + 1]) === 'stair' && NODES[n].stair === 0)) parts.push('Stair A');
+  if (seq.some((n, k) => k + 1 < seq.length && edgeKind(n, seq[k + 1]) === 'stair' && NODES[n].stair === 1)) parts.push('Stair B');
+  if (seq.some(n => NODES[n].kind === 'fedoor')) parts.push('Fire escape');
+  const ex = seq.map(n => NODES[n].exit).find(x => x !== undefined);
+  if (ex !== undefined && !(ex === 3)) parts.push(EXITS[ex].name);
+  return ['Corridor'].concat(parts, ['Assembly']).join(' → ');
+}
+function pathPoint(legs, d, out) {
+  let k = 0; while (k < legs.length - 1 && d > legs[k].start + legs[k].len) k++;
+  const L = legs[k]; return L.curve.getPointAt(clamp((d - L.start) / L.len, 0, 1), out);
+}
+
+// From anywhere on a floor, the waypoints needed to reach the corridor
+// (through the room's door when the bay is an enclosed office/meeting room).
+function bayAt(f, x, z) {
+  if (Math.abs(z) <= CORR + 0.05) return null;
+  const s = z > 0 ? 1 : -1;
+  for (const b of BAYS[f]) if (b.s === s && x >= b.x0 && x < b.x1) return b;
+  return null;
+}
+function exitPrefix(p, f) {
+  const y = f * FH, b = bayAt(f, p.x, p.z);
+  if (!b || b.type === 'lobby') return [p.clone()];
+  if (b.enclosed) return [p.clone(), V3(b.doorX, y, b.s * 2.3), V3(b.doorX, y, b.s * 0.7)];
+  return [p.clone(), V3(clamp(p.x, -15.5, 15.5), y, b.s * 0.7)];
+}
+const ASM_POS = i => V3(((i % 16) - 7.5) * 0.85, 0, -27 - Math.floor(i / 16) % 14 * 0.85);
+const insideBuilding = p => Math.abs(p.x) <= HX + 0.05 && Math.abs(p.z) <= HZ + 0.05;
+
+// ============================================================================
+//  OCCUPANTS
+// ============================================================================
+let avatars = [];
+const SIM = { t: 0, alarm: false, hazardAcc: 0, done: false, doneT: 0, paused: false, speed: 1, asmNext: 0, routeAcc: 0 };
+const SHIRTS = [0x6b84a8, 0x8a7fa8, 0x5f9a92, 0xa8836b, 0x7d8ea0, 0x9aa3b8, 0x6f7f9a, 0x8b6f7d].map(h => new THREE.Color(h));
+const SKINS = [0xf1c7a5, 0xd9a47e, 0xb07a52, 0x8a5a3a, 0x5e3b26, 0xe8b893].map(h => new THREE.Color(h));
+let nextId = 1;
+
+function makeAvatar(slot) {
+  const av = {
+    id: nextId++, slot, home: slot.pos.clone(), pos: slot.pos.clone(), yaw: slot.yaw, state: ST.WORKING,
+    sit: slot.sit, idle: slot.sit ? (Math.random() < 0.72 ? 'type' : 'stand') : 'stand', idleCurve: null, idleT: 0, idleDir: 1,
+    phase: Math.random() * 6.28, walkPhase: Math.random() * 6.28, speed: WALK_SPEED * rand(0.86, 1.14), lane: rand(-0.36, 0.36),
+    legs: null, legIdx: 0, dist: 0, total: 0, marks: null, markIdx: 0, seq: null, route: '', exit: -1,
+    reactAt: 0, fireExp: 0, smokeExp: 0, asm: -1, crowd: 1, smokeSlow: 1, vNow: 0, look: 0, pending: false,
+    shirt: pick(SHIRTS), skin: pick(SKINS), evacAt: 0, prev: V3(),
+  };
+  slot.occ = av.id;
+  // ~18% of desk workers are walking to/from a meeting room (or the café on L1)
+  if (slot.kind === 'desk' && Math.random() < 0.18) {
+    const targets = SLOTS.filter(s => s.f === slot.f && (s.kind === 'meeting' || s.kind === 'cafe'));
+    if (targets.length) {
+      const T = pick(targets), a = exitPrefix(slot.pos, slot.f), b = exitPrefix(T.pos, T.f).reverse();
+      const pts = [];
+      a.concat(b).forEach(p => { if (!pts.length || pts[pts.length - 1].distanceTo(p) > 0.2) pts.push(p); });
+      if (pts.length >= 2) {
+        av.idleCurve = new THREE.CatmullRomCurve3(pts, false, 'centripetal'); av.idleLen = av.idleCurve.getLength();
+        av.idle = 'walk'; av.sit = false; av.idleT = Math.random(); av.idleDir = Math.random() < .5 ? 1 : -1;
+        av.idleCurve.getPointAt(av.idleT, av.pos);
+      }
+    }
+  }
+  if (av.idle === 'stand') av.sit = false;
+  av.prev.copy(av.pos);
+  return av;
+}
+function freeSlot(f) {
+  const free = SLOTS.filter(s => s.occ < 0 && (f === undefined || s.f === f));
+  const desks = free.filter(s => s.kind === 'desk');
+  return free.length ? (desks.length && Math.random() < 0.72 ? pick(desks) : pick(free)) : null;
+}
+function spawnAvatar() {
+  const counts = new Array(FLOORS).fill(0); avatars.forEach(a => counts[a.slot.f]++);
+  const f = counts.indexOf(Math.min(...counts));
+  const slot = freeSlot(f) || freeSlot(); if (!slot) return null;
+  const av = makeAvatar(slot);
+  if (SIM.alarm) { av.state = ST.ALERTED; av.sit = false; av.reactAt = Math.max(SIM.t, MOVE_T) + rand(0.2, 1.4); }
+  avatars.push(av); return av;
+}
+function removeAvatar() {
+  const av = avatars.pop(); if (!av) return;
+  av.slot.occ = -1;
+  if (SEL.av === av) select(null);
+  if (CAM.followAv === av) CAM.followAv = null;
+}
+function setOccupants(n) {
+  while (avatars.length < n && spawnAvatar());
+  while (avatars.length > n) removeAvatar();
+  syncMeshCounts();
+}
+
+// ---------- avatar meshes: capsule body + sphere head + two capsule arms ----------
+function capsule(r, half, seg) {
+  const pts = [];
+  for (let i = 0; i <= seg; i++) { const a = -Math.PI / 2 + i / seg * Math.PI / 2; pts.push(new THREE.Vector2(Math.max(1e-4, r * Math.cos(a)), -half + r * Math.sin(a))); }
+  for (let i = 0; i <= seg; i++) { const a = i / seg * Math.PI / 2; pts.push(new THREE.Vector2(Math.max(1e-4, r * Math.cos(a)), half + r * Math.sin(a))); }
+  return new THREE.LatheGeometry(pts, 12);
+}
+const bodyMat = new THREE.MeshStandardMaterial({ roughness: .55, metalness: .05 });
+const BODY = new THREE.InstancedMesh(capsule(0.2, 0.49, 5), bodyMat, MAX_AV);
+const HEAD = new THREE.InstancedMesh(new THREE.SphereGeometry(0.135, 14, 10), new THREE.MeshStandardMaterial({ roughness: .6 }), MAX_AV);
+const armGeo = capsule(0.058, 0.22, 3); armGeo.translate(0, -0.28, 0);   // pivot at the shoulder
+const ARM_L = new THREE.InstancedMesh(armGeo, bodyMat, MAX_AV);
+const ARM_R = new THREE.InstancedMesh(armGeo, bodyMat, MAX_AV);
+[BODY, HEAD, ARM_L, ARM_R].forEach(m => { m.frustumCulled = false; for (let i = 0; i < MAX_AV; i++) m.setColorAt(i, ST_COL[0]); G.people.add(m); });
+BODY.castShadow = HEAD.castShadow = true;
+function syncMeshCounts() { [BODY, HEAD, ARM_L, ARM_R].forEach(m => m.count = avatars.length); }
+
+// selection marker
+const SEL = { av: null };
+const selRing = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.045, 8, 40).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xfff27a }));
+const selBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 3, 6), new THREE.MeshBasicMaterial({ color: 0xfff27a, transparent: true, opacity: .55 }));
+selRing.visible = selBeam.visible = false; G.people.add(selRing, selBeam);
+const selLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xfff6a0 }));
+selLine.frustumCulled = false; selLine.renderOrder = 8; G.people.add(selLine);
+
+// ============================================================================
+//  EVACUATION PLANNING
+// ============================================================================
+function planEvac(av) {
+  const f = clamp(Math.round(av.pos.y / FH), 0, FLOORS - 1);
+  const prefix = exitPrefix(av.pos, f), q = prefix[prefix.length - 1];
+  let plen = 0;
+  for (let i = 0; i + 1 < prefix.length; i++) {
+    if (segBlocked(prefix[i], prefix[i + 1], f, i === 0 ? 1.0 : 0)) return false;   // skip the first metre: they are fleeing from there
+    plen += prefix[i].distanceTo(prefix[i + 1]);
+  }
+  let best = -1, bestCost = Infinity;
+  for (const n of PLAN_NODES[f]) {
+    const d = Math.hypot(n.pos.x - q.x, n.pos.z - q.z);
+    if (d > 6.5 || D[n.i] === Infinity) continue;
+    const c = plen + d + D[n.i];
+    if (c >= bestCost) continue;
+    if (segBlocked(q, n.pos, f, prefix.length === 1 ? 1.0 : 0)) continue;
+    best = n.i; bestCost = c;
+  }
+  if (best < 0) return false;
+  const seq = [best]; let guard = 0;
+  while (seq[seq.length - 1] !== ASM && guard++ < 200) { const nx = NEXT[seq[seq.length - 1]]; if (nx < 0) return false; seq.push(nx); }
+  if (av.asm < 0) av.asm = SIM.asmNext++;
+  const P = compilePath(prefix, seq, ASM_POS(av.asm));
+  Object.assign(av, { legs: P.legs, marks: P.marks, total: P.total, seq, legIdx: 0, markIdx: 0, dist: 0, route: routeLabel(seq), pending: false });
+  av.exit = seq.map(n => NODES[n].exit).find(x => x !== undefined);
+  return true;
+}
+function startEvac(av) {
+  av.sit = false;
+  if (planEvac(av)) av.state = ST.MOVING_TO_EXIT;
+  else { av.state = ST.TRAPPED; av.legs = null; }
+}
+// Called at every hazard update for moving avatars: if anything ahead became
+// impassable (fire, blocked exit) or a much cheaper route opened (e.g. smoke
+// filled the stairwell they were heading to), replan from where they stand.
+function validateRoute(av) {
+  if (!av.legs) return;
+  const leg = av.legs[av.legIdx], inside = insideBuilding(av.pos);
+  const mk = av.marks; let blocked = false, rem = 0;
+  for (let m = av.markIdx; m < mk.length - 1; m++) {
+    const e = EDGE.get(mk[m].node + '>' + mk[m + 1].node); if (!e) continue;
+    if (e.cost === Infinity) { blocked = true; break; } rem += e.cost;
+  }
+  const f = Math.round(av.pos.y / FH);
+  if (!blocked && leg.type === 'walk' && inside && av.markIdx < mk.length) {
+    const nn = NODES[mk[av.markIdx].node];
+    if (nn.f === f && segBlocked(av.pos, nn.pos, f, 1.0)) blocked = true;
+  }
+  if (leg.type !== 'walk' || !inside) { if (blocked) av.pending = true; return; }
+  if (blocked || av.pending) { replan(av); return; }
+  if (av.markIdx < mk.length && rem > D[mk[av.markIdx].node] + 20) replan(av);
+}
+function replan(av) {
+  if (!planEvac(av)) { av.state = ST.TRAPPED; av.legs = null; }
+  else av.state = ST.MOVING_TO_EXIT;
+}
+
+function countExitUses() {
+  EXITS.forEach(e => e.uses = 0);
+  avatars.forEach(a => { if (a.exit !== undefined && a.exit >= 0 && (a.state === ST.MOVING_TO_EXIT || a.state === ST.IN_STAIRWELL)) EXITS[a.exit].uses++; });
+}
+function hazardUpdate() {
+  countExitUses();
+  updateEdgeCosts();
+  dijkstra();
+  updateSensors();
+  for (const av of avatars) {
+    if (av.state === ST.MOVING_TO_EXIT || av.state === ST.IN_STAIRWELL) validateRoute(av);
+    else if (av.state === ST.TRAPPED && SIM.t > MOVE_T) { if (planEvac(av)) av.state = ST.MOVING_TO_EXIT; }
+  }
+  countExitUses();
+  colorNetwork(); rebuildBestRoutes(); renderExitChips();
+}
+
+function triggerAlarm() {
+  SIM.alarm = true;
+  for (const av of avatars) {
+    if (av.state !== ST.WORKING) continue;
+    av.state = ST.ALERTED; av.sit = false;
+    const near = Math.round(av.pos.y / FH) === FIRE.layers[0].floor && av.pos.distanceTo(FIRE.origin) < 6;
+    av.reactAt = near ? ALARM_T + rand(0.1, 0.6) : MOVE_T + rand(0, 1.6);   // occupants next to the fire react at once
+  }
+  ELEV.forEach(e => e.locked = true);
+  let best = null, bd = 1e9;   // the detector closest to the origin is the one that raised the alarm
+  SENSORS.forEach(s => { if (s.f !== FIRE.layers[0].floor || s.type !== 'heat') return; const d = s.pos.distanceTo(FIRE.origin); if (d < bd) { bd = d; best = s; } });
+  if (best) { best.on = true; best.at = SIM.t; }
+  hazardUpdate();
+}
+
+// ============================================================================
+//  CROWD LOGIC: spatial hash + simple queueing
+//  Each mover looks at neighbours in its 3x3 hash cells. If a neighbour is in
+//  front (within the forward half-plane) and within QUEUE_SOFT, it slows; if
+//  within QUEUE_HARD (0.3 units) it almost stops, forming a queue. Only other
+//  movers count, so a stationary trapped person does not freeze the line.
+// ============================================================================
+const HASH = new Map(), CELL = 0.75;
+const hkey = (x, y, z) => (Math.floor(x / CELL) + 500) + 1000 * ((Math.floor(z / CELL) + 500) + 1000 * Math.floor(y + 2));
+function computeCrowd() {
+  HASH.clear();
+  for (const av of avatars) {
+    if (av.state !== ST.MOVING_TO_EXIT && av.state !== ST.IN_STAIRWELL) continue;
+    const k = hkey(av.pos.x, av.pos.y, av.pos.z); let b = HASH.get(k); if (!b) HASH.set(k, b = []); b.push(av);
+  }
+  for (const av of avatars) {
+    av.crowd = 1;
+    if (av.state !== ST.MOVING_TO_EXIT && av.state !== ST.IN_STAIRWELL) continue;
+    const hx = Math.sin(av.yaw), hz = Math.cos(av.yaw);
+    const cx = Math.floor(av.pos.x / CELL), cz = Math.floor(av.pos.z / CELL), cy = Math.floor(av.pos.y + 2);
+    for (let dy = -1; dy <= 1; dy++) for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+      const b = HASH.get((cx + i + 500) + 1000 * ((cz + j + 500) + 1000 * (cy + dy))); if (!b) continue;
+      for (const o of b) {
+        if (o === av) continue;
+        const dx = o.pos.x - av.pos.x, dz = o.pos.z - av.pos.z;
+        if (Math.abs(o.pos.y - av.pos.y) > 0.8) continue;
+        const d = Math.hypot(dx, dz);
+        if (d > QUEUE_SOFT || d < 1e-4) continue;
+        if (dx * hx + dz * hz < 0.15 * d) continue;          // the other one is behind or beside us: we are not the rear avatar
+        const f = d < QUEUE_HARD ? 0.12 : 0.35 + 0.65 * (d - QUEUE_HARD) / (QUEUE_SOFT - QUEUE_HARD);
+        if (f < av.crowd) av.crowd = f;
+      }
+    }
+  }
+}
+
+// ============================================================================
+//  PER-AVATAR STATE MACHINE (one sim substep)
+// ============================================================================
+const _p = V3(), _t = V3();
+function updateAvatar(av, h) {
+  const t = SIM.t;
+  switch (av.state) {
+    case ST.WORKING:
+      if (av.idle === 'walk') {                  // ping-pong walk along the meeting-room path
+        av.idleT += av.idleDir * 1.0 * h / av.idleLen;
+        if (av.idleT > 1 || av.idleT < 0) { av.idleDir *= -1; av.idleT = clamp(av.idleT, 0, 1); }
+        av.idleCurve.getPointAt(av.idleT, av.pos);
+        av.idleCurve.getTangentAt(av.idleT, _t);
+        av.yaw = angLerp(av.yaw, Math.atan2(_t.x * av.idleDir, _t.z * av.idleDir), Math.min(1, h * 8));
+        av.walkPhase += 1.0 * h * 5.2; av.vNow = 1.0;
+      } else av.vNow = 0;
+      break;
+    case ST.ALERTED:
+      av.vNow = 0;
+      if (t >= av.reactAt) startEvac(av);
+      break;
+    case ST.MOVING_TO_EXIT: case ST.IN_STAIRWELL: {
+      let leg = av.legs[av.legIdx];
+      const factor = leg.type === 'stair' ? STAIR_FACTOR : leg.type === 'escape' ? ESCAPE_FACTOR : 1;
+      const v = av.speed * factor * av.crowd * av.smokeSlow;
+      av.vNow = v; av.dist += v * h; av.walkPhase += v * h * 5.2;
+      while (av.legIdx < av.legs.length - 1 && av.dist > leg.start + leg.len) { av.legIdx++; leg = av.legs[av.legIdx]; }
+      while (av.markIdx < av.marks.length && av.marks[av.markIdx].d <= av.dist) av.markIdx++;
+      if (av.dist >= av.total) {
+        av.state = ST.EVACUATED; av.evacAt = t; av.legs = null; av.pos.copy(ASM_POS(av.asm)); av.yaw = 0; av.vNow = 0; break;
+      }
+      av.state = leg.type === 'walk' ? ST.MOVING_TO_EXIT : ST.IN_STAIRWELL;
+      const u = clamp((av.dist - leg.start) / leg.len, 0, 1);
+      leg.curve.getPointAt(u, _p); leg.curve.getTangentAt(u, _t);
+      // lateral lane offset so a crowd spreads across the corridor instead of walking in single file
+      const fade = Math.min(1, av.dist / 1.5, (av.total - av.dist) / 1.5), tl = Math.hypot(_t.x, _t.z) || 1;
+      const lane = av.lane * fade * (leg.type === 'walk' ? 1 : 0.3);
+      av.pos.set(_p.x + _t.z / tl * lane, _p.y, _p.z - _t.x / tl * lane);
+      if (tl > 0.2) av.yaw = angLerp(av.yaw, Math.atan2(_t.x, _t.z), Math.min(1, h * 10));
+      // doors spring open for the first arrival
+      if (av.pos.y < 0.5) for (const ex of EXITS) if (!ex.open && !ex.blocked && Math.hypot(av.pos.x - ex.pos.x, av.pos.z - ex.pos.z) < 1.7) ex.open = true;
+      // smoke: slows people down and accumulates exposure (heavy stairwell smoke can injure)
+      if (leg.type === 'stair') {
+        const s = SMOKE.level[leg.stair];
+        av.smokeSlow = 1 - 0.35 * s; av.smokeExp += h * s * (0.25 + 0.05 * SEV());
+      } else {
+        const s = insideBuilding(av.pos) ? smokeAt(av.pos, Math.round(av.pos.y / FH)) : 0;
+        av.smokeSlow = 1 - 0.25 * s; av.smokeExp += h * s * 0.15;
+      }
+      if (av.smokeExp > 12) { av.state = ST.INJURED; av.legs = null; av.injAt = SIM.t; }
+      break;
+    }
+    default: av.vNow = 0;
+  }
+  // fire exposure: anyone standing inside the flame radius after the alarm accumulates burns
+  if (SIM.alarm && av.state !== ST.EVACUATED && av.state !== ST.INJURED && av.state !== ST.IN_STAIRWELL && insideBuilding(av.pos)) {
+    const f = Math.round(av.pos.y / FH);
+    if (Math.abs(av.pos.y - f * FH) < 0.3 && FIRE.layers.some(L => L.active && L.floor === f)) {
+      const I = fireIntensity(av.pos, f);
+      if (I > 0.05) av.fireExp += h * I * 1.6; else av.fireExp = Math.max(0, av.fireExp - h * 0.3);
+      if (av.fireExp > 1.2) { av.state = ST.INJURED; av.legs = null; av.injAt = SIM.t; }
+    }
+  }
+}
+
+function updateDoors(h) {
+  for (const ex of EXITS) for (const L of ex.leaves) {
+    // damped spring (k=38, c=4.2 → under-damped, so the door overshoots and settles)
+    const target = ex.open && !ex.blocked ? L.sign * 1.5 : 0;
+    L.vel += (38 * (target - L.ang) - 4.2 * L.vel) * h; L.ang += L.vel * h;
+    L.pivot.rotation.y = L.ang;
+  }
+}
+
+function step(h) {
+  SIM.t += h;
+  if (!SIM.alarm && SIM.t >= ALARM_T) triggerAlarm();
+  updateFire(h);
+  SIM.hazardAcc += h;
+  if (SIM.hazardAcc >= HAZARD_DT) { SIM.hazardAcc = 0; hazardUpdate(); }
+  computeCrowd();
+  for (const av of avatars) updateAvatar(av, h);
+  updateDoors(h);
+  ELEV.forEach(e => { if (!e.locked) e.y = (0.5 + 0.5 * Math.sin(SIM.t * 0.3 + e.phase)) * 16; });
+  if (SIM.alarm && !SIM.done && SIM.t > MOVE_T + 2 && avatars.every(a => a.state >= ST.EVACUATED)) { SIM.done = true; SIM.doneT = SIM.t; }
+}
+
+// ============================================================================
+//  ROUTE LAYER: network (green / amber / red), animated best route per floor,
+//  and per-avatar remaining paths that fade out as they near the end.
+// ============================================================================
+const NET = (() => {
+  const P = [];
+  for (const e of EDGES) {
+    e.v0 = P.length / 3;
+    const A = NODES[e.a].pos, B = NODES[e.b].pos;
+    let pts;
+    if (e.kind === 'stair') { const c = new HelixCurve(STAIRS[e.stair], A.y, 1); pts = c.getPoints(24); }
+    else if (e.kind === 'fe') pts = new THREE.CatmullRomCurve3([A.clone()].concat(feFlightPts(A.y / FH | 0)), false, 'centripetal').getPoints(24);
+    else pts = [A, B];
+    for (let i = 0; i + 1 < pts.length; i++) P.push(pts[i].x, pts[i].y + 0.08, pts[i].z, pts[i + 1].x, pts[i + 1].y + 0.08, pts[i + 1].z);
+    e.vn = P.length / 3 - e.v0;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(P.length), 3));
+  const l = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: .75 }));
+  G.routes.add(l); return g;
+})();
+function colorNetwork() {
+  const c = NET.attributes.color;
+  for (const e of EDGES) {
+    let r = .12, g = .62, b = .32;
+    if (e.cost === Infinity) { r = 1; g = .16; b = .16; } else if (e.cost - e.base > 15) { r = 1; g = .66; b = .1; }
+    for (let i = 0; i < e.vn; i++) c.setXYZ(e.v0 + i, r, g, b);
+  }
+  c.needsUpdate = true;
+}
+const BEST = [];   // per floor: {sig, mesh, pts}
+function rebuildBestRoutes() {
+  for (let f = 0; f < FLOORS; f++) {
+    const start = C[f][6]; let sig = 'none', seq = null;
+    if (D[start] < Infinity) { seq = [start]; while (seq[seq.length - 1] !== ASM && seq.length < 200) seq.push(NEXT[seq[seq.length - 1]]); sig = seq.join(','); }
+    const B = BEST[f] || (BEST[f] = { sig: '', mesh: null, pts: [] });
+    if (B.sig === sig) continue;
+    B.sig = sig;
+    if (B.mesh) { G.routes.remove(B.mesh); B.mesh.geometry.dispose(); B.mesh.material.map.dispose(); B.mesh.material.dispose(); B.mesh = null; }
+    B.pts = [];
+    if (!seq) continue;
+    const P = compilePath([NODES[start].pos], seq, NODES[ASM].pos), pts = [];
+    for (let d = 0; d <= P.total; d += 0.5) pts.push(pathPoint(P.legs, d, V3()).add(V3(0, 0.12, 0)));
+    B.pts = pts;
+    const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+    const tex = chevronTex.clone(); tex.needsUpdate = true; tex.repeat.set(P.total / 1.6, 1);
+    B.mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, Math.min(900, pts.length * 2), 0.075, 6, false),
+      new THREE.MeshBasicMaterial({ map: tex, color: 0x8cffb4, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+    B.mesh.renderOrder = 7; G.routes.add(B.mesh);
+  }
+}
+const SEGS = 14;
+const TRAILS = (() => {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MAX_AV * SEGS * 6), 3).setUsage(THREE.DynamicDrawUsage));
+  g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(MAX_AV * SEGS * 6), 3).setUsage(THREE.DynamicDrawUsage));
+  const l = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  l.frustumCulled = false; G.routes.add(l); return g;
+})();
+function updateTrails() {
+  const P = TRAILS.attributes.position.array, Cc = TRAILS.attributes.color.array; let v = 0;
+  const a = V3(), b = V3();
+  for (const av of avatars) {
+    if (!av.legs || (av.state !== ST.MOVING_TO_EXIT && av.state !== ST.IN_STAIRWELL)) continue;
+    const k = (1 - av.dist / av.total) * 0.5;            // brightness fades to zero as the path completes
+    pathPoint(av.legs, av.dist, a);
+    for (let i = 1; i <= SEGS; i++) {
+      pathPoint(av.legs, av.dist + (av.total - av.dist) * i / SEGS, b);
+      P.set([a.x, a.y + 0.1, a.z, b.x, b.y + 0.1, b.z], v * 3);
+      Cc.set([0.25 * k, k, 0.55 * k, 0.25 * k, k, 0.55 * k], v * 3);
+      v += 2; a.copy(b);
+    }
+  }
+  TRAILS.setDrawRange(0, v);
+  TRAILS.attributes.position.needsUpdate = TRAILS.attributes.color.needsUpdate = true;
+  if (SEL.av && SEL.av.legs) {
+    const pts = [];
+    for (let i = 0; i <= 60; i++) pts.push(pathPoint(SEL.av.legs, SEL.av.dist + (SEL.av.total - SEL.av.dist) * i / 60, V3()).add(V3(0, 0.14, 0)));
+    selLine.geometry.setFromPoints(pts); selLine.visible = true;
+  } else selLine.visible = false;
+}
+
+// ============================================================================
+//  VISUAL UPDATE (every frame): avatar matrices, procedural walk, colours
+// ============================================================================
+const mBase = new THREE.Matrix4(), mLoc = new THREE.Matrix4(), mOut = new THREE.Matrix4();
+const qq = new THREE.Quaternion(), ee = new THREE.Euler(0, 0, 0, 'YXZ'), ONE = V3(1, 1, 1), _bp = V3(), _col = new THREE.Color();
+function updateAvatarVisuals() {
+  const t = SIM.t;
+  for (let i = 0; i < avatars.length; i++) {
+    const av = avatars[i];
+    let pitch = 0, bob = 0, sy = 1, aL = 0.05, aR = -0.05, look = 0, yOff = 0;
+    const walking = av.vNow > 0.05;
+    switch (av.state) {
+      case ST.WORKING:
+        if (walking) { const s = Math.sin(av.walkPhase); bob = Math.abs(s) * 0.045; aL = s * 0.45; aR = -aL; }
+        else if (av.sit) { sy = 0.78; aL = -1.15 + Math.sin(t * 15 + av.phase) * 0.08; aR = -1.15 + Math.sin(t * 15 + av.phase + 2) * 0.08; look = Math.sin(t * 0.6 + av.phase) * 0.18; }
+        else { look = Math.sin(t * 0.5 + av.phase) * 0.5; bob = Math.sin(t * 1.2 + av.phase) * 0.01; }
+        break;
+      case ST.ALERTED: look = Math.sin(t * 2.6 + av.phase) * 1.0; aL = aR = -0.35; break;     // brief pause, looking around
+      case ST.MOVING_TO_EXIT: case ST.IN_STAIRWELL: {
+        const s = Math.sin(av.walkPhase), amp = Math.min(1, av.vNow / 1.2);
+        bob = Math.abs(s) * 0.06 * amp; aL = s * 0.6 * amp; aR = -aL; pitch = 0.07 * amp; break;
+      }
+      case ST.EVACUATED: look = Math.sin(t * 0.6 + av.phase) * 0.4; break;
+      case ST.TRAPPED: aL = -2.7 + Math.sin(t * 7 + av.phase) * 0.35; aR = -2.7 + Math.sin(t * 7 + av.phase + 1.6) * 0.35; bob = Math.abs(Math.sin(t * 4 + av.phase)) * 0.05; break;
+      case ST.INJURED: pitch = -Math.PI / 2; yOff = 0.2; aL = aR = -0.3; break;
+    }
+    _bp.set(av.pos.x, av.pos.y + bob + yOff, av.pos.z);
+    mBase.compose(_bp, qq.setFromEuler(ee.set(pitch, av.yaw, 0)), ONE);
+    mLoc.makeScale(1, sy, 1).setPosition(0, 0.69 * sy, 0); BODY.setMatrixAt(i, mOut.multiplyMatrices(mBase, mLoc));
+    mLoc.makeRotationY(look).setPosition(0, 1.38 * sy + 0.15, 0); HEAD.setMatrixAt(i, mOut.multiplyMatrices(mBase, mLoc));
+    mLoc.makeRotationX(aL).setPosition(-0.25, 1.24 * sy, 0); ARM_L.setMatrixAt(i, mOut.multiplyMatrices(mBase, mLoc));
+    mLoc.makeRotationX(aR).setPosition(0.25, 1.24 * sy, 0); ARM_R.setMatrixAt(i, mOut.multiplyMatrices(mBase, mLoc));
+    if (av.state === ST.WORKING) _col.copy(av.shirt);
+    else { _col.copy(ST_COL[av.state]); if (av.state === ST.TRAPPED || av.state === ST.INJURED) _col.multiplyScalar(0.65 + 0.35 * Math.sin(t * 8 + av.phase)); }
+    if (SEL.av === av) _col.lerp(ONE_COL, 0.25);
+    BODY.setColorAt(i, _col); ARM_L.setColorAt(i, _col); ARM_R.setColorAt(i, _col); HEAD.setColorAt(i, av.skin);
+  }
+  for (const m of [BODY, HEAD, ARM_L, ARM_R]) { m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; }
+  if (SEL.av) {
+    const p = SEL.av.pos; selRing.position.set(p.x, p.y + 0.04, p.z); selBeam.position.set(p.x, p.y + 3.4, p.z);
+    selRing.scale.setScalar(1 + 0.12 * Math.sin(performance.now() / 180));
+  }
+}
+const ONE_COL = new THREE.Color(1, 1, 1);
+
+const _m4 = new THREE.Matrix4(), _cc = new THREE.Color();
+function updateFxVisuals(dt, now) {
+  // alarm strobes: double flash ~1.3 Hz
+  const ph = (now / 1000 * 1.3) % 1, flash = SIM.alarm && (ph < 0.07 || (ph > 0.15 && ph < 0.22));
+  strobeMat.color.setRGB(flash ? 1 : 0.19, flash ? 0.86 : 0.03, flash ? 0.82 : 0.03);
+  STROBE_LIGHTS.forEach(L => L.intensity = flash ? 3.2 : 0);
+  // fire lights + ember decals
+  const r = fireRadius(); let k = 0;
+  FIRE.layers.forEach((L, i) => {
+    const light = FIRE_LIGHTS[i];
+    if (!L.active) { light.intensity = 0; return; }
+    const c = FIRE.samples[FIRE.c];
+    light.position.set(c.x, L.floor * FH + 1.8, c.z);
+    light.intensity = (2.6 + 0.12 * SEV()) * (0.8 + 0.2 * Math.sin(now / 47 + i) * Math.sin(now / 83));
+    light.distance = 14 + (L.hi - L.lo) * 0.18;
+    for (let s = L.lo; s <= L.hi && k < 120; s += 4) {
+      const p = FIRE.samples[s], fl = 0.75 + 0.25 * Math.sin(now / 90 + s);
+      _m4.makeScale(r * 0.75, 1, r * 0.75).setPosition(p.x, L.floor * FH + 0.03, p.z);
+      EMBERS.setMatrixAt(k, _m4); EMBERS.setColorAt(k, _cc.setRGB(0.5 * fl, 0.15 * fl, 0.02 * fl)); k++;
+    }
+  });
+  EMBERS.count = k; EMBERS.instanceMatrix.needsUpdate = true; if (EMBERS.instanceColor) EMBERS.instanceColor.needsUpdate = true;
+  // elevators
+  ELEV.forEach(e => {
+    e.car.position.set(e.xPos, e.y + 1.3, 4.8);
+    e.x.visible = e.locked; e.x.position.set(e.xPos, e.y + 1.3, 3.4);
+    e.mat.emissive.setRGB(e.locked ? 0.35 + 0.15 * Math.sin(now / 200) : 0, 0, 0);
+  });
+  // blocked exit beacons
+  EXITS.forEach(ex => { ex.barrier.visible = ex.blockSign.visible = ex.blocked; ex.sign.visible = !ex.blocked; ex.beacon.material.color.setRGB(1, 0.2 + 0.2 * Math.sin(now / 120), 0.2); });
+  // sensors
+  let nOn = 0;
+  SENSORS.forEach((s, i) => {
+    if (s.on) {
+      nOn++;
+      const pulse = ((SIM.t - s.at) * 0.9) % 1;
+      SENS_MESH.setColorAt(i, _cc.setRGB(1, 0.78, 0.74));
+      _m4.makeScale(0.3 + pulse * 1.6, 1, 0.3 + pulse * 1.6).setPosition(s.pos.x, s.pos.y - 0.02, s.pos.z);
+      SENS_RING.setMatrixAt(i, _m4); SENS_RING.setColorAt(i, _cc.setRGB(1, 0.12, 0.08).multiplyScalar(1 - pulse));
+    } else {
+      SENS_MESH.setColorAt(i, s.type === 'heat' ? _cc.setRGB(0.75, 0.55, 0.18) : _cc.setRGB(0.45, 0.62, 0.72));
+      SENS_RING.setColorAt(i, _cc.setRGB(0, 0, 0));
+    }
+  });
+  SENS_MESH.instanceColor.needsUpdate = SENS_RING.instanceColor.needsUpdate = SENS_RING.instanceMatrix.needsUpdate = true;
+  SIM.sensorsOn = nOn;
+  // best-route chevrons flow towards the exits
+  BEST.forEach(B => { if (B && B.mesh) B.mesh.material.map.offset.x -= dt * 0.9; });
+  // smoke-driven fog
+  const smoky = G.fire.visible ? Math.min(1, SMOKE.alive / 1400) : 0;
+  scene.fog.density += (0.0045 + 0.011 * smoky - scene.fog.density) * Math.min(1, dt * 2);
+  scene.fog.color.copy(BG).lerp(SMOKE_BG, smoky); scene.background.copy(scene.fog.color);
+}
+
+// ============================================================================
+//  CAMERA MODES
+// ============================================================================
+const CAM = { mode: 'orbit', fly: null, followAv: null, followT: 0, idleUntil: 0 };
+const HOME_POS = V3(52, 40, -50), HOME_TGT = V3(0, 6, -6);
+function flyTo(pos, tgt, dur) { CAM.fly = { p0: camera.position.clone(), t0: controls.target.clone(), p1: pos, t1: tgt, k: 0, dur: dur || 1.6 }; }
+function setCam(mode) {
+  CAM.mode = mode;
+  document.querySelectorAll('#camSeg button').forEach(b => b.classList.toggle('on', b.dataset.cam === mode));
+  controls.autoRotate = mode === 'orbit'; controls.autoRotateSpeed = 0.35;
+  if (mode === 'orbit') flyTo(HOME_POS.clone(), HOME_TGT.clone());
+  else if (mode === 'fire') { const c = fireCentroid(V3()); flyTo(V3(c.x + 9, c.y + 8, c.z - 16), c.clone(), 1.8); }
+  else if (mode === 'assembly') flyTo(V3(14, 9, -52), V3(0, 1, -31), 1.8);
+  else if (mode === 'follow') { CAM.followAv = pickFollow(); if (CAM.followAv) select(CAM.followAv); }
+}
+function pickFollow() {
+  const moving = avatars.filter(a => a.state === ST.MOVING_TO_EXIT || a.state === ST.IN_STAIRWELL || a.state === ST.ALERTED);
+  const upper = moving.filter(a => a.pos.y > FH * 1.5);
+  return pick(upper.length ? upper : moving.length ? moving : avatars) || null;
+}
+const ease = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+const _ct2 = V3(), _cp = V3();
+function updateCamera(dt) {
+  if (CAM.fly) {
+    const F = CAM.fly; F.k = Math.min(1, F.k + dt / F.dur); const e = ease(F.k);
+    camera.position.lerpVectors(F.p0, F.p1, e); controls.target.lerpVectors(F.t0, F.t1, e);
+    if (F.k >= 1) CAM.fly = null;
+  }
+  if (CAM.mode === 'follow') {
+    let av = CAM.followAv;
+    if (!av || (av.state === ST.EVACUATED && SIM.t - av.evacAt > 3) || av.state === ST.INJURED && SIM.t - (av.injAt || SIM.t) > 4) {
+      const nxt = pickFollow(); if (nxt && nxt !== av) { CAM.followAv = av = nxt; select(av); }
+    }
+    if (av) {
+      const k = 1 - Math.exp(-dt * 2.6);
+      _ct2.set(av.pos.x, av.pos.y + 1.2, av.pos.z);
+      _cp.set(av.pos.x - Math.sin(av.yaw) * 7, av.pos.y + 5, av.pos.z - Math.cos(av.yaw) * 7);
+      controls.target.lerp(_ct2, k); if (!CAM.fly) camera.position.lerp(_cp, k * 0.6);
+    }
+  } else if (CAM.mode === 'fire' && !CAM.fly) {
+    controls.target.lerp(fireCentroid(_ct2), 1 - Math.exp(-dt * 1.5));
+    controls.autoRotate = performance.now() > CAM.idleUntil; controls.autoRotateSpeed = 0.8;
+  } else if (CAM.mode === 'orbit') controls.autoRotate = performance.now() > CAM.idleUntil;
+}
+controls.addEventListener('start', () => { CAM.idleUntil = performance.now() + 6000; controls.autoRotate = false; CAM.fly = null; });
+controls.addEventListener('end', () => { CAM.idleUntil = performance.now() + 6000; });
+
+// ============================================================================
+//  PICKING + CARD
+// ============================================================================
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2(); let down = null;
+renderer.domElement.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
+  mouse.set(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  if (!G.people.visible) return;
+  const hits = ray.intersectObjects([BODY, HEAD]);
+  if (hits.length && hits[0].instanceId !== undefined && avatars[hits[0].instanceId]) select(avatars[hits[0].instanceId]);
+  else select(null);
+});
+function select(av) {
+  SEL.av = av; selRing.visible = selBeam.visible = !!av;
+  document.getElementById('card').classList.toggle('on', !!av);
+  if (!av && CAM.mode === 'follow') setCam('orbit');
+  renderCard();
+}
+const cardEl = document.getElementById('card');
+cardEl.addEventListener('click', e => {
+  if (e.target.dataset.act === 'close') select(null);
+  if (e.target.dataset.act === 'follow' && SEL.av) { CAM.mode = 'follow'; CAM.followAv = SEL.av; document.querySelectorAll('#camSeg button').forEach(b => b.classList.toggle('on', b.dataset.cam === 'follow')); controls.autoRotate = false; }
+});
+function renderCard() {
+  const av = SEL.av; if (!av) return;
+  const f = clamp(Math.round(av.pos.y / FH), 0, FLOORS - 1);
+  const where = !insideBuilding(av.pos) && av.pos.y < 0.5 ? 'Outside' : av.state === ST.IN_STAIRWELL ? 'Stairs ~L' + (f + 1) : 'L' + (f + 1) + ' · ' + (av.slot.kind === 'desk' ? 'desk' : av.slot.kind);
+  const remain = av.legs ? av.total - av.dist : 0;
+  const eta = av.legs ? remain / Math.max(0.3, av.speed * 0.85) : 0;
+  const prog = av.legs ? av.dist / av.total : av.state === ST.EVACUATED ? 1 : 0;
+  const route = av.state === ST.TRAPPED ? 'No safe route: all paths from here pass through fire. Awaiting rescue.'
+    : av.state === ST.INJURED ? 'Injured by ' + (av.smokeExp > 12 ? 'smoke inhalation' : 'fire exposure') + '. Needs assisted rescue.'
+    : av.state === ST.EVACUATED ? 'Reached the assembly point at T+' + (av.evacAt - ALARM_T).toFixed(1) + 's via ' + av.route.replace('Corridor → ', '').replace(' → Assembly', '')
+    : av.route ? av.route : av.state === ST.ALERTED ? 'Alerted, deciding on an exit…' : 'At work. Alarm not raised yet.';
+  const html = `<div class="hd"><span class="id">Occupant #${String(av.id).padStart(3, '0')}</span>
+      <span class="st" style="background:${ST_HEX[av.state]}">${ST_NAME[av.state]}</span>
+      <span class="x" data-act="follow" title="Follow">◎</span><span class="x" data-act="close" title="Close" style="margin-left:0">×</span></div>
+    <div class="route">${route}</div>
+    <div class="grid">
+      <div><small>Location</small><b>${where}</b></div>
+      <div><small>ETA</small><b>${av.legs ? eta.toFixed(0) + 's' : '—'}</b></div>
+      <div><small>Remaining</small><b>${av.legs ? remain.toFixed(0) + ' m' : '—'}</b></div>
+      <div><small>Speed</small><b>${av.vNow.toFixed(2)} m/s</b></div>
+    </div>
+    <div class="bar"><i style="width:${(prog * 100).toFixed(1)}%"></i></div>`;
+  if (cardEl._last !== html) { cardEl.innerHTML = html; cardEl._last = html; }
+}
+
+// ============================================================================
+//  MINI-MAPS (one canvas per floor, avatar dots moving to the exits)
+// ============================================================================
+const MM = { x0: -24, x1: 26, z0: -12.5, z1: 15 };
+const MAPS = [];
+{
+  const host = document.getElementById('maps');
+  for (let f = FLOORS - 1; f >= 0; f--) {
+    const wrap = document.createElement('div'); wrap.className = 'map';
+    wrap.innerHTML = `<div class="lbl"><span><b>L${f + 1}</b> ${f === 0 ? 'Ground · lobby & café' : 'Offices'}<span class="fire" id="mf${f}"></span></span><span id="mc${f}">0</span></div>`;
+    const cv = document.createElement('canvas'); wrap.appendChild(cv); host.appendChild(wrap);
+    MAPS[f] = { cv, ctx: cv.getContext('2d'), cnt: wrap.querySelector('#mc' + f), fire: wrap.querySelector('#mf' + f) };
+  }
+}
+function sizeMaps() {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  MAPS.forEach(M => { const w = M.cv.clientWidth || 240, h = Math.round(w * (MM.z1 - MM.z0) / (MM.x1 - MM.x0)); M.cv.width = w * dpr; M.cv.height = h * dpr; M.w = w; M.h = h; M.dpr = dpr; });
+}
+function drawMaps() {
+  const counts = new Array(FLOORS).fill(0);
+  for (let f = 0; f < FLOORS; f++) {
+    const M = MAPS[f], g = M.ctx, W = M.w, H = M.h;
+    if (!W) continue;
+    g.setTransform(M.dpr, 0, 0, M.dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const S = W / (MM.x1 - MM.x0), X = x => (x - MM.x0) * S, Y = z => (MM.z1 - z) * S;
+    g.fillStyle = 'rgba(48,62,90,.55)'; g.fillRect(X(-HX), Y(HZ), 2 * HX * S, 2 * HZ * S);
+    g.fillStyle = 'rgba(140,160,200,.16)'; g.fillRect(X(-16), Y(CORR), 32 * S, 2 * CORR * S);
+    g.strokeStyle = 'rgba(170,190,220,.22)'; g.lineWidth = 1;
+    BAYS[f].forEach(b => { if (b.enclosed) g.strokeRect(X(b.x0), Y(b.s > 0 ? HZ : -CORR), (b.x1 - b.x0) * S, (HZ - CORR) * S); });
+    g.strokeStyle = 'rgba(170,190,220,.7)'; g.strokeRect(X(-HX), Y(HZ), 2 * HX * S, 2 * HZ * S);
+    // smoke cells
+    const grid = SMOKE.grid[f];
+    for (let c = 0; c < 50; c++) if (grid[c] > 1) { g.fillStyle = `rgba(160,165,175,${Math.min(.55, grid[c] / 40)})`; g.fillRect(X(-HX + (c % 10) * 4), Y(-HZ + Math.floor(c / 10) * 4 + 4), 4 * S, 4 * S); }
+    // stairwells
+    [0, 1].forEach(s => {
+      const x0 = s ? 16 : -20, lv = SMOKE.level[s];
+      g.fillStyle = lv > 0.3 ? `rgba(150,150,160,${0.4 + lv * 0.4})` : 'rgba(255,196,0,.32)'; g.fillRect(X(x0), Y(2), 4 * S, 4 * S);
+      g.fillStyle = '#ffd95a'; g.font = '700 9px sans-serif'; g.textAlign = 'center'; g.fillText(s ? 'B' : 'A', X(x0 + 2), Y(-0.9));
+    });
+    // elevators
+    g.fillStyle = 'rgba(90,209,255,.25)'; g.fillRect(X(-2.6), Y(6), 5.2 * S, 2.4 * S);
+    if (ELEV[0].locked) { g.strokeStyle = '#ff2d3d'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(X(-2.6), Y(6)); g.lineTo(X(2.6), Y(3.6)); g.moveTo(X(2.6), Y(6)); g.lineTo(X(-2.6), Y(3.6)); g.stroke(); }
+    // fire escape
+    g.fillStyle = 'rgba(184,58,46,.55)'; g.fillRect(X(3.6), Y(12.4), 7.8 * S, 2.2 * S);
+    // ground exits
+    if (f === 0) EXITS.forEach(ex => { g.fillStyle = ex.blocked ? '#ff2d3d' : '#2ee66b'; g.beginPath(); g.arc(X(ex.pos.x), Y(ex.pos.z), 3.2, 0, 7); g.fill(); });
+    // best route
+    const B = BEST[f];
+    if (B && B.pts.length) {
+      g.strokeStyle = 'rgba(46,230,107,.75)'; g.lineWidth = 1.4; g.setLineDash([3, 3]); g.beginPath(); let on = false;
+      B.pts.forEach(p => { if (Math.abs(p.y - 0.12 - f * FH) < 0.4) { on ? g.lineTo(X(p.x), Y(p.z)) : g.moveTo(X(p.x), Y(p.z)); on = true; } else on = false; });
+      g.stroke(); g.setLineDash([]);
+    }
+    // fire
+    let burning = false;
+    FIRE.layers.forEach(L => {
+      if (!L.active || L.floor !== f) return; burning = true;
+      const r = fireRadius() * S;
+      g.fillStyle = 'rgba(255,110,20,.22)';
+      for (let i = L.lo; i <= L.hi; i += 3) { const p = FIRE.samples[i]; g.beginPath(); g.arc(X(p.x), Y(p.z), r, 0, 7); g.fill(); }
+      g.fillStyle = '#ffd25a'; const o = FIRE.samples[FIRE.c]; g.beginPath(); g.arc(X(o.x), Y(o.z), 2.4, 0, 7); g.fill();
+    });
+    M.fire.textContent = burning ? '  ● FIRE' : '';
+    // triggered sensors
+    g.fillStyle = '#ff4a4a';
+    SENSORS.forEach(s => { if (s.on && s.f === f) g.fillRect(X(s.x) - 1.5, Y(s.z) - 1.5, 3, 3); });
+    // occupants
+    for (const av of avatars) {
+      const af = Math.round(av.pos.y / FH);
+      if (af !== f) continue;
+      if (!insideBuilding(av.pos) && (av.pos.z < MM.z0 || f !== 0)) continue;
+      if (insideBuilding(av.pos)) counts[f]++;
+      g.fillStyle = av.state === ST.WORKING ? '#a8b6cc' : ST_HEX[av.state];
+      g.beginPath(); g.arc(X(av.pos.x), Y(av.pos.z), 1.9, 0, 7); g.fill();
+      if (SEL.av === av) { g.strokeStyle = '#fff27a'; g.lineWidth = 1.5; g.beginPath(); g.arc(X(av.pos.x), Y(av.pos.z), 4.5, 0, 7); g.stroke(); }
+    }
+    M.cnt.textContent = counts[f] + ' inside';
+  }
+}
+
+// ============================================================================
+//  UI WIRING
+// ============================================================================
+const $ = id => document.getElementById(id);
+const LAYERS = [['Building shell', 'shell'], ['Fire + smoke', 'fire'], ['Occupants', 'people'], ['Evacuation routes', 'routes'], ['Sensor overlay', 'sensors']];
+$('layers').innerHTML = LAYERS.map(([n, k], i) => `<label class="layer"><span class="n">${i + 1}</span><input type="checkbox" data-layer="${k}" checked><span class="sw"></span>${n}</label>`).join('');
+$('layers').addEventListener('change', e => { const k = e.target.dataset.layer; if (k) G[k].visible = e.target.checked; });
+$('legend').innerHTML = ST_NAME.map((n, i) => `<span><i style="background:${ST_HEX[i]}"></i>${n.replace(/_/g, ' ').toLowerCase()}</span>`).join('');
+$('sSpeed').addEventListener('input', e => { SIM.speed = +e.target.value; $('vSpeed').textContent = SIM.speed.toFixed(1) + '×'; });
+const sevName = v => v <= 3 ? 'Small' : v <= 7 ? 'Medium' : 'Large';
+$('sSev').addEventListener('input', e => { $('vSev').textContent = sevName(+e.target.value) + ' · ' + e.target.value; });
+$('vSev').textContent = sevName(SEV()) + ' · ' + SEV();
+$('sOcc').addEventListener('input', e => { $('vOcc').textContent = e.target.value; setOccupants(+e.target.value); });
+$('bPause').addEventListener('click', togglePause);
+$('bReset').addEventListener('click', reset);
+$('bBlock').addEventListener('click', () => {
+  const open = EXITS.filter(e => !e.blocked);
+  if (open.length <= 1) { EXITS.forEach(e => e.blocked = false); toast('All exits reopened'); }
+  else {
+    // block the exit currently carrying the most evacuees, so the reroute is visible
+    const ex = open.slice().sort((a, b) => b.uses - a.uses || Math.random() - .5)[0];
+    ex.blocked = true; ex.open = false; toast('⛔ ' + ex.name + ' is blocked. Occupants rerouting.');
+  }
+  $('bBlock').textContent = EXITS.filter(e => !e.blocked).length <= 1 ? '↺ Reopen all exits' : '⛔ Block an exit';
+  hazardUpdate();
+});
+$('bSmoke').addEventListener('click', () => {
+  SMOKE.manualA = !SMOKE.manualA;
+  $('bSmoke').classList.toggle('on', SMOKE.manualA);
+  $('bSmoke').textContent = SMOKE.manualA ? '☁ Clear smoke in stairwell A' : '☁ Add smoke in stairwell A';
+  toast(SMOKE.manualA ? 'Stairwell A is smoke-logged. Avoid.' : 'Stairwell A ventilated');
+  hazardUpdate();
+});
+$('camSeg').addEventListener('click', e => { if (e.target.dataset.cam) setCam(e.target.dataset.cam); });
+$('mLeft').addEventListener('click', () => { $('left').classList.toggle('open'); $('right').classList.remove('open'); });
+$('mRight').addEventListener('click', () => { $('right').classList.toggle('open'); $('left').classList.remove('open'); });
+addEventListener('keydown', e => { if (e.code === 'Space' && e.target.tagName !== 'INPUT') { e.preventDefault(); togglePause(); } });
+function togglePause() { SIM.paused = !SIM.paused; $('bPause').textContent = SIM.paused ? 'Resume' : 'Pause'; }
+let toastT = 0;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2600); }
+function renderExitChips() {
+  const html = EXITS.map(e => `<span class="chip ${e.blocked ? 'bad' : ''}">${e.blocked ? '✕' : '✓'} ${e.name}${e.blocked ? '' : ' · ' + e.uses}</span>`).join('');
+  if ($('exitChips')._last !== html) { $('exitChips').innerHTML = html; $('exitChips')._last = html; }
+}
+function updateHUD() {
+  let ev = 0, tr = 0, inj = 0, inSt = 0;
+  for (const a of avatars) { if (a.state === ST.EVACUATED) ev++; else if (a.state === ST.TRAPPED) tr++; else if (a.state === ST.INJURED) inj++; else if (a.state === ST.IN_STAIRWELL) inSt++; }
+  const tAl = SIM.alarm ? (SIM.done ? SIM.doneT : SIM.t) - ALARM_T : 0;
+  $('cEv').textContent = ev; $('cTot').textContent = avatars.length; $('cTr').textContent = tr; $('cIn').textContent = inj;
+  $('cTm').textContent = tAl.toFixed(1) + 's';
+  const ban = $('banner');
+  ban.classList.toggle('on', SIM.alarm);
+  if (SIM.done) { ban.classList.add('done'); ban.classList.toggle('warn', tr + inj > 0); ban.textContent = (tr + inj ? 'DRILL COMPLETE · ' + (tr + inj) + ' NEED RESCUE' : 'ALL CLEAR') + ' · ' + ev + ' evacuated in ' + tAl.toFixed(0) + 's'; }
+  else { ban.classList.remove('done', 'warn'); ban.textContent = '⚠ EVACUATE ⚠'; }
+  const ph = $('phase');
+  ph.textContent = SIM.done ? 'Drill complete' : SIM.t < ALARM_T ? 'Phase 0 · Normal operations · alarm in ' + (ALARM_T - SIM.t).toFixed(1) + 's' : SIM.t < MOVE_T ? 'Phase 1 · Alarm · occupants alerted' : 'Phase 2 · Evacuation in progress';
+  ph.classList.toggle('alarm', SIM.alarm && !SIM.done);
+  const L0 = FIRE.layers[0];
+  $('sFire').textContent = 'L' + (L0.floor + 1) + (FIRE.layers[1] && FIRE.layers[1].active ? ' → L' + (L0.floor + 2) : '');
+  $('sElev').textContent = ELEV[0].locked ? 'LOCKED ✕' : 'In service'; $('sElev').className = ELEV[0].locked ? 'bad' : 'ok';
+  $('sStA').textContent = Math.round(SMOKE.level[0] * 100) + '%' + (SMOKE.manualA ? ' (hazard)' : ''); $('sStA').className = SMOKE.level[0] > 0.3 ? 'bad' : '';
+  $('sStB').textContent = Math.round(SMOKE.level[1] * 100) + '%'; $('sStB').className = SMOKE.level[1] > 0.3 ? 'bad' : '';
+  $('sSens').textContent = (SIM.sensorsOn || 0) + ' / ' + SENSORS.length;
+  $('sInSt').textContent = inSt;
+  renderCard();
+}
+
+// ============================================================================
+//  RESET
+// ============================================================================
+function reset() {
+  avatars.forEach(a => a.slot.occ = -1); avatars = [];
+  Object.assign(SIM, { t: 0, alarm: false, hazardAcc: 0, done: false, doneT: 0, asmNext: 0 });
+  EXITS.forEach(e => { e.blocked = false; e.open = false; e.leaves.forEach(L => { L.ang = 0; L.vel = 0; }); });
+  $('bBlock').textContent = '⛔ Block an exit';
+  SMOKE.manualA = false; SMOKE.level = [0, 0]; $('bSmoke').classList.remove('on'); $('bSmoke').textContent = '☁ Add smoke in stairwell A';
+  FP.life.fill(0); FP.max.fill(0); SP.life.fill(0); SP.max.fill(0); resetSmokeGrid();
+  SENSORS.forEach(s => { s.on = false; });
+  ELEV.forEach(e => e.locked = false);
+  initFire();
+  select(null); CAM.followAv = null;
+  setOccupants(+$('sOcc').value);
+  updateEdgeCosts(); dijkstra(); colorNetwork(); rebuildBestRoutes(); renderExitChips();
+}
+
+// ============================================================================
+//  MAIN LOOP
+// ============================================================================
+function onResize() {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
+  bloom.setSize(innerWidth, innerHeight);
+  FP.mat.uniforms.uScale.value = SP.mat.uniforms.uScale.value = renderer.domElement.height / 2;
+  sizeMaps();
+}
+addEventListener('resize', onResize);
+reset(); sizeMaps();
+
+let last = performance.now(), uiAcc = 0, trailAcc = 0, mapAcc = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!SIM.paused) {
+    const simDt = dt * SIM.speed, n = Math.ceil(simDt / 0.04);   // substeps keep crowd + fire stable at 8×
+    for (let i = 0; i < n; i++) step(simDt / n);
+    const pn = simDt > 0.1 ? 2 : 1;
+    for (let i = 0; i < pn; i++) { updateFireParticles(simDt / pn); updateSmoke(simDt / pn); }
+  }
+  updateAvatarVisuals();
+  updateFxVisuals(dt, now);
+  updateCamera(dt);
+  controls.update();
+  trailAcc += dt; if (trailAcc > 0.15) { trailAcc = 0; updateTrails(); }
+  mapAcc += dt; if (mapAcc > 0.08) { mapAcc = 0; drawMaps(); }
+  uiAcc += dt; if (uiAcc > 0.1) { uiAcc = 0; updateHUD(); }
+  composer.render();
+}
+requestAnimationFrame(frame);
+window.__sim = { SIM, avatars: () => avatars, FIRE, EXITS, SMOKE, D, NODES, step, updateAvatarVisuals, updateSmoke, updateFireParticles, updateTrails, drawMaps, setOccupants, render: () => composer.render() };
+})();
+</script>
+</body>
+</html>
