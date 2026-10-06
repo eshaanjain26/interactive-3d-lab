@@ -1,6 +1,6 @@
 # Interactive 3D Lab
 
-Fifteen interactive Three.js explorers covering chips, quantum computing, AI, robotics, audio, anatomy, embryology, energy, aviation, space and U.S. immigration law. Each one is a single self-contained HTML file.
+Eighteen interactive Three.js explorers covering chips, quantum computing, AI, robotics, audio, anatomy, cardiology, embryology, energy, logistics, space and U.S. immigration law. Each one is a single self-contained HTML file.
 
 **Live site:** https://eshaanjain26.github.io/interactive-3d-lab/
 
@@ -13,14 +13,18 @@ Fifteen interactive Three.js explorers covering chips, quantum computing, AI, ro
 | [Q-Learning Grid World](https://eshaanjain26.github.io/interactive-3d-lab/q-learning-grid-world/) | A tabular Q-learning agent trained live, with a Q-table view |
 | [EV Teardown Explorer](https://eshaanjain26.github.io/interactive-3d-lab/ev-teardown-explorer/) | A dual-motor electric sedan in exploded view, with component specs |
 | [Microgrid Flow](https://eshaanjain26.github.io/interactive-3d-lab/microgrid-flow/) | Smart-city microgrid supply and demand, shown live |
+| [Data Center Thermal Lab](https://eshaanjain26.github.io/interactive-3d-lab/datacenter-thermal-lab/) | A 40-rack hall with hot/cold aisle containment, particle airflow from CRAC units through the raised floor, a live thermal model, and a CRAC failure that grows a hotspot in about 10 seconds |
 | [Cardiac Flow Lab](https://eshaanjain26.github.io/interactive-3d-lab/cardiac-flow-lab/) | Four chambers, four valves, one cardiac cycle |
 | [Glass Body Atlas](https://eshaanjain26.github.io/interactive-3d-lab/glass-body-atlas/) | A see-through anatomy atlas of the organ systems |
+| [Coronary Stent Lab](https://eshaanjain26.github.io/interactive-3d-lab/coronary-stent-lab/) | A beating heart with a blocked coronary artery: toggleable anatomy layers, stent delivery and balloon expansion on a scrubbable timeline, and blood flow that speeds up once the artery opens |
 | [Fetal Growth Timeline Lab](https://eshaanjain26.github.io/interactive-3d-lab/fetal-growth-timeline/) | Embryo and fetus from week 1 to 40 by day: length and weight, a real-scale comparison object, and organ-system milestones |
 | [EB-1 Adjudication Lab](https://eshaanjain26.github.io/interactive-3d-lab/eb1-adjudication-lab/) | The EB-1A petition in 3D: lifecycle timeline, the ten criteria, USCIS two-step adjudication with outcome simulation, and AAO review |
 | [Heliocentric Orrery](https://eshaanjain26.github.io/interactive-3d-lab/heliocentric-orrery/) | A 3D solar system simulator |
 | [Drone Swarm Boids](https://eshaanjain26.github.io/interactive-3d-lab/drone-swarm-boids/) | Reynolds flocking across up to 600 quadcopters, with click-placed beacons, hazards and obstacles, three camera modes and live swarm telemetry |
+| [AMR Fulfillment Floor](https://eshaanjain26.github.io/interactive-3d-lab/amr-fulfillment-floor/) | A goods-to-person warehouse: 4 to 20 robots lift racks, queue at picking stations, yield in the aisles and recharge, with live KPIs, route overlays and a traffic heat map |
 | [Audio Spectrum Matrix](https://eshaanjain26.github.io/interactive-3d-lab/audio-spectrum-matrix/) | A neon wireframe terrain driven by live FFT data from a built-in synth, microphone or audio file |
-| [Gate B12 Turnaround](https://eshaanjain26.github.io/interactive-3d-lab/airport-turnaround/) | An A320neo lands, turns at the gate (fuel, catering, bags, passengers on the jet bridge) and departs, run by a state machine with a scrubbable ops Gantt and a late-fuel-truck delay scenario |
+| [Warehouse Dock Twin](https://eshaanjain26.github.io/interactive-3d-lab/warehouse-dock-twin/) | A six-bay warehouse dock as a digital twin: trucks run their own arrive, dock, unload, load and depart timelines while pallets flow from truck to conveyor to racking and forklifts work the aisles |
+| [Warehouse Ops Academy](https://eshaanjain26.github.io/interactive-3d-lab/warehouse-ops-academy/) | An end-to-end distribution center for teaching: gate check-in, intermodal rail and drayage, docking, receiving, putaway, pick-to-light, AMR goods-to-person, packing, sortation, shipping, cycle counts and andons, with 20+ animated workers, a guided tour and a walkable floor |
 
 ## Run locally
 
