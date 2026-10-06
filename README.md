@@ -15,12 +15,14 @@ Fifteen interactive Three.js explorers covering chips, quantum computing, AI, ro
 | [Microgrid Flow](https://eshaanjain26.github.io/interactive-3d-lab/microgrid-flow/) | Smart-city microgrid supply and demand, shown live |
 | [Cardiac Flow Lab](https://eshaanjain26.github.io/interactive-3d-lab/cardiac-flow-lab/) | Four chambers, four valves, one cardiac cycle |
 | [Glass Body Atlas](https://eshaanjain26.github.io/interactive-3d-lab/glass-body-atlas/) | A see-through anatomy atlas of the organ systems |
+| [Coronary Stent Lab](https://eshaanjain26.github.io/interactive-3d-lab/coronary-stent-lab/) | A beating heart with a blocked coronary artery: toggleable anatomy layers, stent delivery and balloon expansion on a scrubbable timeline, and blood flow that speeds up once the artery opens |
 | [Fetal Growth Timeline Lab](https://eshaanjain26.github.io/interactive-3d-lab/fetal-growth-timeline/) | Embryo and fetus from week 1 to 40 by day: length and weight, a real-scale comparison object, and organ-system milestones |
 | [EB-1 Adjudication Lab](https://eshaanjain26.github.io/interactive-3d-lab/eb1-adjudication-lab/) | The EB-1A petition in 3D: lifecycle timeline, the ten criteria, USCIS two-step adjudication with outcome simulation, and AAO review |
 | [Heliocentric Orrery](https://eshaanjain26.github.io/interactive-3d-lab/heliocentric-orrery/) | A 3D solar system simulator |
 | [Drone Swarm Boids](https://eshaanjain26.github.io/interactive-3d-lab/drone-swarm-boids/) | Reynolds flocking across up to 600 quadcopters, with click-placed beacons, hazards and obstacles, three camera modes and live swarm telemetry |
 | [AMR Fulfillment Floor](https://eshaanjain26.github.io/interactive-3d-lab/amr-fulfillment-floor/) | A goods-to-person warehouse: 4 to 20 robots lift racks, queue at picking stations, yield in the aisles and recharge, with live KPIs, route overlays and a traffic heat map |
 | [Audio Spectrum Matrix](https://eshaanjain26.github.io/interactive-3d-lab/audio-spectrum-matrix/) | A neon wireframe terrain driven by live FFT data from a built-in synth, microphone or audio file |
+| [Fire Evacuation Drill](https://eshaanjain26.github.io/interactive-3d-lab/fire-evacuation-drill/) | A five-floor office in a fire drill: up to 200 occupants pick the nearest safe exit, queue in corridors and spiral down stairwells while fire and smoke spread, block routes and force reroutes |
 
 ## Run locally
 

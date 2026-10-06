@@ -1,0 +1,764 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Coronary Stent 3D</title>
+<style>
+  :root {
+    --bg: #05070d;
+    --glass: rgba(16, 20, 32, 0.55);
+    --glass-hi: rgba(30, 36, 54, 0.7);
+    --stroke: rgba(255, 255, 255, 0.09);
+    --stroke-hi: rgba(255, 255, 255, 0.18);
+    --text: #e9edf6;
+    --muted: #96a0b6;
+    --red: #ff4d5e;
+    --amber: #ffc23d;
+    --blue: #5aa8ff;
+    --green: #3ddc97;
+    --radius: 16px;
+    --ease: cubic-bezier(.2, .8, .2, 1);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font: 14px/1.45 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased; }
+  canvas { position: fixed; inset: 0; display: block; outline: none; }
+  body::after { /* vignette so panels read cleanly over the scene */
+    content: ""; position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%); }
+
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+  .panel { position: absolute; pointer-events: auto; background: var(--glass);
+    backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid var(--stroke); border-radius: var(--radius);
+    box-shadow: 0 12px 40px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06); }
+  .eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+
+  /* ---------- Layers (top-left) ---------- */
+  .layers { top: 16px; left: 16px; width: 228px; padding: 14px; display: flex; flex-direction: column; gap: 6px; }
+  .layers .eyebrow { margin: 0 4px 6px; }
+  .layer { all: unset; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 9px 10px;
+    border-radius: 10px; border: 1px solid transparent; color: var(--muted);
+    transition: background .18s var(--ease), border-color .18s var(--ease), color .18s var(--ease), transform .18s var(--ease); }
+  .layer:hover { background: rgba(255,255,255,.06); color: var(--text); transform: translateX(2px); }
+  .layer:focus-visible { border-color: var(--stroke-hi); }
+  .layer.on { color: var(--text); background: rgba(255,255,255,.045); border-color: var(--stroke); }
+  .layer .sw { width: 10px; height: 10px; border-radius: 50%; background: var(--c); opacity: .3;
+    transition: opacity .2s, box-shadow .2s; flex: none; }
+  .layer.on .sw { opacity: 1; box-shadow: 0 0 10px var(--c); }
+  .layer .nm { flex: 1; font-size: 13px; }
+  kbd { font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted);
+    border: 1px solid var(--stroke); border-radius: 5px; padding: 3px 5px; }
+
+  /* ---------- Step card (top-right) ---------- */
+  .step { top: 16px; right: 16px; width: 320px; padding: 18px; }
+  .step h1 { font-size: 17px; line-height: 1.3; margin: 6px 0 6px; font-weight: 650; letter-spacing: -.01em; }
+  .step p { margin: 0 0 14px; color: var(--muted); font-size: 13px; min-height: 38px; }
+  .dots { display: flex; gap: 6px; margin-bottom: 14px; }
+  .dots i { height: 4px; width: 14px; border-radius: 4px; background: rgba(255,255,255,.14); transition: width .3s var(--ease), background .3s; }
+  .dots i.on { width: 34px; background: var(--red); }
+  .dots i.done { background: rgba(255,77,94,.45); }
+  .row { display: flex; gap: 8px; }
+  .btn { all: unset; cursor: pointer; flex: 1; text-align: center; padding: 10px 14px; border-radius: 11px;
+    font-weight: 600; font-size: 13px; background: rgba(255,255,255,.07); border: 1px solid var(--stroke);
+    transition: background .18s var(--ease), border-color .18s var(--ease), transform .18s var(--ease), box-shadow .18s var(--ease); }
+  .btn:hover { background: rgba(255,255,255,.13); border-color: var(--stroke-hi); transform: translateY(-1px); }
+  .btn:active { transform: translateY(0) scale(.98); }
+  .btn:focus-visible { box-shadow: 0 0 0 2px var(--blue); }
+  .btn.ghost { flex: 0 0 auto; color: var(--muted); }
+  .btn.primary { display: block; margin-top: 8px; background: linear-gradient(135deg, #ff5a6a, #d61f45);
+    border-color: rgba(255,120,140,.5); box-shadow: 0 6px 22px rgba(230,40,70,.35); }
+  .btn.primary:hover { box-shadow: 0 10px 30px rgba(230,40,70,.55); background: linear-gradient(135deg, #ff6d7b, #e52a51); }
+  .btn.primary[data-state="running"] { background: linear-gradient(135deg, #3b4560, #2a3148); border-color: var(--stroke-hi); box-shadow: none; }
+
+  /* ---------- Timeline (bottom) ---------- */
+  .timeline { left: 50%; bottom: 16px; transform: translateX(-50%); width: min(760px, calc(100% - 32px));
+    padding: 12px 16px; display: flex; align-items: center; gap: 14px; }
+  .icon-btn { all: unset; cursor: pointer; width: 40px; height: 40px; flex: none; display: grid; place-items: center;
+    border-radius: 50%; background: rgba(255,255,255,.08); border: 1px solid var(--stroke);
+    transition: background .18s, transform .18s var(--ease); }
+  .icon-btn:hover { background: rgba(255,255,255,.16); transform: scale(1.06); }
+  .icon-btn:focus-visible { box-shadow: 0 0 0 2px var(--blue); }
+  .icon-btn svg { width: 16px; height: 16px; fill: var(--text); }
+  .track-wrap { flex: 1; min-width: 0; }
+  .phases { display: flex; gap: 4px; margin-bottom: 6px; }
+  .phases span { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 6px;
+    border-left: 2px solid rgba(255,255,255,.15); transition: color .2s, border-color .2s; }
+  .phases span.on { color: var(--text); border-color: var(--red); }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 20px; background: transparent; cursor: pointer; margin: 0; }
+  input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 6px;
+    background: linear-gradient(90deg, var(--red) 0 var(--p, 0%), rgba(255,255,255,.12) var(--p, 0%) 100%); }
+  input[type=range]::-moz-range-track { height: 6px; border-radius: 6px; background: rgba(255,255,255,.12); }
+  input[type=range]::-moz-range-progress { height: 6px; border-radius: 6px; background: var(--red); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -5px; border-radius: 50%;
+    background: #fff; box-shadow: 0 0 0 4px rgba(255,77,94,.35), 0 2px 8px rgba(0,0,0,.5); transition: box-shadow .18s; }
+  input[type=range]:hover::-webkit-slider-thumb { box-shadow: 0 0 0 7px rgba(255,77,94,.35), 0 2px 8px rgba(0,0,0,.5); }
+  input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 50%; background: #fff;
+    box-shadow: 0 0 0 4px rgba(255,77,94,.35); }
+  .time { font: 600 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); white-space: nowrap; }
+  .time b { color: var(--text); font-weight: 600; }
+
+  /* ---------- 3D-anchored blockage marker ---------- */
+  #marker { position: fixed; left: 0; top: 0; pointer-events: none; will-change: transform; transition: opacity .3s; }
+  #marker.hidden { opacity: 0; }
+  #marker.behind { opacity: .35; }
+  #marker .ping { position: absolute; left: -15px; top: -15px; width: 30px; height: 30px; border-radius: 50%;
+    border: 2px solid var(--amber); animation: ping 1.4s var(--ease) infinite; }
+  #marker .arrow { position: absolute; left: -74px; top: -74px; width: 58px; height: 58px;
+    animation: bob 1.1s ease-in-out infinite; filter: drop-shadow(0 0 6px rgba(255,77,94,.8)); transition: opacity .3s; }
+  #marker .tag { position: absolute; left: -168px; top: -112px; padding: 6px 12px; border-radius: 999px;
+    font: 700 11px/1 ui-sans-serif, -apple-system, sans-serif; letter-spacing: .16em; white-space: nowrap;
+    color: #fff; background: rgba(220, 30, 55, .85); border: 1px solid rgba(255,140,150,.7);
+    animation: alarm 1.1s ease-in-out infinite; }
+  #marker.ok .tag { background: rgba(20, 140, 95, .85); border-color: rgba(120,255,200,.6); animation: none;
+    box-shadow: 0 0 18px rgba(61,220,151,.5); }
+  #marker.ok .ping { border-color: var(--green); }
+  #marker.ok .arrow { opacity: 0; }
+  @keyframes bob { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(9px, 9px); } }
+  @keyframes ping { 0% { transform: scale(.5); opacity: 1; } 100% { transform: scale(2.2); opacity: 0; } }
+  @keyframes alarm {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 8px rgba(255,50,70,.5); }
+    50% { transform: scale(1.07); box-shadow: 0 0 26px rgba(255,50,70,.95); } }
+
+  #fps { position: fixed; left: 16px; bottom: 16px; z-index: 2; font: 600 11px/1 ui-monospace, Menlo, monospace;
+    color: var(--muted); padding: 7px 10px; border-radius: 8px; background: var(--glass); border: 1px solid var(--stroke);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+  #err { position: fixed; inset: 0; display: none; place-items: center; color: var(--muted); z-index: 5; text-align: center; padding: 24px; }
+
+  @media (max-width: 760px) {
+    .layers { top: 12px; left: 12px; right: 12px; width: auto; flex-direction: row; overflow-x: auto; padding: 8px; gap: 4px; scrollbar-width: none; }
+    .layers .eyebrow, .layer kbd { display: none; }
+    .layer { flex: none; padding: 7px 10px; }
+    .layer .nm { font-size: 12px; white-space: nowrap; }
+    .step { top: auto; bottom: 92px; left: 12px; right: 12px; width: auto; padding: 14px; }
+    .step p { min-height: 0; margin-bottom: 10px; }
+    .dots { display: none; }
+    .timeline { bottom: 12px; width: calc(100% - 24px); padding: 10px 12px; gap: 10px; }
+    .phases { display: none; }
+    #fps { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { #marker .arrow, #marker .ping, #marker .tag { animation: none; } }
+</style>
+</head>
+<body>
+<div id="hud">
+  <section class="panel layers" aria-label="Anatomy layers">
+    <div class="eyebrow">Anatomy layers</div>
+    <button class="layer on" data-layer="0" aria-pressed="true"><span class="sw" style="--c:#e8c2ad"></span><span class="nm">Skin + ribcage</span><kbd>1</kbd></button>
+    <button class="layer on" data-layer="1" aria-pressed="true"><span class="sw" style="--c:#5aa8ff"></span><span class="nm">Pericardium</span><kbd>2</kbd></button>
+    <button class="layer on" data-layer="2" aria-pressed="true"><span class="sw" style="--c:#ff4d5e"></span><span class="nm">Heart + coronaries</span><kbd>3</kbd></button>
+    <button class="layer on" data-layer="3" aria-pressed="true"><span class="sw" style="--c:#ffc23d"></span><span class="nm">Blocked segment</span><kbd>4</kbd></button>
+    <button class="layer on" data-layer="4" aria-pressed="true"><span class="sw" style="--c:#cfd8e6"></span><span class="nm">Stent</span><kbd>5</kbd></button>
+  </section>
+
+  <section class="panel step" aria-live="polite">
+    <div class="eyebrow">Percutaneous coronary intervention</div>
+    <h1 id="stepTitle">Step 1 of 5: Chest Overview</h1>
+    <p id="stepDesc"></p>
+    <div class="dots" id="dots"></div>
+    <div class="row">
+      <button class="btn ghost" id="prevBtn" aria-label="Previous step">&larr;</button>
+      <button class="btn" id="nextBtn">Next Step &rarr;</button>
+    </div>
+    <button class="btn primary" id="deployBtn">Deploy Stent</button>
+  </section>
+
+  <section class="panel timeline" aria-label="Procedure timeline">
+    <button class="icon-btn" id="playBtn" aria-label="Play"></button>
+    <div class="track-wrap">
+      <div class="phases" id="phases">
+        <span style="flex:3">Catheter travel</span>
+        <span style="flex:1.4">Expansion</span>
+        <span style="flex:2.6">Flow restored</span>
+      </div>
+      <input type="range" id="scrub" min="0" max="7" step="0.01" value="0" aria-label="Procedure time">
+    </div>
+    <div class="time"><b id="tNow">0.00</b>s / 7.00s</div>
+  </section>
+
+  <div id="marker" class="hidden" aria-hidden="true">
+    <div class="ping"></div>
+    <svg class="arrow" viewBox="0 0 58 58" fill="none" stroke="#ff4d5e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 6 L50 50"/><path d="M50 28 L50 50 L28 50"/>
+    </svg>
+    <div class="tag" id="tag">BLOCKAGE</div>
+  </div>
+</div>
+<div id="fps">-- fps</div>
+<div id="err">Could not load Three.js from the CDN. Check your network connection and reload.</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+(() => {
+  'use strict';
+  if (!window.THREE || !THREE.OrbitControls || !THREE.UnrealBloomPass) {
+    document.getElementById('err').style.display = 'grid';
+    return;
+  }
+
+  // =====================================================================
+  // Constants
+  // =====================================================================
+  const V3 = THREE.Vector3;
+  const HEART_R = 2.0;
+  const LAD_R = 0.1, BRANCH_R = 0.065, SMALL_R = 0.045;
+  const BLOCK_U0 = 0.42, BLOCK_U1 = 0.52, BLOCK_U = 0.47;
+  const STENT_R0 = 0.05, STENT_R1 = 0.2, STENT_LEN = 0.85;
+  const PROC = { travel: 3.0, expand: 1.4, deflate: 0.8, total: 7.0 };
+  const PARTICLES = 300;
+  const FLOW_SLOW = 0.07, FLOW_FAST = 0.2;
+
+  const clamp01 = x => Math.min(1, Math.max(0, x));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const smooth = x => x * x * (3 - 2 * x);
+  const easeInOutCubic = x => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+  // Damped spring: overshoots ~18% then settles to 1.
+  const springEase = x => x >= 1 ? 1 : 1 - Math.exp(-5.5 * x) * Math.cos(x * Math.PI * 3.2);
+
+  // =====================================================================
+  // Renderer, scene, camera, controls
+  // =====================================================================
+  const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  renderer.setSize(innerWidth, innerHeight);
+  document.body.prepend(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x05070d);
+  scene.fog = new THREE.FogExp2(0x05070d, 0.018);
+
+  const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 200);
+  camera.position.set(7, 4, 19);
+
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.minDistance = 2.5;
+  controls.maxDistance = 32;
+  controls.target.set(0, 0.3, 0);
+
+  scene.add(new THREE.HemisphereLight(0x9cb8ff, 0x2a0a0e, 0.55));
+  const key = new THREE.DirectionalLight(0xfff1e6, 0.95);
+  key.position.set(6, 9, 10);
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0x6a8cff, 0.9);
+  rim.position.set(-8, 3, -7);
+  scene.add(rim);
+
+  // Small procedural environment so the metallic stent has something to reflect.
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const envScene = new THREE.Scene();
+  envScene.background = new THREE.Color(0x0b0f1a);
+  const envPanel = new THREE.PlaneGeometry(8, 8);
+  [[0xbfd6ff, [0, 7, 0], [Math.PI / 2, 0, 0]], [0xffffff, [7, 1, 2], [0, -Math.PI / 2, 0]],
+   [0xff7a7a, [-7, 0, 0], [0, Math.PI / 2, 0]], [0x4a6cff, [0, 0, -7], [0, 0, 0]]].forEach(([c, p, r]) => {
+    const m = new THREE.Mesh(envPanel, new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide }));
+    m.position.set(...p); m.rotation.set(...r); envScene.add(m);
+  });
+  const envMap = pmrem.fromScene(envScene, 0.04).texture;
+
+  // =====================================================================
+  // Layer 1: skin + ribcage
+  // =====================================================================
+  const chestLayer = new THREE.Group();
+  scene.add(chestLayer);
+
+  const skin = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 64, 40),
+    new THREE.MeshStandardMaterial({ color: 0x8a6a62, roughness: 0.7, transparent: true, opacity: 0.25, depthWrite: false })
+  );
+  skin.scale.set(5.4, 6.8, 4.2);
+  skin.renderOrder = 10;
+  chestLayer.add(skin);
+
+  const boneMat = new THREE.MeshStandardMaterial({ color: 0xb9b0a2, roughness: 0.6, transparent: true, opacity: 0.25, depthWrite: false });
+  for (let i = 0; i < 10; i++) {
+    const t = i / 9;
+    const R = 3.1 + Math.sin(t * Math.PI) * 1.35;
+    const g = new THREE.TorusGeometry(R, 0.11, 8, 64, Math.PI * 2 - 0.7);
+    g.rotateZ(Math.PI / 2 + 0.35); // leave the gap at the front for the sternum
+    g.rotateX(Math.PI / 2);
+    const rib = new THREE.Mesh(g, boneMat);
+    rib.scale.set(1, 1, 0.78);
+    rib.position.y = 3.7 - i * 0.78;
+    rib.rotation.x = 0.18; // ribs slope down toward the front
+    rib.renderOrder = 9;
+    chestLayer.add(rib);
+  }
+  const sternum = new THREE.Mesh(new THREE.BoxGeometry(0.55, 5.4, 0.2), boneMat);
+  sternum.position.set(0, 0.6, 3.3);
+  sternum.rotation.x = -0.1;
+  sternum.renderOrder = 9;
+  chestLayer.add(sternum);
+  const vertGeo = new THREE.BoxGeometry(0.6, 0.42, 0.6);
+  for (let i = 0; i < 14; i++) {
+    const v = new THREE.Mesh(vertGeo, boneMat);
+    v.position.set(0, 4.6 - i * 0.66, -3.25);
+    v.renderOrder = 9;
+    chestLayer.add(v);
+  }
+
+  // =====================================================================
+  // Heart rig: heartRoot holds placement, heartBeat receives the pulse scale
+  // =====================================================================
+  const heartRoot = new THREE.Group();
+  heartRoot.position.set(0.5, -0.3, 0.2);
+  heartRoot.rotation.set(0.12, -0.3, 0.45); // apex toward the patient's left
+  scene.add(heartRoot);
+  const heartBeat = new THREE.Group();
+  heartRoot.add(heartBeat);
+
+  // Maps a unit-sphere point onto the heart surface (tapered apex, broad base, faint muscle noise).
+  function heartShape(x, y, z, out) {
+    const n = 1 + 0.018 * Math.sin(x * 5.1 + y * 3.3) * Math.cos(z * 4.7 - y * 2.1);
+    let X = x * n, Y = y * n, Z = z * n;
+    if (Y < 0) { const k = 1 + Y * 0.6; X *= k; Z *= k; Y *= 1.38; }
+    else { Y *= 0.92; X *= 1 + 0.08 * Y; }
+    return out.set(X * 1.05, Y, Z * 0.84).multiplyScalar(HEART_R);
+  }
+  function surfacePoint(polar, az, lift = 1.03) {
+    const v = new V3(Math.sin(polar) * Math.sin(az), Math.cos(polar), Math.sin(polar) * Math.cos(az));
+    return heartShape(v.x, v.y, v.z, v).multiplyScalar(lift);
+  }
+
+  const heartGeo = new THREE.SphereGeometry(1, 112, 80);
+  heartGeo.rotateY(-Math.PI / 2); // move the UV seam to the back
+  {
+    const pos = heartGeo.attributes.position, v = new V3();
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      heartShape(v.x, v.y, v.z, v);
+      pos.setXYZ(i, v.x, v.y, v.z);
+    }
+    heartGeo.computeVertexNormals();
+  }
+
+  // =====================================================================
+  // Layer 2: pericardium
+  // =====================================================================
+  const pericardium = new THREE.Mesh(
+    heartGeo.clone().scale(1.1, 1.08, 1.13),
+    new THREE.MeshStandardMaterial({ color: 0x4fa3ff, emissive: 0x0a2a55, roughness: 0.25,
+      transparent: true, opacity: 0.17, depthWrite: false })
+  );
+  pericardium.renderOrder = 5;
+  heartBeat.add(pericardium);
+
+  // =====================================================================
+  // Layer 3: heart muscle, great vessels, coronary arteries
+  // =====================================================================
+  const heartLayer = new THREE.Group();
+  heartBeat.add(heartLayer);
+
+  const muscleMat = new THREE.MeshStandardMaterial({ color: 0x9a1c22, roughness: 0.5, metalness: 0.05,
+    emissive: 0xff1e2d, emissiveIntensity: 0.1 });
+  heartLayer.add(new THREE.Mesh(heartGeo, muscleMat));
+
+  const atriumMat = new THREE.MeshStandardMaterial({ color: 0x7c1820, roughness: 0.55, emissive: 0xff1e2d, emissiveIntensity: 0.06 });
+  [[-0.45, 0.7, -0.1], [0.3, 0.78, -0.4]].forEach(p => {
+    const a = new THREE.Mesh(new THREE.SphereGeometry(0.38 * HEART_R, 40, 28), atriumMat);
+    a.position.set(...p).multiplyScalar(HEART_R);
+    a.scale.set(1, 0.8, 0.9);
+    heartLayer.add(a);
+  });
+
+  const vessel = (pts, r, mat) => {
+    const curve = new THREE.CatmullRomCurve3(pts.map(p => new V3(...p).multiplyScalar(HEART_R)));
+    heartLayer.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 48, r * HEART_R, 20, false), mat));
+  };
+  vessel([[0, 0.75, 0], [-0.05, 1.35, 0.05], [0.2, 1.75, -0.1], [0.55, 1.55, -0.45], [0.65, 0.4, -0.6]], 0.17,
+    new THREE.MeshStandardMaterial({ color: 0xb02a30, roughness: 0.45 }));               // aorta
+  vessel([[0.25, 0.7, 0.35], [0.3, 1.15, 0.3], [0.2, 1.45, 0], [-0.2, 1.4, -0.3]], 0.14,
+    new THREE.MeshStandardMaterial({ color: 0x3d5fbf, roughness: 0.45 }));               // pulmonary trunk
+  vessel([[-0.55, 0.8, -0.2], [-0.58, 1.3, -0.22], [-0.6, 1.85, -0.2]], 0.12,
+    new THREE.MeshStandardMaterial({ color: 0x34509e, roughness: 0.5 }));                // superior vena cava
+
+  // Coronary arteries: dense (polar, azimuth) samples projected onto the surface, then a CatmullRom spline.
+  function arteryCurve(keys, perSeg = 8, start) {
+    const pts = start ? [start.clone()] : [];
+    for (let k = 0; k < keys.length - 1; k++) {
+      for (let j = (k === 0 && start) ? 1 : 0; j < perSeg; j++) {
+        const s = j / perSeg;
+        pts.push(surfacePoint(lerp(keys[k][0], keys[k + 1][0], s), lerp(keys[k][1], keys[k + 1][1], s)));
+      }
+    }
+    const last = keys[keys.length - 1];
+    pts.push(surfacePoint(last[0], last[1]));
+    return new THREE.CatmullRomCurve3(pts);
+  }
+  const arteryMat = new THREE.MeshStandardMaterial({ color: 0xd8333c, roughness: 0.35, emissive: 0xff2a3a, emissiveIntensity: 0.75 });
+
+  // Left anterior descending (LAD): the main path for blood flow, blockage and stent delivery.
+  const ladKeys = [];
+  for (let i = 0; i <= 10; i++) {
+    const s = i / 10;
+    ladKeys.push([lerp(0.5, 2.75, s), lerp(0.25, -0.1, s) + 0.06 * Math.sin(s * 7)]);
+  }
+  const ladCurve = arteryCurve(ladKeys, 4);
+  heartLayer.add(new THREE.Mesh(new THREE.TubeGeometry(ladCurve, 160, LAD_R, 12, false), arteryMat));
+
+  const branches = [
+    { keys: [[1.15, 0.2], [1.5, 0.6], [1.9, 0.95]], from: 0.3, r: BRANCH_R },        // diagonal 1
+    { keys: [[1.95, 0.15], [2.2, 0.55], [2.45, 0.85]], from: 0.62, r: SMALL_R },     // diagonal 2
+    { keys: [[0.55, 0.45], [0.85, 1.2], [1.05, 1.9], [1.25, 2.6]], r: BRANCH_R },    // circumflex
+    { keys: [[0.95, 1.55], [1.6, 1.7], [2.2, 1.6]], r: SMALL_R },                    // obtuse marginal
+    { keys: [[0.6, -0.35], [0.95, -1.1], [1.25, -1.9], [1.45, -2.6], [1.6, -3.0]], r: BRANCH_R }, // right coronary
+    { keys: [[1.1, -1.5], [1.8, -1.4], [2.3, -1.1]], r: SMALL_R },                   // acute marginal
+  ];
+  branches.forEach(b => {
+    const start = b.from !== undefined ? ladCurve.getPointAt(b.from) : undefined;
+    const c = arteryCurve(b.keys, 8, start);
+    heartLayer.add(new THREE.Mesh(new THREE.TubeGeometry(c, 64, b.r, 8, false), arteryMat));
+  });
+
+  // =====================================================================
+  // Layer 4: blocked artery segment (plaque + additive warning glow shell)
+  // =====================================================================
+  const blockLayer = new THREE.Group();
+  heartBeat.add(blockLayer);
+  const blockPts = [];
+  for (let i = 0; i <= 12; i++) blockPts.push(ladCurve.getPointAt(lerp(BLOCK_U0, BLOCK_U1, i / 12)));
+  const blockCurve = new THREE.CatmullRomCurve3(blockPts);
+  const plaqueMat = new THREE.MeshStandardMaterial({ color: 0xffc400, roughness: 0.4, emissive: 0xffaa00, emissiveIntensity: 1.5 });
+  blockLayer.add(new THREE.Mesh(new THREE.TubeGeometry(blockCurve, 32, 0.145, 14, false), plaqueMat));
+  [blockPts[0], blockPts[12]].forEach(p => {
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.145, 16, 12), plaqueMat);
+    cap.position.copy(p);
+    blockLayer.add(cap);
+  });
+  const glowMat = new THREE.MeshBasicMaterial({ color: 0xffb300, transparent: true, opacity: 0.3,
+    blending: THREE.AdditiveBlending, depthWrite: false });
+  const glowShell = new THREE.Mesh(new THREE.TubeGeometry(blockCurve, 32, 0.26, 14, false), glowMat);
+  blockLayer.add(glowShell);
+
+  // =====================================================================
+  // Layer 5: stent (helical lattice on a balloon catheter)
+  // =====================================================================
+  const stentLayer = new THREE.Group();
+  heartBeat.add(stentLayer);
+  const stent = new THREE.Group();     // positioned and oriented along the delivery curve
+  const lattice = new THREE.Group();   // scaled radially for the collapse/expand animation
+  stent.add(lattice);
+  stentLayer.add(stent);
+
+  const stentMat = new THREE.MeshStandardMaterial({ color: 0xdfe5ee, metalness: 1, roughness: 0.22,
+    envMap, envMapIntensity: 1.3, emissive: 0x24344c, emissiveIntensity: 0.5 });
+  // X-ray ghost: draws only where the stent is hidden (inside the artery or behind the heart).
+  const ghostMat = new THREE.MeshBasicMaterial({ color: 0x4fb8d8, transparent: true, opacity: 0.35,
+    depthFunc: THREE.GreaterDepth, depthWrite: false });
+
+  const strutGeos = [];
+  for (const dir of [1, -1]) {
+    for (let k = 0; k < 8; k++) {
+      const pts = [];
+      for (let j = 0; j <= 32; j++) {
+        const s = j / 32, a = (k / 8) * Math.PI * 2 + dir * s * Math.PI;
+        pts.push(new V3(Math.cos(a), s - 0.5, Math.sin(a)));
+      }
+      strutGeos.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 32, 0.09, 5, false));
+    }
+  }
+  for (const y of [-0.5, 0.5]) {
+    const g = new THREE.TorusGeometry(1, 0.1, 6, 40);
+    g.rotateX(Math.PI / 2);
+    g.translate(0, y, 0);
+    strutGeos.push(g);
+  }
+  strutGeos.forEach(g => {
+    lattice.add(new THREE.Mesh(g, stentMat));
+    const ghost = new THREE.Mesh(g, ghostMat);
+    ghost.renderOrder = 20;
+    lattice.add(ghost);
+  });
+
+  const balloon = new THREE.Mesh(
+    new THREE.CylinderGeometry(1, 1, 1, 24, 1, false),
+    new THREE.MeshStandardMaterial({ color: 0x5ab0ff, emissive: 0x1a4a9a, transparent: true, opacity: 0.45, depthWrite: false })
+  );
+  stent.add(balloon);
+
+  // Delivery path: the LAD from its origin to the centre of the blockage.
+  const deliveryPts = [];
+  for (let i = 0; i <= 30; i++) deliveryPts.push(ladCurve.getPointAt((i / 30) * BLOCK_U));
+  const deliveryCurve = new THREE.CatmullRomCurve3(deliveryPts);
+
+  // =====================================================================
+  // Blood flow particles (300 points riding the LAD wall)
+  // =====================================================================
+  const LUT_N = 512;
+  const lut = ladCurve.getSpacedPoints(LUT_N - 1);
+  const frames = ladCurve.computeFrenetFrames(LUT_N - 1, false);
+  const pU = new Float32Array(PARTICLES), pAng = new Float32Array(PARTICLES),
+        pRad = new Float32Array(PARTICLES), pSpd = new Float32Array(PARTICLES);
+  for (let i = 0; i < PARTICLES; i++) {
+    pU[i] = Math.random();
+    pAng[i] = Math.random() * Math.PI * 2;
+    pRad[i] = Math.random() * 0.035;
+    pSpd[i] = 0.75 + Math.random() * 0.5;
+  }
+  const pPos = new Float32Array(PARTICLES * 3);
+  const pGeo = new THREE.BufferGeometry();
+  pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3).setUsage(THREE.DynamicDrawUsage));
+  const dot = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,140,150,.9)'); gr.addColorStop(1, 'rgba(255,0,30,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  })();
+  const particles = new THREE.Points(pGeo, new THREE.PointsMaterial({ size: 0.11, map: dot, color: 0xff5a66,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }));
+  particles.frustumCulled = false;
+  heartLayer.add(particles);
+
+  // =====================================================================
+  // Post-processing: bloom for the emissive arteries, plaque and particles
+  // =====================================================================
+  const composer = new THREE.EffectComposer(renderer);
+  composer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  composer.setSize(innerWidth, innerHeight);
+  composer.addPass(new THREE.RenderPass(scene, camera));
+  const bloom = new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.75, 0.5, 0.72);
+  composer.addPass(bloom);
+
+  // =====================================================================
+  // Camera viewpoints (computed from the rig so they track the blockage)
+  // =====================================================================
+  heartRoot.updateMatrixWorld(true);
+  const heartWorld = heartRoot.getWorldPosition(new V3());
+  const blockWorld = heartBeat.localToWorld(ladCurve.getPointAt(BLOCK_U));
+  const outward = blockWorld.clone().sub(heartWorld).normalize();
+  const tanWorld = ladCurve.getTangentAt(BLOCK_U).transformDirection(heartBeat.matrixWorld);
+  const VIEWS = [
+    { pos: new V3(7, 4, 19), target: new V3(0, 0.3, 0) },
+    { pos: heartWorld.clone().add(new V3(3, 2, 9.5)), target: heartWorld.clone() },
+    { pos: blockWorld.clone().addScaledVector(outward, 5).add(new V3(0, 1.2, 0)), target: blockWorld.clone() },
+    { pos: blockWorld.clone().addScaledVector(outward, 3.6).addScaledVector(tanWorld, -2.2).add(new V3(0, 0.8, 0)), target: blockWorld.clone() },
+  ];
+  const STEPS = [
+    { title: 'Chest Overview', view: 0, desc: 'Skin and ribcage at 25% opacity. The heart beats with a lub-dub rhythm.' },
+    { title: 'Coronary Arteries', view: 1, desc: 'The coronary arteries wrap the heart. The LAD runs down the front and feeds the left ventricle.' },
+    { title: 'Locate Blockage', view: 2, desc: 'Plaque narrows the LAD. Blood slows and bunches up at the lesion.' },
+    { title: 'Stent Deployment', view: 3, desc: 'A collapsed stent on a balloon catheter travels the artery, then the balloon expands it.' },
+    { title: 'Flow Restored', view: 1, desc: 'The stent holds the artery open and blood flow speeds back up.' },
+  ];
+
+  // =====================================================================
+  // State + UI wiring
+  // =====================================================================
+  const $ = id => document.getElementById(id);
+  const ui = { stepTitle: $('stepTitle'), stepDesc: $('stepDesc'), dots: $('dots'), deploy: $('deployBtn'),
+    play: $('playBtn'), scrub: $('scrub'), tNow: $('tNow'), phases: $('phases').children,
+    marker: $('marker'), tag: $('tag'), fps: $('fps') };
+  const layerObjs = [chestLayer, pericardium, heartLayer, blockLayer, stentLayer];
+  const layerBtns = [...document.querySelectorAll('.layer')];
+  const proc = { t: 0, playing: false };
+  const fly = { active: false, pos: new V3(), target: new V3() };
+  let step = 0;
+
+  STEPS.forEach(() => ui.dots.appendChild(document.createElement('i')));
+  const ICON_PLAY = '<svg viewBox="0 0 16 16"><path d="M4 2.5v11l9.5-5.5z"/></svg>';
+  const ICON_PAUSE = '<svg viewBox="0 0 16 16"><path d="M3.5 2.5h3v11h-3zM9.5 2.5h3v11h-3z"/></svg>';
+
+  function setLayer(i, on) {
+    layerObjs[i].visible = on;
+    layerBtns[i].classList.toggle('on', on);
+    layerBtns[i].setAttribute('aria-pressed', on);
+  }
+  layerBtns.forEach((b, i) => b.addEventListener('click', () => setLayer(i, !layerObjs[i].visible)));
+
+  function flyTo(view) { fly.pos.copy(view.pos); fly.target.copy(view.target); fly.active = true; }
+  controls.addEventListener('start', () => { fly.active = false; });
+
+  function goToStep(i) {
+    step = (i + STEPS.length) % STEPS.length;
+    const s = STEPS[step];
+    ui.stepTitle.textContent = `Step ${step + 1} of ${STEPS.length}: ${s.title}`;
+    ui.stepDesc.textContent = s.desc;
+    [...ui.dots.children].forEach((d, k) => { d.className = k === step ? 'on' : k < step ? 'done' : ''; });
+    flyTo(VIEWS[s.view]);
+    if (step === 3 && proc.t === 0 && !proc.playing) startDeploy();
+    if (step === 4 && proc.t < PROC.total) proc.playing = true;
+  }
+  function startDeploy() {
+    proc.t = 0;
+    proc.playing = true;
+    setLayer(4, true);
+    if (step !== 3) goToStep(3);
+  }
+  function togglePlay() {
+    if (!proc.playing && proc.t >= PROC.total) proc.t = 0;
+    proc.playing = !proc.playing;
+  }
+
+  $('nextBtn').addEventListener('click', () => goToStep(step + 1));
+  $('prevBtn').addEventListener('click', () => goToStep(step - 1));
+  ui.deploy.addEventListener('click', startDeploy);
+  ui.play.addEventListener('click', togglePlay);
+  ui.scrub.addEventListener('input', () => { proc.t = parseFloat(ui.scrub.value); proc.playing = false; });
+  window.addEventListener('keydown', e => {
+    if (e.target === ui.scrub && e.key.startsWith('Arrow')) return;
+    if (e.key >= '1' && e.key <= '5') setLayer(+e.key - 1, !layerObjs[+e.key - 1].visible);
+    else if (e.key === 'n' || e.key === 'ArrowRight') goToStep(step + 1);
+    else if (e.key === 'ArrowLeft') goToStep(step - 1);
+    else if (e.key === 'd') startDeploy();
+    else if (e.key === ' ' && e.target.tagName !== 'BUTTON') { e.preventDefault(); togglePlay(); }
+  });
+
+  window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+    composer.setSize(innerWidth, innerHeight);
+  });
+
+  // =====================================================================
+  // Pure functions of time (so the scrubber can replay any moment)
+  // =====================================================================
+  // Lub-dub: a sharp peak from sin(t*4) followed ~0.15s later by a softer one from the sin(t*8) harmonic.
+  function heartbeat(t) {
+    const s1 = Math.sin(t * 4);
+    const lub = Math.pow(Math.max(0, s1), 14);
+    const dub = Math.pow(Math.max(0, Math.sin(t * 8 - Math.PI / 2 - 1.2)), 14) * Math.max(0, s1);
+    return Math.min(1, lub + 0.65 * dub);
+  }
+  function procedureAt(T) {
+    const travel = easeInOutCubic(clamp01(T / PROC.travel));
+    const expand = clamp01((T - PROC.travel) / PROC.expand);
+    const radius = STENT_R0 + (STENT_R1 - STENT_R0) * springEase(expand);
+    const deflate = smooth(clamp01((T - PROC.travel - PROC.expand) / PROC.deflate));
+    const resolved = smooth(clamp01((T - PROC.travel - 0.6) / 1.2));
+    return { travel, expand, radius, deflate, resolved };
+  }
+
+  // =====================================================================
+  // Frame loop
+  // =====================================================================
+  const clock = new THREE.Clock();
+  const _up = new V3(0, 1, 0), _tan = new V3(), _p = new V3(), _blk = new V3(), _cam = new V3();
+  const blockLocal = ladCurve.getPointAt(BLOCK_U);
+  const blockNormalLocal = blockLocal.clone().normalize();
+  let elapsed = 0, fpsAcc = 0, fpsFrames = 0, lastPhase = -1;
+  goToStep(0);
+
+  function frame() {
+    requestAnimationFrame(frame);
+    const dt = Math.min(clock.getDelta(), 0.05);
+    elapsed += dt;
+
+    // ---- Animation: heartbeat (scale X/Y/Z + emissive pulse share one signal) ----
+    const beat = heartbeat(elapsed);
+    heartBeat.scale.set(1 + 0.055 * beat, 1 + 0.035 * beat, 1 + 0.055 * beat);
+    muscleMat.emissiveIntensity = 0.04 + 0.5 * beat;
+    atriumMat.emissiveIntensity = 0.06 + 0.35 * beat;
+
+    // ---- Animation: procedure clock (drives stent, blockage, flow; scrubber reads/writes it) ----
+    if (proc.playing) {
+      proc.t += dt;
+      if (proc.t >= PROC.total) { proc.t = PROC.total; proc.playing = false; }
+    }
+    const P = procedureAt(proc.t);
+
+    // ---- Animation: stent travel along the LAD via getPointAt(t), eased over 3s ----
+    deliveryCurve.getPointAt(P.travel, stent.position);
+    deliveryCurve.getTangentAt(P.travel, _tan);
+    stent.quaternion.setFromUnitVectors(_up, _tan);
+
+    // ---- Animation: radial spring expansion 0.05 -> 0.2, balloon inflates then deflates ----
+    lattice.scale.set(P.radius, STENT_LEN, P.radius);
+    const balloonR = lerp(P.radius * 0.9, 0.03, P.deflate);
+    balloon.scale.set(balloonR, STENT_LEN * 1.15, balloonR);
+    balloon.visible = P.deflate < 1;
+    ghostMat.opacity = 0.35 * (1 - P.expand); // ghost only matters while the stent is inside the artery
+
+    // ---- Animation: blockage warning glow (fades once the stent opens the artery) ----
+    const warn = 0.5 + 0.5 * Math.sin(elapsed * 6);
+    const danger = 1 - P.resolved;
+    plaqueMat.emissiveIntensity = 0.25 + danger * (1.0 + 1.4 * warn);
+    glowMat.opacity = danger * (0.12 + 0.3 * warn);
+    glowShell.scale.setScalar(1 + danger * 0.04 * warn);
+
+    // ---- Animation: blood flow particles (pulsatile, slowed at the lesion until stented) ----
+    if (heartLayer.visible) {
+      const base = lerp(FLOW_SLOW, FLOW_FAST, P.resolved) * (0.55 + 0.9 * beat);
+      for (let i = 0; i < PARTICLES; i++) {
+        let u = pU[i];
+        const inBlock = u > BLOCK_U0 - 0.03 && u < BLOCK_U1;
+        const choke = inBlock ? lerp(0.18, 1, P.resolved) : 1;
+        u += base * pSpd[i] * choke * dt;
+        if (u >= 1) u -= 1;
+        pU[i] = u;
+        pAng[i] += dt * 1.5;
+        const f = u * (LUT_N - 1), i0 = Math.min(f | 0, LUT_N - 2), fr = f - i0;
+        const a = lut[i0], b = lut[i0 + 1];
+        const n = frames.normals[i0], bn = frames.binormals[i0];
+        const wall = (inBlock ? lerp(0.19, LAD_R + 0.03, P.resolved) : LAD_R + 0.03) + pRad[i];
+        const c = Math.cos(pAng[i]) * wall, s = Math.sin(pAng[i]) * wall;
+        pPos[i * 3]     = a.x + (b.x - a.x) * fr + n.x * c + bn.x * s;
+        pPos[i * 3 + 1] = a.y + (b.y - a.y) * fr + n.y * c + bn.y * s;
+        pPos[i * 3 + 2] = a.z + (b.z - a.z) * fr + n.z * c + bn.z * s;
+      }
+      pGeo.attributes.position.needsUpdate = true;
+    }
+
+    // ---- Animation: camera flight between viewpoints (frame-rate independent lerp) ----
+    if (fly.active) {
+      const k = 1 - Math.exp(-dt * 2.4);
+      camera.position.lerp(fly.pos, k);
+      controls.target.lerp(fly.target, k);
+      if (camera.position.distanceToSquared(fly.pos) < 1e-4) fly.active = false;
+    }
+    controls.update();
+
+    // ---- Overlay: project the beating blockage position to screen space each frame ----
+    heartRoot.updateMatrixWorld(true);
+    heartBeat.localToWorld(_blk.copy(blockLocal));
+    _p.copy(blockNormalLocal).transformDirection(heartBeat.matrixWorld);
+    const facing = _cam.copy(camera.position).sub(_blk).dot(_p) > 0;
+    _blk.project(camera);
+    const onScreen = _blk.z < 1 && Math.abs(_blk.x) < 1.1 && Math.abs(_blk.y) < 1.1;
+    ui.marker.classList.toggle('hidden', !onScreen || !blockLayer.visible);
+    ui.marker.classList.toggle('behind', !facing);
+    ui.marker.style.transform = `translate3d(${(_blk.x * 0.5 + 0.5) * innerWidth}px, ${(-_blk.y * 0.5 + 0.5) * innerHeight}px, 0)`;
+    const ok = P.resolved > 0.85;
+    if (ui.marker.classList.contains('ok') !== ok) {
+      ui.marker.classList.toggle('ok', ok);
+      ui.tag.textContent = ok ? 'FLOW RESTORED' : 'BLOCKAGE';
+    }
+
+    // ---- UI: timeline + button state ----
+    if (document.activeElement !== ui.scrub || proc.playing) ui.scrub.value = proc.t;
+    ui.scrub.style.setProperty('--p', (proc.t / PROC.total * 100) + '%');
+    ui.tNow.textContent = proc.t.toFixed(2);
+    const phase = proc.t < PROC.travel ? 0 : proc.t < PROC.travel + PROC.expand ? 1 : 2;
+    const playKey = (proc.playing ? 1 : 0) + phase * 2 + (proc.t > 0 ? 10 : 0);
+    if (playKey !== lastPhase) {
+      lastPhase = playKey;
+      [...ui.phases].forEach((el, k) => el.classList.toggle('on', proc.t > 0 && k === phase));
+      ui.play.innerHTML = proc.playing ? ICON_PAUSE : ICON_PLAY;
+      ui.play.setAttribute('aria-label', proc.playing ? 'Pause' : 'Play');
+      ui.deploy.dataset.state = proc.playing ? 'running' : '';
+      ui.deploy.textContent = proc.playing ? 'Deploying...' : proc.t >= PROC.total ? 'Replay Deployment' : 'Deploy Stent';
+    }
+
+    // ---- FPS meter ----
+    fpsAcc += dt; fpsFrames++;
+    if (fpsAcc >= 0.5) { ui.fps.textContent = Math.round(fpsFrames / fpsAcc) + ' fps'; fpsAcc = 0; fpsFrames = 0; }
+
+    composer.render();
+  }
+  frame();
+})();
+</script>
+</body>
+</html>
