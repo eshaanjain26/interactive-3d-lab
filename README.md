@@ -1,6 +1,6 @@
 # Interactive 3D Lab
 
-Eighteen interactive Three.js explorers covering chips, quantum computing, AI, robotics, audio, anatomy, cardiology, embryology, energy, logistics, space and U.S. immigration law. Each one is a single self-contained HTML file.
+Twenty interactive Three.js explorers covering chips, quantum computing, AI, robotics, audio, anatomy, cardiology, embryology, energy, logistics, space and U.S. immigration law. Each one is a single self-contained HTML file.
 
 **Live site:** https://eshaanjain26.github.io/interactive-3d-lab/
 
@@ -25,6 +25,7 @@ Eighteen interactive Three.js explorers covering chips, quantum computing, AI, r
 | [Audio Spectrum Matrix](https://eshaanjain26.github.io/interactive-3d-lab/audio-spectrum-matrix/) | A neon wireframe terrain driven by live FFT data from a built-in synth, microphone or audio file |
 | [Warehouse Dock Twin](https://eshaanjain26.github.io/interactive-3d-lab/warehouse-dock-twin/) | A six-bay warehouse dock as a digital twin: trucks run their own arrive, dock, unload, load and depart timelines while pallets flow from truck to conveyor to racking and forklifts work the aisles |
 | [Warehouse Ops Academy](https://eshaanjain26.github.io/interactive-3d-lab/warehouse-ops-academy/) | An end-to-end distribution center for teaching: gate check-in, intermodal rail and drayage, docking, receiving, putaway, pick-to-light, AMR goods-to-person, packing, sortation, shipping, cycle counts and andons, with 20+ animated workers, a guided tour and a walkable floor |
+| [Rocket Launch Broadcast](https://eshaanjain26.github.io/interactive-3d-lab/rocket-launch-broadcast/) | A heavy-lift launch from T-10 to orbit as a live broadcast: umbilicals and swing arms release, ignition and liftoff with flame-trench smoke, booster and stage separation, fairing deploy, then a pull-back to Earth's curvature, with telemetry, an altitude tape, a cutaway view and a scrubbable timeline |
 
 ## Run locally
 
