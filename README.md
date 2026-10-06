@@ -1,6 +1,6 @@
 # Interactive 3D Lab
 
-Eighteen interactive Three.js explorers covering chips, quantum computing, AI, robotics, logistics, data centers, audio, anatomy, cardiology, embryology, energy, space and U.S. immigration law. Each one is a single self-contained HTML file.
+Eighteen interactive Three.js explorers covering chips, quantum computing, AI, robotics, audio, anatomy, cardiology, embryology, energy, logistics, space and U.S. immigration law. Each one is a single self-contained HTML file.
 
 **Live site:** https://eshaanjain26.github.io/interactive-3d-lab/
 
@@ -24,6 +24,7 @@ Eighteen interactive Three.js explorers covering chips, quantum computing, AI, r
 | [AMR Fulfillment Floor](https://eshaanjain26.github.io/interactive-3d-lab/amr-fulfillment-floor/) | A goods-to-person warehouse: 4 to 20 robots lift racks, queue at picking stations, yield in the aisles and recharge, with live KPIs, route overlays and a traffic heat map |
 | [Audio Spectrum Matrix](https://eshaanjain26.github.io/interactive-3d-lab/audio-spectrum-matrix/) | A neon wireframe terrain driven by live FFT data from a built-in synth, microphone or audio file |
 | [Warehouse Dock Twin](https://eshaanjain26.github.io/interactive-3d-lab/warehouse-dock-twin/) | A six-bay warehouse dock as a digital twin: trucks run their own arrive, dock, unload, load and depart timelines while pallets flow from truck to conveyor to racking and forklifts work the aisles |
+| [Warehouse Ops Academy](https://eshaanjain26.github.io/interactive-3d-lab/warehouse-ops-academy/) | An end-to-end distribution center for teaching: gate check-in, intermodal rail and drayage, docking, receiving, putaway, pick-to-light, AMR goods-to-person, packing, sortation, shipping, cycle counts and andons, with 20+ animated workers, a guided tour and a walkable floor |
 
 ## Run locally
 
