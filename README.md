@@ -1,6 +1,6 @@
 # Interactive 3D Lab
 
-Sixteen interactive Three.js explorers covering chips, quantum computing, AI, robotics, audio, anatomy, cardiology, embryology, energy, logistics, space and U.S. immigration law. Each one is a single self-contained HTML file.
+Eighteen interactive Three.js explorers covering chips, quantum computing, AI, robotics, logistics, data centers, audio, anatomy, cardiology, embryology, energy, space and U.S. immigration law. Each one is a single self-contained HTML file.
 
 **Live site:** https://eshaanjain26.github.io/interactive-3d-lab/
 
@@ -13,6 +13,7 @@ Sixteen interactive Three.js explorers covering chips, quantum computing, AI, ro
 | [Q-Learning Grid World](https://eshaanjain26.github.io/interactive-3d-lab/q-learning-grid-world/) | A tabular Q-learning agent trained live, with a Q-table view |
 | [EV Teardown Explorer](https://eshaanjain26.github.io/interactive-3d-lab/ev-teardown-explorer/) | A dual-motor electric sedan in exploded view, with component specs |
 | [Microgrid Flow](https://eshaanjain26.github.io/interactive-3d-lab/microgrid-flow/) | Smart-city microgrid supply and demand, shown live |
+| [Data Center Thermal Lab](https://eshaanjain26.github.io/interactive-3d-lab/datacenter-thermal-lab/) | A 40-rack hall with hot/cold aisle containment, particle airflow from CRAC units through the raised floor, a live thermal model, and a CRAC failure that grows a hotspot in about 10 seconds |
 | [Cardiac Flow Lab](https://eshaanjain26.github.io/interactive-3d-lab/cardiac-flow-lab/) | Four chambers, four valves, one cardiac cycle |
 | [Glass Body Atlas](https://eshaanjain26.github.io/interactive-3d-lab/glass-body-atlas/) | A see-through anatomy atlas of the organ systems |
 | [Coronary Stent Lab](https://eshaanjain26.github.io/interactive-3d-lab/coronary-stent-lab/) | A beating heart with a blocked coronary artery: toggleable anatomy layers, stent delivery and balloon expansion on a scrubbable timeline, and blood flow that speeds up once the artery opens |
