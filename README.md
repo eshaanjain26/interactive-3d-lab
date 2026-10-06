@@ -1,6 +1,6 @@
 # Interactive 3D Lab
 
-Fourteen interactive Three.js explorers covering chips, quantum computing, AI, robotics, audio, anatomy, embryology, energy, space and U.S. immigration law. Each one is a single self-contained HTML file.
+Fifteen interactive Three.js explorers covering chips, quantum computing, AI, robotics, audio, anatomy, embryology, energy, aviation, space and U.S. immigration law. Each one is a single self-contained HTML file.
 
 **Live site:** https://eshaanjain26.github.io/interactive-3d-lab/
 
@@ -20,6 +20,7 @@ Fourteen interactive Three.js explorers covering chips, quantum computing, AI, r
 | [Heliocentric Orrery](https://eshaanjain26.github.io/interactive-3d-lab/heliocentric-orrery/) | A 3D solar system simulator |
 | [Drone Swarm Boids](https://eshaanjain26.github.io/interactive-3d-lab/drone-swarm-boids/) | Reynolds flocking across up to 600 quadcopters, with click-placed beacons, hazards and obstacles, three camera modes and live swarm telemetry |
 | [Audio Spectrum Matrix](https://eshaanjain26.github.io/interactive-3d-lab/audio-spectrum-matrix/) | A neon wireframe terrain driven by live FFT data from a built-in synth, microphone or audio file |
+| [Gate B12 Turnaround](https://eshaanjain26.github.io/interactive-3d-lab/airport-turnaround/) | An A320neo lands, turns at the gate (fuel, catering, bags, passengers on the jet bridge) and departs, run by a state machine with a scrubbable ops Gantt and a late-fuel-truck delay scenario |
 
 ## Run locally
 
