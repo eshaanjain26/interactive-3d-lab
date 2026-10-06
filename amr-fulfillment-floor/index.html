@@ -1,0 +1,1528 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AMR Fulfillment Floor</title>
+<meta name="description" content="A live 3D fulfillment center: autonomous mobile robots lift storage racks, carry them to picking stations, yield to each other in the aisles, and recharge, with KPIs, heat map and route overlays.">
+<style>
+:root{
+  --bg:#050a16;--glass:rgba(12,24,48,.56);--glass-strong:rgba(9,18,38,.82);
+  --line:rgba(120,210,255,.16);--line-strong:rgba(120,210,255,.34);
+  --text:#dce8f6;--muted:#8299b4;--cyan:#00e5ff;--amber:#ffb020;--green:#39ff88;
+  --blue:#5a9bff;--yellow:#ffd400;--orange:#ff7a1a;--red:#ff5a6a;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+#scene{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#scene:active{cursor:grabbing}
+#labels{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+.glass{background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.05)}
+.topbar{position:fixed;top:16px;left:16px;right:16px;display:flex;align-items:center;gap:16px;padding:10px 12px 10px 14px;flex-wrap:wrap;z-index:3}
+.brand{display:flex;gap:11px;align-items:center;min-width:230px}
+.logo{width:30px;height:30px;border-radius:9px;border:1px solid var(--line-strong);background:radial-gradient(circle,rgba(0,229,255,.55) 0 22%,transparent 24% 46%,rgba(0,229,255,.35) 48% 54%,transparent 56%);box-shadow:0 0 18px rgba(0,229,255,.3)}
+.brand h1{font-size:15px;margin:0;letter-spacing:.02em;font-weight:650}
+.brand p{margin:2px 0 0;font-size:11px;color:var(--muted)}
+.kpis{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.kpi{padding:6px 12px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid var(--line);min-width:100px}
+.kpi .k{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}
+.kpi .v{font-family:var(--mono);font-size:18px;font-variant-numeric:tabular-nums;color:var(--cyan);text-shadow:0 0 12px rgba(0,229,255,.35)}
+.kpi .v small{font-size:11px;color:var(--muted);text-shadow:none}
+.kpi.amber .v{color:var(--amber);text-shadow:0 0 12px rgba(255,176,32,.35)}
+body.rush .kpi .v{color:var(--amber);text-shadow:0 0 12px rgba(255,176,32,.4)}
+.controls{position:fixed;left:16px;top:104px;width:258px;padding:14px;z-index:3;max-height:calc(100% - 150px);overflow:auto}
+.controls h2,.inspector h2{font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin:0 0 12px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.drawer-btn{display:none;background:none;border:1px solid var(--line);color:var(--muted);border-radius:7px;font:inherit;font-size:10px;padding:3px 8px;cursor:pointer}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:10px 0;font-size:13px}
+.slider-head{display:flex;justify-content:space-between;font-size:13px}
+.slider-head output{font-family:var(--mono);color:var(--cyan)}
+input[type=range]{width:100%;margin:8px 0 4px;accent-color:var(--cyan);height:22px}
+.switch{position:relative;width:38px;height:22px;border-radius:11px;border:1px solid var(--line-strong);background:rgba(255,255,255,.05);cursor:pointer;flex:none;transition:background .2s,border-color .2s}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:var(--muted);transition:transform .2s,background .2s}
+.switch[aria-checked=true]{background:rgba(0,229,255,.18);border-color:var(--cyan)}
+.switch[aria-checked=true]::after{transform:translateX(16px);background:var(--cyan);box-shadow:0 0 10px var(--cyan)}
+.seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:9px;overflow:hidden;margin:6px 0 12px}
+.seg button{background:none;border:0;color:var(--muted);font:inherit;font-size:12px;padding:8px 6px;cursor:pointer}
+.seg button.on{background:rgba(0,229,255,.14);color:var(--cyan)}
+.rush{width:100%;padding:11px;border-radius:10px;border:1px solid rgba(255,176,32,.55);background:linear-gradient(180deg,rgba(255,176,32,.2),rgba(255,176,32,.06));color:var(--amber);font:inherit;font-weight:650;font-size:13px;letter-spacing:.04em;cursor:pointer;transition:box-shadow .2s}
+.rush:hover{box-shadow:0 0 22px rgba(255,176,32,.3)}
+body.rush .rush{background:rgba(255,176,32,.28);box-shadow:0 0 26px rgba(255,176,32,.45)}
+.bar{height:4px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:7px}
+.bar i{display:block;height:100%;width:0;background:var(--amber);box-shadow:0 0 8px var(--amber)}
+.legend{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:11px;color:var(--muted)}
+.legend span{display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;box-shadow:0 0 8px currentColor}
+.label-small{font-size:11px;color:var(--muted);margin-top:2px}
+.inspector{position:fixed;right:16px;top:104px;width:310px;max-height:calc(100% - 150px);overflow:auto;padding:14px;z-index:3;transition:opacity .2s,transform .2s}
+.inspector.hidden{opacity:0;transform:translateX(12px);pointer-events:none}
+.insp-title{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.insp-title h3{margin:0;font-family:var(--mono);font-size:20px;color:#fff}
+.chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;padding:3px 8px;border-radius:20px;border:1px solid currentColor;white-space:nowrap}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.cell{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:9px;padding:7px 9px}
+.cell .k{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.cell .v{font-family:var(--mono);font-size:14px;margin-top:2px;font-variant-numeric:tabular-nums}
+.wide{grid-column:1 / -1}
+.meter{height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:6px}
+.meter i{display:block;height:100%}
+table{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:6px}
+th{color:var(--muted);font-weight:500;text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;padding:4px 4px;border-bottom:1px solid var(--line)}
+td{padding:6px 4px;border-bottom:1px solid rgba(120,210,255,.07);vertical-align:middle}
+td.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.btns{display:flex;gap:8px;margin-top:12px}
+.btn{flex:1;padding:8px;border-radius:9px;border:1px solid var(--line-strong);background:rgba(0,229,255,.08);color:var(--cyan);font:inherit;font-size:12px;cursor:pointer}
+.btn.ghost{background:none;color:var(--muted);border-color:var(--line)}
+.btn:hover{border-color:var(--cyan)}
+.hint{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);font-size:11.5px;color:var(--muted);padding:7px 14px;border-radius:20px;z-index:2;white-space:nowrap}
+.fps{position:fixed;right:16px;bottom:16px;font-family:var(--mono);font-size:10.5px;color:var(--muted);padding:5px 10px;border-radius:9px;z-index:2}
+.tag{position:absolute;left:0;top:0;display:flex;align-items:center;gap:5px;font:10px/1.2 var(--mono);padding:3px 7px;border-radius:6px;background:rgba(6,14,30,.74);border:1px solid var(--line);white-space:nowrap;will-change:transform;color:var(--text)}
+.tag b{font-weight:600;color:#fff}
+.tag span{color:var(--muted)}
+.tag.sel{border-color:var(--cyan);box-shadow:0 0 14px rgba(0,229,255,.35)}
+.tag i{width:6px;height:6px;border-radius:50%;box-shadow:0 0 6px currentColor}
+.boot{position:fixed;inset:0;display:grid;place-items:center;color:var(--muted);font-size:13px;z-index:10;background:var(--bg);transition:opacity .4s}
+.boot.done{opacity:0;pointer-events:none}
+kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);border-radius:4px;padding:0 4px}
+@media (max-width:820px){
+  .topbar{top:10px;left:10px;right:10px;padding:8px 10px;gap:8px}
+  .brand{min-width:0}.brand p{display:none}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);width:100%;margin-left:0}
+  .kpi{min-width:0;padding:5px 8px}.kpi .v{font-size:15px}
+  .controls{top:auto;bottom:10px;left:10px;right:10px;width:auto;max-height:52vh;padding:12px}
+  .controls.collapsed .body{display:none}
+  .controls.collapsed h2{margin:0}
+  .drawer-btn{display:inline-block}
+  .inspector{top:auto;bottom:70px;left:10px;right:10px;width:auto;max-height:46vh}
+  .hint{display:none}
+  .fps{top:auto;bottom:auto;display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<canvas id="scene" aria-label="3D fulfillment center simulation"></canvas>
+<div id="labels"></div>
+<div class="boot" id="boot">Loading the fulfillment floor…</div>
+
+<header class="glass topbar">
+  <div class="brand">
+    <div class="logo" aria-hidden="true"></div>
+    <div><h1>AMR Fulfillment Floor</h1><p>Goods-to-person robotics · live simulation</p></div>
+  </div>
+  <div class="kpis">
+    <div class="kpi"><span class="k">Active AMRs</span><span class="v" id="kActive">0</span></div>
+    <div class="kpi"><span class="k">Tasks / min</span><span class="v" id="kRate">0</span></div>
+    <div class="kpi"><span class="k">Avg cycle</span><span class="v" id="kCycle">–</span></div>
+    <div class="kpi amber"><span class="k">Backlog</span><span class="v" id="kBacklog">0</span></div>
+    <div class="kpi"><span class="k">Units shipped</span><span class="v" id="kShipped">0</span></div>
+    <div class="kpi"><span class="k">Shift clock</span><span class="v" id="kClock">00:00</span></div>
+  </div>
+</header>
+
+<aside class="glass controls" id="controls">
+  <h2>Fleet controls <button class="drawer-btn" id="drawerBtn" aria-expanded="true">Hide</button></h2>
+  <div class="body">
+    <div class="slider-head"><span>Fleet size</span><output id="fleetOut">12</output></div>
+    <input type="range" id="fleet" min="4" max="20" value="12" aria-label="Fleet size">
+    <div class="row"><span>Show paths</span><button class="switch" role="switch" aria-checked="false" id="tPaths" aria-label="Show paths"></button></div>
+    <div class="row"><span>Heat map</span><button class="switch" role="switch" aria-checked="false" id="tHeat" aria-label="Heat map"></button></div>
+    <div class="row"><span>Task labels</span><button class="switch" role="switch" aria-checked="true" id="tLabels" aria-label="Task labels"></button></div>
+    <div class="label-small">Camera</div>
+    <div class="seg" role="group" aria-label="Camera mode">
+      <button data-cam="orbit" class="on">Orbit</button>
+      <button data-cam="follow">Follow AMR</button>
+    </div>
+    <button class="rush" id="rush">Rush hour</button>
+    <div class="bar"><i id="rushBar"></i></div>
+    <div class="legend">
+      <span><i class="dot" style="color:var(--blue);background:var(--blue)"></i>Idle</span>
+      <span><i class="dot" style="color:var(--cyan);background:var(--cyan)"></i>Traveling</span>
+      <span><i class="dot" style="color:var(--yellow);background:var(--yellow)"></i>Lift / lower</span>
+      <span><i class="dot" style="color:var(--amber);background:var(--amber)"></i>At station</span>
+      <span><i class="dot" style="color:var(--green);background:var(--green)"></i>Charging</span>
+      <span><i class="dot" style="color:var(--orange);background:var(--orange)"></i>Yielding</span>
+    </div>
+  </div>
+</aside>
+
+<aside class="glass inspector hidden" id="inspector" aria-live="polite"></aside>
+<div class="glass hint">Click an AMR or rack to inspect · drag to orbit · scroll to zoom · <kbd>Esc</kbd> to release</div>
+<div class="glass fps" id="fps">– fps</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Reflector.js"></script>
+<script>
+(() => {
+'use strict';
+if (!window.THREE || !THREE.OrbitControls || !THREE.UnrealBloomPass) {
+  document.getElementById('boot').textContent = 'Could not load Three.js from the CDN. Check your connection and reload.';
+  return;
+}
+const V3 = THREE.Vector3;
+
+/* =========================================================================
+   Utilities
+   ========================================================================= */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const rand = mulberry32(20261005);
+const rr = (a,b) => a + (b-a)*rand();
+const ri = (a,b) => Math.floor(rr(a, b+1));
+const pick = arr => arr[Math.floor(rand()*arr.length)];
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const easeInOut = t => t < .5 ? 2*t*t : 1 - Math.pow(-2*t+2, 2)/2;
+const angDiff = (a,b) => { let d = a-b; while (d > Math.PI) d -= 2*Math.PI; while (d < -Math.PI) d += 2*Math.PI; return d; };
+const pad2 = n => String(n).padStart(2,'0');
+const hex = c => '#' + c.toString(16).padStart(6,'0');
+const MONO = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+
+/* =========================================================================
+   Floor layout (world units ≈ metres, floor spans x,z ∈ [-20, 20])
+   Robots drive on a Manhattan network: horizontal aisles (constant z)
+   joined by three vertical lanes (constant x). Every endpoint (rack slot,
+   station stop, dock, parking spot) has an "access" point on an aisle.
+   ========================================================================= */
+const AISLES_Z  = [-15, -12, -6, 0, 6];
+const AISLE_X   = 17.6;                 // aisles run x ∈ [-17.6, 17.6]
+const LANES_X   = [-14, 0, 14];         // lanes run z ∈ [-15, 6]
+const RACK_COLS = [-11, -9, -7, -5, -3, 3, 5, 7, 9, 11];
+const RACK_ROWS = [{z:-10,a:-12},{z:-8,a:-6},{z:-4,a:-6},{z:-2,a:0},{z:2,a:0},{z:4,a:6}];
+const SHELF_Y   = [0.38, 0.98, 1.58, 2.18];
+const STOP_X = 16.6, HUMAN_X = 17.9, BELT_X = 19.2, SLOT_GAP = 1.6;
+const BELT_Z_END = 12.5, BELT_SPEED = 2.2, BELT_TEX_UNIT = 0.5;
+const PARK_Z = -18.2;
+
+// Motion + sim tuning
+const V_EMPTY = 3.1, V_LOADED = 2.3, ACCEL = 2.6, DECEL = 3.0, TURN_RATE = 4.2;
+const CORNER_R = 0.7, WHEEL_R = 0.08, HALF_TRACK = 0.47;
+const ZONE_R = 0.95, LIFT_H = 0.2, LIFT_T = 0.9, CHARGE_T = 5, CHARGE_AT = 35, MIN_BATT = 15;
+const TASKS_PER_ROBOT_MIN = 1.5, RUSH_SECONDS = 45, RUSH_TIMESCALE = 1.6, RUSH_TASK_MULT = 3;
+
+const STATE = Object.freeze({
+  IDLE:'IDLE', TRAVELING_TO_RACK:'TRAVELING_TO_RACK', LIFTING:'LIFTING',
+  TRAVELING_TO_STATION:'TRAVELING_TO_STATION', DROPPING:'DROPPING', RETURNING:'RETURNING',
+  LOWERING:'LOWERING', TO_CHARGER:'TO_CHARGER', CHARGING:'CHARGING', PARKING:'PARKING', YIELDING:'YIELDING'
+});
+const TRAVEL_STATES = new Set([STATE.TRAVELING_TO_RACK, STATE.TRAVELING_TO_STATION, STATE.RETURNING, STATE.TO_CHARGER, STATE.PARKING]);
+const STATE_COLOR = {
+  IDLE:0x5a9bff, TRAVELING_TO_RACK:0x00e5ff, TRAVELING_TO_STATION:0x00e5ff, RETURNING:0x00e5ff,
+  TO_CHARGER:0x00e5ff, PARKING:0x00e5ff, LIFTING:0xffd400, LOWERING:0xffd400,
+  DROPPING:0xffb020, CHARGING:0x39ff88, YIELDING:0xff7a1a
+};
+const STATE_NAME = {
+  IDLE:'Idle', TRAVELING_TO_RACK:'To rack', LIFTING:'Lifting', TRAVELING_TO_STATION:'To station',
+  DROPPING:'Picking', RETURNING:'Returning rack', LOWERING:'Lowering', TO_CHARGER:'To charger',
+  CHARGING:'Charging', PARKING:'Parking', YIELDING:'Yielding'
+};
+const SKU_NAMES = ['USB-C cable 2 m','Wireless earbuds','Phone case','LED desk lamp','Water bottle 750 ml','Yoga mat',
+  'A5 notebook','Coffee beans 1 kg','Running socks','HDMI adapter','Board game','Kitchen scale','Hand cream',
+  '30 W charger','Bluetooth speaker','Screwdriver set','Dog chew toy','Sunscreen SPF 50','Paperback novel','Ceramic mug',
+  'Desk organizer','Phone tripod','Lunch box','Wool beanie'];
+const SKU_COLORS = [0x2f86a6,0xc98a2e,0x5b72c4,0x3fa36f,0xb0525f,0x9a8a3a,0x7a5ac0,0x2fa3a0];
+
+/* =========================================================================
+   Renderer, camera, post-processing
+   ========================================================================= */
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:false, powerPreference:'high-performance' });
+let pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+renderer.setPixelRatio(pixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x050a16);
+scene.fog = new THREE.FogExp2(0x050a16, 0.0095);
+
+const camera = new THREE.PerspectiveCamera(38, innerWidth/innerHeight, 0.5, 260);
+camera.position.set(30, 32, 30);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0, -1);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.maxPolarAngle = 1.38; controls.minDistance = 7; controls.maxDistance = 85;
+controls.autoRotate = true; controls.autoRotateSpeed = 0.35;
+let resumeOrbitAt = 0;
+controls.addEventListener('start', () => { controls.autoRotate = false; resumeOrbitAt = Infinity; });
+controls.addEventListener('end',   () => { resumeOrbitAt = performance.now() + 8000; });
+
+// Multisampled render target keeps edges clean even though the composer bypasses canvas MSAA (WebGL2 only).
+function makeComposerTarget(){
+  const opts = { minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter, format:THREE.RGBAFormat };
+  if (renderer.capabilities.isWebGL2 && THREE.WebGLMultisampleRenderTarget) {
+    const rt = new THREE.WebGLMultisampleRenderTarget(innerWidth, innerHeight, opts); rt.samples = 4; return rt;
+  }
+  return new THREE.WebGLRenderTarget(innerWidth, innerHeight, opts);
+}
+const composer = new THREE.EffectComposer(renderer, makeComposerTarget());
+composer.setPixelRatio(pixelRatio);
+composer.setSize(innerWidth, innerHeight);
+composer.addPass(new THREE.RenderPass(scene, camera));
+// Lit surfaces are kept below the threshold so only emissive rings, route dots and accent strips bloom.
+const bloom = new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.05, 0.5, 0.6);
+composer.addPass(bloom);
+
+/* =========================================================================
+   Lights
+   ========================================================================= */
+scene.add(new THREE.HemisphereLight(0x6f8fbf, 0x0a0f1e, 0.55));
+const sun = new THREE.DirectionalLight(0xdfe8ff, 0.8);
+sun.position.set(14, 30, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left:-27, right:27, top:27, bottom:-27, near:5, far:80 });
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0x3a6fb0, 0.25);
+fill.position.set(-20, 12, -16);
+scene.add(fill);
+
+/* =========================================================================
+   Canvas-texture helpers
+   ========================================================================= */
+function canvasTex(w, h, draw){
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+const dotTex = canvasTex(64, 64, (g) => {
+  const gr = g.createRadialGradient(32,32,0,32,32,32);
+  gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(.45,'rgba(255,255,255,.85)'); gr.addColorStop(1,'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0,0,64,64);
+});
+
+/* =========================================================================
+   Floor: reflective base + translucent grid overlay + markings
+   ========================================================================= */
+const floorOverlays = [];          // hidden while the reflector renders its mirror view
+const markings = new THREE.Group(); scene.add(markings); floorOverlays.push(markings);
+
+const reflector = new THREE.Reflector(new THREE.PlaneGeometry(40, 40), {
+  clipBias:0.003, color:0x7f8ea3,
+  textureWidth: Math.round(innerWidth * pixelRatio * 0.5),
+  textureHeight: Math.round(innerHeight * pixelRatio * 0.5)
+});
+reflector.rotation.x = -Math.PI/2; reflector.position.y = -0.01;
+scene.add(reflector);
+const reflectorBeforeRender = reflector.onBeforeRender;
+reflector.onBeforeRender = function(r, s, c){
+  const prev = floorOverlays.map(o => o.visible);
+  floorOverlays.forEach(o => { o.visible = false; });
+  reflectorBeforeRender.call(this, r, s, c);
+  floorOverlays.forEach((o,i) => { o.visible = prev[i]; });
+};
+
+const gridTex = canvasTex(256, 256, (g) => {
+  g.fillStyle = '#0b1529'; g.fillRect(0,0,256,256);
+  g.strokeStyle = 'rgba(90,160,220,.16)'; g.lineWidth = 1;
+  for (let i = 1; i < 4; i++) { const p = i*64 + .5; g.beginPath(); g.moveTo(p,0); g.lineTo(p,256); g.moveTo(0,p); g.lineTo(256,p); g.stroke(); }
+  g.strokeStyle = 'rgba(110,200,255,.3)'; g.lineWidth = 2; g.strokeRect(1,1,254,254);
+});
+gridTex.wrapS = gridTex.wrapT = THREE.RepeatWrapping; gridTex.repeat.set(10, 10);
+const floorMat = new THREE.MeshStandardMaterial({ map:gridTex, roughness:.85, metalness:.1, transparent:true, opacity:.87, depthWrite:false });
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), floorMat);
+floor.rotation.x = -Math.PI/2; floor.receiveShadow = true; floor.renderOrder = 1;
+scene.add(floor); floorOverlays.push(floor);
+
+// Dashed lane centre-lines along every aisle and lane
+const dashTex = canvasTex(64, 8, (g) => { g.fillStyle = 'rgba(70,170,215,.9)'; g.fillRect(0,0,34,8); });
+dashTex.wrapS = THREE.RepeatWrapping;
+function laneStrip(x0, z0, x1, z1){
+  const len = Math.hypot(x1-x0, z1-z0);
+  const t = dashTex.clone(); t.needsUpdate = true; t.repeat.set(len/1.1, 1);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(len, 0.07), new THREE.MeshBasicMaterial({ map:t, transparent:true, opacity:.5, depthWrite:false }));
+  m.rotation.x = -Math.PI/2; m.rotation.z = Math.atan2(-(z1-z0), x1-x0);
+  m.position.set((x0+x1)/2, 0.006, (z0+z1)/2); m.renderOrder = 3;
+  markings.add(m);
+}
+AISLES_Z.forEach(z => laneStrip(-AISLE_X, z, AISLE_X, z));
+LANES_X.forEach(x => laneStrip(x, -15, x, 6));
+
+// Outline squares (rack slots, station stops, parking, docks) batched into a few LineSegments
+function squares(list, size, color, opacity){
+  const pos = [];
+  for (const [x,z] of list) {
+    const h = size/2, y = 0.008;
+    const c = [[x-h,z-h],[x+h,z-h],[x+h,z+h],[x-h,z+h]];
+    for (let i = 0; i < 4; i++) { const a = c[i], b = c[(i+1)%4]; pos.push(a[0],y,a[1], b[0],y,b[1]); }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  const l = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color, transparent:true, opacity, depthWrite:false }));
+  l.renderOrder = 3; markings.add(l); return l;
+}
+function floorText(text, x, z, w, color = 'rgba(90,190,235,.6)', rot = 0){
+  const fs = 96, c = document.createElement('canvas'), g = c.getContext('2d');
+  g.font = `700 ${fs}px ${MONO}`; const tw = g.measureText(text).width;
+  c.width = Math.ceil(tw + 40); c.height = fs + 40;
+  g.font = `700 ${fs}px ${MONO}`; g.fillStyle = color; g.textBaseline = 'middle'; g.fillText(text, 20, c.height/2);
+  const tex = new THREE.CanvasTexture(c); tex.anisotropy = 8;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, w*c.height/c.width), new THREE.MeshBasicMaterial({ map:tex, transparent:true, depthWrite:false }));
+  m.rotation.x = -Math.PI/2; m.rotation.z = rot; m.position.set(x, 0.012, z); m.renderOrder = 3;
+  markings.add(m); return m;
+}
+
+/* =========================================================================
+   Perimeter walls and outbound doors
+   ========================================================================= */
+const wallMat = new THREE.MeshStandardMaterial({ color:0x0d182c, roughness:.7, metalness:.3 });
+const trimMat = new THREE.MeshBasicMaterial({ color:0x127f9e });
+[[0,-20.2,40.6,.2],[0,20.2,40.6,.2],[-20.2,0,.2,40.6],[20.2,0,.2,40.6]].forEach(([x,z,w,d]) => {
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(w, .5, d), wallMat); wall.position.set(x,.25,z); wall.receiveShadow = true; scene.add(wall);
+  const trim = new THREE.Mesh(new THREE.BoxGeometry(w, .03, d+.02), trimMat); trim.position.set(x,.51,z); scene.add(trim);
+});
+const doorMat = new THREE.MeshStandardMaterial({ color:0x1a2740, metalness:.5, roughness:.5 });
+const doorStrip = new THREE.MeshBasicMaterial({ color:0xffb020 });
+[-11,-5,5,11].forEach(x => {
+  [-1.3,1.3].forEach(dx => { const p = new THREE.Mesh(new THREE.BoxGeometry(.18,2.6,.3), doorMat); p.position.set(x+dx,1.3,20.1); p.castShadow = true; scene.add(p); });
+  const lintel = new THREE.Mesh(new THREE.BoxGeometry(2.8,.22,.3), doorMat); lintel.position.set(x,2.6,20.1); scene.add(lintel);
+  const strip = new THREE.Mesh(new THREE.BoxGeometry(2.4,.05,.05), doorStrip); strip.position.set(x,2.45,19.92); scene.add(strip);
+});
+
+/* =========================================================================
+   Racks: 60 pods drawn with three InstancedMeshes (shelves, legs, bins)
+   ========================================================================= */
+const racks = [];
+RACK_ROWS.forEach((row, rIdx) => RACK_COLS.forEach((x, cIdx) => {
+  const idx = racks.length;
+  racks.push({
+    idx, id:'R-' + pad2(idx+1), row:rIdx+1, col:cIdx+1, zone: x < 0 ? 'A' : 'B',
+    home:new V3(x, 0, row.z), pos:new V3(x, 0, row.z), access:{ x, z:row.a },
+    skus: SHELF_Y.map(() => ({ sku:'SKU-' + ri(10000, 99999), name:pick(SKU_NAMES), qty:ri(14, 40), max:40, color:pick(SKU_COLORS) })),
+    picks:0, lastPicked:null, lastPicker:null, reserved:false, carrier:null, parked:null, dirty:true
+  });
+}));
+const shelfMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1.2, .04, 1.2), new THREE.MeshStandardMaterial({ color:0x2a3a56, metalness:.55, roughness:.45 }), racks.length*4);
+const legMesh   = new THREE.InstancedMesh(new THREE.BoxGeometry(.06, 2.3, .06), new THREE.MeshStandardMaterial({ color:0x4a5e80, metalness:.6, roughness:.4 }), racks.length*4);
+const binMesh   = new THREE.InstancedMesh(new THREE.BoxGeometry(.5, .32, .5), new THREE.MeshStandardMaterial({ color:0xffffff, roughness:.75, metalness:.05 }), racks.length*8);
+[shelfMesh, legMesh, binMesh].forEach(m => { m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); });
+const LEG_OFF = [[-.57,-.57],[.57,-.57],[-.57,.57],[.57,.57]];
+const dummy = new THREE.Object3D();
+const tmpColor = new THREE.Color();
+racks.forEach(rack => rack.skus.forEach((s, k) => {
+  tmpColor.setHex(s.color).multiplyScalar(.8);
+  binMesh.setColorAt(rack.idx*8 + k*2, tmpColor); binMesh.setColorAt(rack.idx*8 + k*2 + 1, tmpColor);
+}));
+// Bin height tracks stock, so emptying a shelf is visible on the pod itself.
+function writeRack(rack){
+  const p = rack.pos;
+  dummy.rotation.set(0,0,0);
+  for (let k = 0; k < 4; k++) {
+    dummy.scale.set(1,1,1); dummy.position.set(p.x, p.y + SHELF_Y[k], p.z); dummy.updateMatrix();
+    shelfMesh.setMatrixAt(rack.idx*4 + k, dummy.matrix);
+    const [lx, lz] = LEG_OFF[k];
+    dummy.position.set(p.x + lx, p.y + 1.15, p.z + lz); dummy.updateMatrix();
+    legMesh.setMatrixAt(rack.idx*4 + k, dummy.matrix);
+    const s = rack.skus[k], f = .3 + .7*(s.qty / s.max);
+    for (let j = 0; j < 2; j++) {
+      dummy.scale.set(1, f, 1);
+      dummy.position.set(p.x + (j ? .28 : -.28), p.y + SHELF_Y[k] + .02 + .16*f, p.z); dummy.updateMatrix();
+      binMesh.setMatrixAt(rack.idx*8 + k*2 + j, dummy.matrix);
+    }
+  }
+  rack.dirty = false;
+}
+function flushRacks(){
+  let any = false;
+  for (const r of racks) if (r.dirty) { writeRack(r); any = true; }
+  if (any) { shelfMesh.instanceMatrix.needsUpdate = legMesh.instanceMatrix.needsUpdate = binMesh.instanceMatrix.needsUpdate = true; }
+}
+flushRacks();
+binMesh.instanceColor.needsUpdate = true;
+squares(racks.map(r => [r.home.x, r.home.z]), 1.36, 0x2f6f95, .55);
+floorText('STORAGE A', -7, -13.6, 3.2);
+floorText('STORAGE B', 7, -13.6, 3.2);
+
+/* =========================================================================
+   Humans (procedural capsule body + sphere head, swinging arms)
+   ========================================================================= */
+function makeHuman(vest){
+  const g = new THREE.Group();
+  const dark = new THREE.MeshStandardMaterial({ color:0x1e2838, roughness:.8 });
+  const vestMat = new THREE.MeshStandardMaterial({ color:vest, roughness:.6 });
+  const skin = new THREE.MeshStandardMaterial({ color:0xb58a6c, roughness:.7 });
+  [-.09,.09].forEach(x => { const l = new THREE.Mesh(new THREE.CylinderGeometry(.07,.07,.8,10), dark); l.position.set(x,.4,0); l.castShadow = true; g.add(l); });
+  const torso = new THREE.Group(); torso.position.y = 1.05;
+  const mid = new THREE.Mesh(new THREE.CylinderGeometry(.2,.2,.45,16), vestMat);
+  const top = new THREE.Mesh(new THREE.SphereGeometry(.2,16,10), vestMat); top.position.y = .225;
+  const bot = new THREE.Mesh(new THREE.SphereGeometry(.2,16,10), vestMat); bot.position.y = -.225;
+  [mid,top,bot].forEach(m => { m.castShadow = true; torso.add(m); });
+  g.add(torso);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.13,16,12), skin); head.position.y = 1.58; head.castShadow = true; g.add(head);
+  const hat = new THREE.Mesh(new THREE.SphereGeometry(.145,16,8,0,Math.PI*2,0,Math.PI/2), new THREE.MeshStandardMaterial({ color:0xe8b830, roughness:.5 }));
+  hat.position.y = 1.62; g.add(hat);
+  const arms = [-1,1].map(s => {
+    const pivot = new THREE.Group(); pivot.position.set(.26*s, 1.34, 0);
+    const a = new THREE.Mesh(new THREE.CylinderGeometry(.05,.045,.56,8), vestMat); a.position.y = -.28; a.castShadow = true;
+    pivot.add(a); g.add(pivot); return pivot;
+  });
+  return { group:g, armL:arms[0], armR:arms[1], reach:0, phase:rand()*6 };
+}
+
+/* =========================================================================
+   Conveyor belts (scrolling texture via map.offset.x) and packing area
+   ========================================================================= */
+const beltTex = canvasTex(128, 32, (g) => {
+  g.fillStyle = '#18233a'; g.fillRect(0,0,128,32);
+  g.strokeStyle = '#33476a'; g.lineWidth = 3;
+  for (let x = 8; x < 128; x += 32) { g.beginPath(); g.moveTo(x,3); g.lineTo(x+12,16); g.lineTo(x,29); g.stroke(); }
+});
+beltTex.wrapS = THREE.RepeatWrapping;
+const BELTS = [
+  { x0:-BELT_X, z0:-8, x1:-BELT_X, z1:BELT_Z_END, y:0 },
+  { x0:-BELT_X, z0:BELT_Z_END, x1:-1.0, z1:BELT_Z_END, y:.004 },
+  { x0: BELT_X, z0:-8, x1: BELT_X, z1:BELT_Z_END, y:0 },
+  { x0: BELT_X, z0:BELT_Z_END, x1: 1.0, z1:BELT_Z_END, y:.004 }
+];
+const beltFrameMat = new THREE.MeshStandardMaterial({ color:0x1b2740, metalness:.6, roughness:.4 });
+const beltRailMat = new THREE.MeshBasicMaterial({ color:0x14a0c4 });
+const beltLegPositions = [];
+const belts = BELTS.map(b => {
+  const dx = b.x1-b.x0, dz = b.z1-b.z0, len = Math.hypot(dx, dz);
+  const g = new THREE.Group();
+  g.position.set((b.x0+b.x1)/2, 0, (b.z0+b.z1)/2);
+  g.rotation.y = Math.atan2(-dz, dx);       // maps local +x onto the travel direction
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(len+.2, .14, .86), beltFrameMat);
+  frame.position.y = .52; frame.castShadow = frame.receiveShadow = true; g.add(frame);
+  [-.42,.42].forEach(z => { const rail = new THREE.Mesh(new THREE.BoxGeometry(len+.2,.05,.05), beltRailMat); rail.position.set(0,.63,z); g.add(rail); });
+  const tex = beltTex.clone(); tex.needsUpdate = true; tex.repeat.set(len / BELT_TEX_UNIT, 1);
+  const surf = new THREE.Mesh(new THREE.PlaneGeometry(len, .72), new THREE.MeshStandardMaterial({ map:tex, roughness:.7, metalness:.2 }));
+  surf.rotation.x = -Math.PI/2; surf.position.y = .595 + b.y; surf.receiveShadow = true; g.add(surf);
+  scene.add(g);
+  for (let s = .5; s < len; s += 2) [-.36,.36].forEach(z => {
+    const lx = s - len/2, c = Math.cos(g.rotation.y), sn = Math.sin(g.rotation.y);
+    beltLegPositions.push([g.position.x + lx*c + z*sn, g.position.z - lx*sn + z*c]);
+  });
+  return { group:g, tex };
+});
+const beltLegs = new THREE.InstancedMesh(new THREE.BoxGeometry(.06,.46,.06), beltFrameMat, beltLegPositions.length);
+beltLegPositions.forEach(([x,z], i) => { dummy.position.set(x,.23,z); dummy.scale.set(1,1,1); dummy.updateMatrix(); beltLegs.setMatrixAt(i, dummy.matrix); });
+beltLegs.castShadow = true; scene.add(beltLegs);
+
+// Packing tables, packer, outbound pallets
+const tableMat = new THREE.MeshStandardMaterial({ color:0x24324c, metalness:.5, roughness:.45 });
+const table = new THREE.Mesh(new THREE.BoxGeometry(2.8, .08, .9), tableMat); table.position.set(0,.9,13.8); table.castShadow = table.receiveShadow = true; scene.add(table);
+[[-1.3,-.38],[1.3,-.38],[-1.3,.38],[1.3,.38]].forEach(([x,z]) => { const l = new THREE.Mesh(new THREE.BoxGeometry(.06,.9,.06), tableMat); l.position.set(x,.45,13.8+z); scene.add(l); });
+const cardboard = new THREE.MeshStandardMaterial({ color:0x8d6e4a, roughness:.9 });
+[-.55,.55].forEach(x => { const b = new THREE.Mesh(new THREE.BoxGeometry(.5,.3,.42), cardboard); b.position.set(x,1.09,13.75); b.castShadow = true; scene.add(b); });
+const packer = makeHuman(0x2f7fb8); packer.group.position.set(0,0,14.9); packer.group.rotation.y = Math.PI; scene.add(packer.group);
+[-8,-4,4,8].forEach(x => {
+  const pallet = new THREE.Mesh(new THREE.BoxGeometry(1.2,.14,1), new THREE.MeshStandardMaterial({ color:0x5a4630, roughness:.9 }));
+  pallet.position.set(x,.07,17.4); pallet.receiveShadow = true; scene.add(pallet);
+  const layers = ri(2,4);
+  for (let l = 0; l < layers; l++) for (let i = 0; i < 4; i++) {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(.5,.36,.42), cardboard);
+    b.position.set(x + (i%2 ? .27 : -.27), .32 + l*.37, 17.4 + (i<2 ? -.22 : .22)); b.castShadow = true; scene.add(b);
+  }
+});
+floorText('PACK & SHIP', 0, 16.6, 4.2, 'rgba(255,176,32,.55)');
+floorText('OUTBOUND', 0, 19.1, 2.8, 'rgba(255,176,32,.4)');
+
+/* =========================================================================
+   Picking stations (4, two per side), charging docks (NW corner), parking
+   ========================================================================= */
+const stations = [
+  { id:'ST-1', side:-1, z:-6 }, { id:'ST-2', side:-1, z:6 },
+  { id:'ST-3', side: 1, z:-6 }, { id:'ST-4', side: 1, z:6 }
+].map(s => {
+  const human = makeHuman(0xd98a1c);
+  human.group.position.set(s.side*HUMAN_X, 0, s.z);
+  human.group.rotation.y = s.side < 0 ? Math.PI/2 : -Math.PI/2;      // face the incoming rack
+  scene.add(human.group);
+  const console_ = new THREE.Mesh(new THREE.BoxGeometry(.5,1,.4), tableMat); console_.position.set(s.side*HUMAN_X, .5, s.z + 1.05); console_.castShadow = true; scene.add(console_);
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(.4,.26), new THREE.MeshBasicMaterial({ color:0x0b6f8a }));
+  screen.position.set(s.side*(HUMAN_X - .26), 1.02, s.z + 1.05); screen.rotation.y = s.side < 0 ? Math.PI/2 : -Math.PI/2; scene.add(screen);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(.03,.03,2.2,8), tableMat); pole.position.set(s.side*HUMAN_X, 1.1, s.z - 1.0); scene.add(pole);
+  const lampMat = new THREE.MeshBasicMaterial({ color:0x6a4a10 });
+  const lamp = new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,.22,12), lampMat); lamp.position.set(s.side*HUMAN_X, 2.28, s.z - 1.0); scene.add(lamp);
+  floorText(s.id, s.side*16.2, s.z + 1.45, 1.3, 'rgba(255,176,32,.6)');
+  return Object.assign(s, { human, lampMat, flash:0, queue:[], picks:0, stop:{ x:s.side*STOP_X, z:s.z } });
+});
+squares(stations.map(s => [s.stop.x, s.stop.z]), 1.5, 0xffb020, .6);
+function slotPos(st, k){ return { x: st.side*(STOP_X - SLOT_GAP*k), z: st.z }; }
+
+const docks = [{ id:'CHG-1', x:-17.6 }, { id:'CHG-2', x:-15.2 }].map(d => {
+  const z = PARK_Z;
+  const base = new THREE.Mesh(new THREE.BoxGeometry(1.2,.04,1.2), new THREE.MeshStandardMaterial({ color:0x16243c, metalness:.5, roughness:.5 }));
+  base.position.set(d.x,.02,z); base.receiveShadow = true; scene.add(base);
+  const contactMat = new THREE.MeshBasicMaterial({ color:0x1d7a46 });
+  [-.18,.18].forEach(dx => { const c = new THREE.Mesh(new THREE.BoxGeometry(.08,.02,.5), contactMat); c.position.set(d.x+dx,.05,z); scene.add(c); });
+  const pillar = new THREE.Mesh(new THREE.BoxGeometry(.9,1.1,.22), tableMat); pillar.position.set(d.x,.55,z-.78); pillar.castShadow = true; scene.add(pillar);
+  const barMat = new THREE.MeshBasicMaterial({ color:0x1d7a46 });
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(.62,.07,.02), barMat); bar.position.set(d.x,.9,z-.66); scene.add(bar);
+  return Object.assign(d, { z, access:{ x:d.x, z:-15 }, occupant:null, barMat, contactMat });
+});
+floorText('CHARGING', -16.4, -16.7, 2.2, 'rgba(57,255,136,.5)');
+const parkSpots = Array.from({ length:20 }, (_, k) => ({ id:'P-' + pad2(k+1), x:-12.4 + 1.5*k, z:PARK_Z, occupant:null }));
+parkSpots.forEach(p => { p.access = { x:p.x, z:-15 }; });
+squares(parkSpots.map(p => [p.x, p.z]), 1.1, 0x3d6fae, .5);
+floorText('PARKING', 2, -19.4, 2.2, 'rgba(90,155,255,.5)');
+
+/* =========================================================================
+   Route planning: Manhattan waypoints → filleted CatmullRomCurve3
+   ========================================================================= */
+function planRoute(from, fromAcc, toAcc, to){
+  const pts = [from, fromAcc];
+  if (Math.abs(fromAcc.z - toAcc.z) > 1e-3) {
+    let lane = LANES_X[0], best = Infinity;
+    for (const lx of LANES_X) { const c = Math.abs(fromAcc.x - lx) + Math.abs(lx - toAcc.x); if (c < best) { best = c; lane = lx; } }
+    pts.push({ x:lane, z:fromAcc.z }, { x:lane, z:toAcc.z });
+  }
+  pts.push(toAcc, to);
+  return pts;
+}
+function cleanPts(pts){
+  const out = [];
+  for (const p of pts) { const q = out[out.length-1]; if (!q || Math.hypot(p.x-q.x, p.z-q.z) > .05) out.push({ x:p.x, z:p.z }); }
+  for (let i = 1; i < out.length-1;) {   // merge points that sit inside a straight run
+    const a = out[i-1], b = out[i], c = out[i+1];
+    const ux = b.x-a.x, uz = b.z-a.z, vx = c.x-b.x, vz = c.z-b.z;
+    if (Math.abs(ux*vz - uz*vx) < 1e-6 && ux*vx + uz*vz > 0) out.splice(i, 1); else i++;
+  }
+  return out;
+}
+// Each 90° corner is replaced by two points CORNER_R either side of it, so the
+// Catmull-Rom spline rounds the turn instead of overshooting the aisle.
+function buildCurve(pts){
+  const v = [new V3(pts[0].x, 0, pts[0].z)];
+  for (let i = 1; i < pts.length-1; i++) {
+    const P = pts[i-1], C = pts[i], N = pts[i+1];
+    const d1 = Math.hypot(P.x-C.x, P.z-C.z), d2 = Math.hypot(N.x-C.x, N.z-C.z);
+    const u1x = (P.x-C.x)/d1, u1z = (P.z-C.z)/d1, u2x = (N.x-C.x)/d2, u2z = (N.z-C.z)/d2;
+    if (u1x*u2x + u1z*u2z > .9) { v.push(new V3(C.x, 0, C.z)); continue; }
+    const r = Math.min(CORNER_R, d1*.45, d2*.45);
+    v.push(new V3(C.x + u1x*r, 0, C.z + u1z*r), new V3(C.x + u2x*r, 0, C.z + u2z*r));
+  }
+  const last = pts[pts.length-1]; v.push(new V3(last.x, 0, last.z));
+  const curve = new THREE.CatmullRomCurve3(v, false, 'centripetal');
+  curve.arcLengthDivisions = Math.max(200, Math.ceil(curve.getLength() * 12));
+  curve.updateArcLengths();
+  return curve;
+}
+
+/* =========================================================================
+   AMR robots
+   ========================================================================= */
+const robotBodyGeo = (() => {
+  const w = .82, h = .82, r = .16, x = -w/2, y = -h/2, s = new THREE.Shape();
+  s.moveTo(x+r,y); s.lineTo(x+w-r,y); s.quadraticCurveTo(x+w,y,x+w,y+r); s.lineTo(x+w,y+h-r);
+  s.quadraticCurveTo(x+w,y+h,x+w-r,y+h); s.lineTo(x+r,y+h); s.quadraticCurveTo(x,y+h,x,y+h-r);
+  s.lineTo(x,y+r); s.quadraticCurveTo(x,y,x+r,y);
+  const g = new THREE.ExtrudeGeometry(s, { depth:.16, bevelEnabled:true, bevelThickness:.04, bevelSize:.035, bevelSegments:3, curveSegments:6 });
+  g.rotateX(-Math.PI/2); g.translate(0, .1, 0); g.computeVertexNormals();
+  return g;                                 // body occupies y ∈ [0.06, 0.30]
+})();
+const wheelGeo = new THREE.CylinderGeometry(WHEEL_R, WHEEL_R, .06, 16); wheelGeo.rotateZ(Math.PI/2);
+const spokeGeo = new THREE.BoxGeometry(.066, .13, .025);
+const plateGeo = new THREE.CylinderGeometry(.24, .26, .04, 24);
+const columnGeo = new THREE.CylinderGeometry(.1, .1, 1, 12); columnGeo.translate(0, .5, 0);
+const ringGeo = new THREE.TorusGeometry(.34, .026, 8, 48); ringGeo.rotateX(Math.PI/2);
+const zoneGeo = new THREE.CircleGeometry(ZONE_R, 48); zoneGeo.rotateX(-Math.PI/2);
+const zoneEdgeGeo = new THREE.RingGeometry(ZONE_R-.035, ZONE_R, 64); zoneEdgeGeo.rotateX(-Math.PI/2);
+const warnGeo = new THREE.RingGeometry(ZONE_R+.08, ZONE_R+.22, 64); warnGeo.rotateX(-Math.PI/2);
+const bodyMat = new THREE.MeshStandardMaterial({ color:0x1d2c48, metalness:.55, roughness:.4 });
+const wheelMat = new THREE.MeshStandardMaterial({ color:0x0b0f18, roughness:.8 });
+const spokeMat = new THREE.MeshStandardMaterial({ color:0x55657e, roughness:.5 });
+const plateMat = new THREE.MeshStandardMaterial({ color:0x5a6a86, metalness:.7, roughness:.3 });
+const headMat = new THREE.MeshBasicMaterial({ color:0xbff6ff });
+const tailMat = new THREE.MeshBasicMaterial({ color:0x7a1c2c });
+const dotMatCyan = new THREE.PointsMaterial({ color:0x00e5ff, size:.17, map:dotTex, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending });
+const dotMatAmber = dotMatCyan.clone(); dotMatAmber.color.setHex(0xffb020);
+
+const robots = [];
+let nextRobotId = 1;
+const labelsEl = document.getElementById('labels');
+const robotBodies = [];
+
+function buildRobotMesh(r){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(robotBodyGeo, bodyMat); body.castShadow = true; body.receiveShadow = true; body.userData.robot = r; g.add(body);
+  const wheels = [];
+  [[-.47,.26],[.47,.26],[-.47,-.26],[.47,-.26]].forEach(([x,z]) => {
+    const w = new THREE.Mesh(wheelGeo, wheelMat); w.position.set(x, WHEEL_R, z);
+    const sp = new THREE.Mesh(spokeGeo, spokeMat); sp.position.x = x > 0 ? .002 : -.002; w.add(sp);
+    w.userData.left = x > 0;                 // robot-local +x is the robot's left side
+    g.add(w); wheels.push(w);
+  });
+  [-.22,.22].forEach(x => {
+    const h = new THREE.Mesh(new THREE.BoxGeometry(.12,.03,.02), headMat); h.position.set(x,.2,.458); g.add(h);
+    const t = new THREE.Mesh(new THREE.BoxGeometry(.12,.03,.02), tailMat); t.position.set(x,.2,-.458); g.add(t);
+  });
+  const column = new THREE.Mesh(columnGeo, plateMat); column.position.y = .3; column.scale.y = .001; g.add(column);
+  const plate = new THREE.Mesh(plateGeo, plateMat); plate.position.y = .32; plate.castShadow = true; g.add(plate);
+  const ringMat = new THREE.MeshBasicMaterial({ color:STATE_COLOR.IDLE });
+  const ring = new THREE.Mesh(ringGeo, ringMat); ring.position.y = .315; g.add(ring);
+  const zoneMat = new THREE.MeshBasicMaterial({ color:0x00e5ff, transparent:true, opacity:.07, depthWrite:false });
+  const zone = new THREE.Mesh(zoneGeo, zoneMat); zone.position.y = .016; zone.renderOrder = 4; g.add(zone);
+  const zoneEdgeMat = new THREE.MeshBasicMaterial({ color:0x00e5ff, transparent:true, opacity:.3, depthWrite:false });
+  const zoneEdge = new THREE.Mesh(zoneEdgeGeo, zoneEdgeMat); zoneEdge.position.y = .018; zoneEdge.renderOrder = 4; g.add(zoneEdge);
+  const warnMat = new THREE.MeshBasicMaterial({ color:0xffd400, transparent:true, opacity:0, depthWrite:false });
+  const warn = new THREE.Mesh(warnGeo, warnMat); warn.position.y = .02; warn.visible = false; warn.renderOrder = 4; g.add(warn);
+  scene.add(g);
+  robotBodies.push(body);
+  Object.assign(r, { group:g, body, wheels, column, plate, ring, ringMat, zoneMat, zoneEdgeMat, warn, warnMat });
+}
+
+function spawnRobot(){
+  const spot = parkSpots.find(p => !p.occupant);
+  if (!spot) return null;
+  const r = {
+    id:nextRobotId, name:'AMR-' + pad2(nextRobotId), state:STATE.IDLE, resumeState:null, timer:0,
+    heading:0, v:0, vel:new V3(), path:null, pathPts:null, pathN:0,
+    task:null, rack:null, station:null, dock:null, spot, at:{ kind:'park', ref:spot }, access:spot.access,
+    lift:0, battery:rr(55, 100), chargeFrom:0, tasksDone:0, odometer:0, cycleStart:0,
+    picks:[], pickEnd:0, slotTarget:-1, waitingSlot:-1,
+    conflictT:0, yieldT:0, yieldCooldown:0, idleT:0, label:null, labelText:'', lastColor:-1
+  };
+  nextRobotId++;
+  spot.occupant = r;
+  buildRobotMesh(r);
+  r.group.position.set(spot.x, 0, spot.z);
+  r.heading = 0;                                 // facing +z, toward the aisle
+  r.group.rotation.y = 0;
+  const el = document.createElement('div'); el.className = 'tag';
+  el.innerHTML = '<i></i><b>' + r.name + '</b><span></span>';
+  labelsEl.appendChild(el);
+  r.label = { el, dot:el.querySelector('i'), text:el.querySelector('span') };
+  robots.push(r);
+  return r;
+}
+
+// Removing a robot mid-task puts the world back in a consistent state:
+// its rack returns to the home slot and every reservation it held is released.
+function retireRobot(r){
+  const st = r.station;
+  if (st) { const i = st.queue.indexOf(r); if (i >= 0) st.queue.splice(i, 1); }
+  if (r.rack) { const k = r.rack; k.pos.copy(k.home); k.carrier = null; k.reserved = false; k.dirty = true; }
+  else if (r.task) r.task.rack.reserved = false;
+  if (r.dock && r.dock.occupant === r) r.dock.occupant = null;
+  if (r.spot && r.spot.occupant === r) r.spot.occupant = null;
+  if (r.at.kind === 'rack' && r.at.ref.parked === r) r.at.ref.parked = null;
+  clearPathDots(r);
+  scene.remove(r.group);
+  robotBodies.splice(robotBodies.indexOf(r.body), 1);
+  r.label.el.remove();
+  r.ringMat.dispose(); r.zoneMat.dispose(); r.zoneEdgeMat.dispose(); r.warnMat.dispose();
+  robots.splice(robots.indexOf(r), 1);
+  if (selection && selection.ref === r) clearSelection();
+}
+
+function setFleetSize(n){
+  while (robots.length < n) { if (!spawnRobot()) break; }
+  while (robots.length > n) {
+    const victim = [...robots].reverse().find(r => r.state === STATE.IDLE) || robots[robots.length-1];
+    retireRobot(victim);
+  }
+}
+
+/* ---------- path following ---------- */
+function setState(r, s){ r.state = s; r.timer = 0; }
+function leaveCurrentSpot(r){
+  const at = r.at;
+  if (at.kind === 'park' && at.ref.occupant === r) { at.ref.occupant = null; r.spot = null; }
+  else if (at.kind === 'dock' && at.ref.occupant === r) { at.ref.occupant = null; r.dock = null; }
+  else if (at.kind === 'rack' && at.ref.parked === r) at.ref.parked = null;
+  r.at = { kind:'none' };
+}
+function setPath(r, waypoints, destAccess, onArrive){
+  leaveCurrentSpot(r);
+  clearPathDots(r);
+  const pts = cleanPts(waypoints);
+  if (pts.length < 2) { r.path = null; r.access = destAccess; onArrive(); return; }
+  const curve = buildCurve(pts);
+  r.path = { curve, L:curve.getLength(), s:0, destAccess, onArrive };
+  buildPathDots(r);
+}
+function clearPathDots(r){
+  if (r.pathPts) { scene.remove(r.pathPts); r.pathPts.geometry.dispose(); r.pathPts = null; }
+}
+function buildPathDots(r){
+  const n = Math.max(2, Math.ceil(r.path.L / .32));
+  const pts = r.path.curve.getSpacedPoints(n); pts.forEach(p => { p.y = .06; });
+  const pp = new THREE.Points(new THREE.BufferGeometry().setFromPoints(pts), r.rack ? dotMatAmber : dotMatCyan);
+  pp.visible = ui.paths; pp.renderOrder = 5; pp.frustumCulled = false;
+  scene.add(pp); r.pathPts = pp; r.pathN = n;
+}
+const _tan = new V3(), _pt = new V3();
+// Eased drive along the route: accelerate to v_max, then cap speed by
+// sqrt(2·decel·remaining) so the robot glides to a stop at the endpoint.
+function drive(r, dt){
+  const p = r.path;
+  const u = Math.min(1, p.s / p.L);
+  p.curve.getTangentAt(u, _tan);
+  const want = Math.atan2(_tan.x, _tan.z);
+  const diff = angDiff(want, r.heading);
+  if (p.s < .02 && Math.abs(diff) > .2) {       // AMRs spin in place before pulling away
+    const step = clamp(diff, -TURN_RATE*dt, TURN_RATE*dt);
+    r.heading += step; r.turnStep = step; r.v = 0; return;
+  }
+  let vmax = (r.rack ? V_LOADED : V_EMPTY) * (r.conflictT > 0 ? .5 : 1);
+  if (r.state === STATE.YIELDING) vmax = 0;
+  const remaining = p.L - p.s;
+  let target = Math.min(vmax, Math.sqrt(2*DECEL*remaining));
+  if (vmax > 0) target = Math.max(target, .15);
+  r.v = r.v < target ? Math.min(target, r.v + ACCEL*dt) : Math.max(target, r.v - DECEL*1.5*dt);
+  p.s = Math.min(p.L, p.s + r.v*dt);
+  p.curve.getPointAt(p.s / p.L, _pt);
+  r.group.position.x = _pt.x; r.group.position.z = _pt.z;
+  const step = diff * Math.min(1, dt*10);
+  r.heading += step; r.turnStep = step;
+  if (r.pathPts) {
+    const start = Math.min(r.pathN, Math.floor(p.s / p.L * r.pathN));
+    r.pathPts.geometry.setDrawRange(start, r.pathN + 1 - start);
+  }
+  if (p.s >= p.L - 1e-4) {
+    // A robot that reaches its endpoint while yielding drops the yield first.
+    if (r.state === STATE.YIELDING) { r.state = r.resumeState; r.yieldT = 0; }
+    r.path = null; r.v = 0;
+    clearPathDots(r);
+    r.access = p.destAccess;
+    p.onArrive();
+  }
+}
+
+/* =========================================================================
+   State machine transitions
+   ========================================================================= */
+function posOf(r){ return { x:r.group.position.x, z:r.group.position.z }; }
+
+// IDLE → TRAVELING_TO_RACK
+function startTask(r, task){
+  r.task = task; r.cycleStart = simTime; task.robot = r;
+  const rack = task.rack;
+  setState(r, STATE.TRAVELING_TO_RACK);
+  setPath(r, planRoute(posOf(r), r.access, rack.access, rack.home), rack.access, () => {
+    // TRAVELING_TO_RACK → LIFTING: robot is now centred under the pod
+    setState(r, STATE.LIFTING);
+  });
+}
+
+// LIFTING → TRAVELING_TO_STATION: join the least-loaded station's queue
+function finishLift(r){
+  const rack = r.task.rack;
+  r.rack = rack; rack.carrier = r;
+  let st = stations[0], best = Infinity;
+  for (const s of stations) {
+    const cost = s.queue.length*40 + Math.abs(s.stop.x - rack.home.x) + Math.abs(s.stop.z - rack.home.z);
+    if (cost < best) { best = cost; st = s; }
+  }
+  r.station = st; st.queue.push(r);
+  setState(r, STATE.TRAVELING_TO_STATION);
+  goSlot(r, st.queue.length - 1);
+}
+// Drive to queue slot k (slot 0 is the picking stop itself)
+function goSlot(r, k){
+  const target = slotPos(r.station, k);
+  r.slotTarget = k; r.waitingSlot = -1;
+  setPath(r, planRoute(posOf(r), r.access, target, target), target, () => arriveSlot(r));
+}
+function arriveSlot(r){
+  const idx = r.station.queue.indexOf(r);
+  if (idx === 0 && r.slotTarget === 0) startPicking(r);       // TRAVELING_TO_STATION → DROPPING
+  else if (idx < r.slotTarget) goSlot(r, idx);                 // queue moved up while driving
+  else r.waitingSlot = r.slotTarget;                           // hold position in the queue
+}
+function checkQueuePromotion(r){
+  if (r.waitingSlot < 0) return;
+  const idx = r.station.queue.indexOf(r);
+  if (idx < r.waitingSlot) goSlot(r, idx);
+}
+
+// DROPPING: the picker pulls 1–3 items (2–4 in rush hour) on a fixed beat
+function startPicking(r){
+  setState(r, STATE.DROPPING);
+  const rack = r.rack, n = rush.active ? ri(2,4) : ri(1,3);
+  r.picks = [];
+  for (let i = 0; i < n; i++) {
+    const shelves = rack.skus.map((s,k) => s.qty > 0 ? k : -1).filter(k => k >= 0);
+    r.picks.push({ t:.45 + i*.85, k: shelves.length ? pick(shelves) : 0, done:false });
+  }
+  r.pickEnd = .45 + n*.85 + .7;
+}
+// DROPPING → RETURNING
+function finishPicking(r){
+  const st = r.station, rack = r.rack;
+  rack.lastPicked = simTime; rack.lastPicker = r.name; rack.picks++;
+  st.queue.splice(st.queue.indexOf(r), 1); st.picks++;
+  r.station = null;
+  setState(r, STATE.RETURNING);
+  setPath(r, planRoute(posOf(r), r.access, rack.access, rack.home), rack.access, () => {
+    setState(r, STATE.LOWERING);                                // RETURNING → LOWERING
+  });
+  r.pathPts && (r.pathPts.material = dotMatAmber);
+}
+// LOWERING → IDLE (task complete) or → TO_CHARGER
+function finishLower(r){
+  const rack = r.rack;
+  rack.pos.copy(rack.home); rack.carrier = null; rack.reserved = false; rack.dirty = true;
+  rack.skus.forEach(s => { if (s.qty <= 2) s.qty = s.max; });  // replenishment top-up
+  r.rack = null; r.lift = 0; r.task = null;
+  r.tasksDone++; completions.push(simTime); cycles.push(simTime - r.cycleStart); if (cycles.length > 30) cycles.shift();
+  rack.parked = r; r.at = { kind:'rack', ref:rack };
+  setState(r, STATE.IDLE); r.idleT = 0;
+  if (r.battery < CHARGE_AT) { const d = freeDock(); if (d) goCharge(r, d); }
+}
+function freeDock(){ return docks.find(d => !d.occupant) || null; }
+// → TO_CHARGER, then TO_CHARGER → CHARGING on arrival
+function goCharge(r, d){
+  d.occupant = r; r.dock = d;
+  setState(r, STATE.TO_CHARGER);
+  const target = { x:d.x, z:d.z };
+  setPath(r, planRoute(posOf(r), r.access, d.access, target), d.access, () => {
+    r.at = { kind:'dock', ref:d }; r.dock = d;
+    setState(r, STATE.CHARGING); r.chargeFrom = r.battery;
+  });
+}
+// → PARKING, then PARKING → IDLE on arrival
+function goPark(r){
+  let spot = null, best = Infinity;
+  for (const p of parkSpots) if (!p.occupant) { const c = Math.abs(p.x - r.group.position.x) + Math.abs(p.z - r.group.position.z); if (c < best) { best = c; spot = p; } }
+  if (!spot) return;
+  spot.occupant = r;
+  setState(r, STATE.PARKING);
+  setPath(r, planRoute(posOf(r), r.access, spot.access, { x:spot.x, z:spot.z }), spot.access, () => {
+    r.spot = spot; r.at = { kind:'park', ref:spot };
+    setState(r, STATE.IDLE); r.idleT = 0;
+  });
+}
+
+/* =========================================================================
+   Orders → tasks → assignment
+   ========================================================================= */
+const pending = [];
+let taskSeq = 1, genAcc = 0, simTime = 0, shipped = 0;
+const completions = [], cycles = [];
+const rush = { active:false, t:0 };
+function createTask(){
+  if (pending.length >= 60) return;
+  const free = racks.filter(k => !k.reserved && !k.parked && !k.carrier);
+  if (!free.length) return;
+  const rack = pick(free); rack.reserved = true;
+  pending.push({ id:taskSeq++, rack, created:simTime, robot:null });
+}
+// Oldest order first; the nearest idle robot with enough charge takes it.
+function assignTasks(){
+  while (pending.length) {
+    const task = pending[0];
+    let best = null, bd = Infinity;
+    for (const r of robots) {
+      if (r.state !== STATE.IDLE || r.battery < MIN_BATT) continue;
+      const d = Math.abs(r.group.position.x - task.rack.home.x) + Math.abs(r.group.position.z - task.rack.home.z);
+      if (d < bd) { bd = d; best = r; }
+    }
+    if (!best) return;
+    pending.shift();
+    startTask(best, task);
+  }
+}
+
+/* =========================================================================
+   Collision avoidance: overlapping safety zones that are closing on each
+   other slow both robots; the lower-priority one switches to YIELDING.
+   Loaded robots outrank empty ones; ties go to the lower ID.
+   ========================================================================= */
+const priority = r => (r.rack ? 1000 : 0) - r.id;
+function avoidCollisions(dt){
+  for (const r of robots) { r.conflictT = Math.max(0, r.conflictT - dt); r.yieldCooldown = Math.max(0, r.yieldCooldown - dt); }
+  const D2 = (ZONE_R*2) ** 2;
+  for (let i = 0; i < robots.length; i++) for (let j = i+1; j < robots.length; j++) {
+    const a = robots[i], b = robots[j];
+    const dx = b.group.position.x - a.group.position.x, dz = b.group.position.z - a.group.position.z;
+    if (dx*dx + dz*dz > D2) continue;
+    const aM = !!a.path, bM = !!b.path;
+    if (!aM && !bM) continue;
+    const closing = dx*(b.vel.x - a.vel.x) + dz*(b.vel.z - a.vel.z) < -.01;
+    if (!closing) continue;
+    a.conflictT = b.conflictT = .6;
+    if (aM && bM) {
+      const y = priority(a) < priority(b) ? a : b;
+      if (y.state !== STATE.YIELDING && y.yieldCooldown <= 0 && TRAVEL_STATES.has(y.state)) {
+        // TRAVEL → YIELDING (resumes the saved state when the timer runs out)
+        y.resumeState = y.state; y.state = STATE.YIELDING; y.yieldT = 1.1;
+      }
+    }
+  }
+}
+
+/* =========================================================================
+   Per-robot update (state machine tick)
+   ========================================================================= */
+function updateRobot(r, dt){
+  r.timer += dt; r.turnStep = 0;
+  const px = r.group.position.x, pz = r.group.position.z;
+  switch (r.state) {
+    case STATE.IDLE:
+      r.idleT += dt;
+      if (r.battery < CHARGE_AT && r.at.kind !== 'dock') { const d = freeDock(); if (d) { goCharge(r, d); break; } }
+      if ((r.at.kind === 'dock' && r.idleT > 1.2) || (r.at.kind === 'none' && r.idleT > 1)) goPark(r);
+      break;
+    case STATE.YIELDING:
+      r.yieldT -= dt;
+      if (r.yieldT <= 0) { r.state = r.resumeState; r.yieldCooldown = 2.2; }   // YIELDING → previous travel state
+      if (r.path) drive(r, dt);
+      break;
+    case STATE.TRAVELING_TO_RACK: case STATE.RETURNING: case STATE.TO_CHARGER: case STATE.PARKING:
+      if (r.path) drive(r, dt);
+      break;
+    case STATE.TRAVELING_TO_STATION:
+      if (r.path) drive(r, dt); else checkQueuePromotion(r);
+      break;
+    case STATE.LIFTING: {                                      // animate rack.position.y 0 → 0.2
+      const p = Math.min(1, r.timer / LIFT_T);
+      r.lift = easeInOut(p) * LIFT_H;
+      const k = r.task.rack; k.pos.y = r.lift; k.dirty = true;
+      if (p >= 1) finishLift(r);
+      break;
+    }
+    case STATE.DROPPING:
+      for (const pk of r.picks) if (!pk.done && r.timer >= pk.t) { pk.done = true; launchItem(r, pk.k); }
+      if (r.timer >= r.pickEnd) finishPicking(r);
+      break;
+    case STATE.LOWERING: {                                     // animate rack.position.y 0.2 → 0
+      const p = Math.min(1, r.timer / LIFT_T);
+      r.lift = (1 - easeInOut(p)) * LIFT_H;
+      r.rack.pos.y = r.lift; r.rack.dirty = true;
+      if (p >= 1) finishLower(r);
+      break;
+    }
+    case STATE.CHARGING: {                                     // 5 s simulated charge to 100 %
+      const p = Math.min(1, r.timer / CHARGE_T);
+      r.battery = r.chargeFrom + (100 - r.chargeFrom) * p;
+      if (p >= 1) { r.battery = 100; setState(r, STATE.IDLE); r.idleT = 0; }   // CHARGING → IDLE
+      break;
+    }
+  }
+
+  // Carried rack rides on the lift plate (orientation stays fixed, like a real pod)
+  if (r.rack) { r.rack.pos.set(r.group.position.x, r.lift, r.group.position.z); r.rack.dirty = true; }
+  r.group.rotation.y = r.heading;
+  r.plate.position.y = .32 + r.lift;
+  r.column.scale.y = Math.max(.001, r.lift);
+
+  // Velocity estimate (used by collision checks), odometer, wheels
+  const mx = r.group.position.x - px, mz = r.group.position.z - pz;
+  const dist = Math.hypot(mx, mz);
+  if (dt > 0) r.vel.set(mx/dt, 0, mz/dt);
+  r.odometer += dist;
+  const turn = r.turnStep * HALF_TRACK;
+  for (const w of r.wheels) w.rotation.x += (dist + (w.userData.left ? -turn : turn)) / WHEEL_R;
+
+  // Battery model
+  if (r.state !== STATE.CHARGING) {
+    const drain = dist > 0 ? (r.rack ? .55 : .4) : (r.state === STATE.IDLE ? .02 : .08);
+    r.battery = Math.max(2, r.battery - drain*dt);
+  }
+
+  // Dust puffs under fast robots; traffic heat
+  if (r.v > V_EMPTY*.78 && rand() < dt*5) spawnDust(r);
+  if (dist > 0) depositHeat(r.group.position.x, r.group.position.z, dt);
+
+  // Status ring colour by state; charging pulses green
+  const col = STATE_COLOR[r.state];
+  if (r.state === STATE.CHARGING) {
+    const k = .5 + .5*Math.sin(simTime*6 + r.id);
+    r.ringMat.color.setHex(col).multiplyScalar(.45 + .55*k);
+    r.ring.scale.setScalar(1 + .1*k);
+    r.lastColor = -1;
+  } else if (r.lastColor !== col) {
+    r.ringMat.color.setHex(col); r.ring.scale.setScalar(1); r.lastColor = col;
+  }
+  // Safety zone + yellow warning ring during conflicts
+  const conflict = r.conflictT > 0 || r.state === STATE.YIELDING;
+  r.zoneMat.color.setHex(conflict ? 0xffb020 : 0x00e5ff);
+  r.zoneMat.opacity = conflict ? .16 : .07;
+  r.zoneEdgeMat.color.setHex(conflict ? 0xffb020 : 0x00e5ff);
+  r.warn.visible = conflict;
+  if (conflict) { r.warnMat.opacity = .45 + .4*Math.sin(simTime*14); r.warn.scale.setScalar(1 + .05*Math.sin(simTime*9)); }
+}
+
+/* =========================================================================
+   Items: rack → picker → conveyor → packing table
+   ========================================================================= */
+const ITEM_MAX = 200;
+const itemMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(.17,.17,.17), new THREE.MeshStandardMaterial({ roughness:.5, metalness:.1 }), ITEM_MAX);
+itemMesh.frustumCulled = false; itemMesh.castShadow = true; itemMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+const items = Array.from({ length:ITEM_MAX }, () => ({ active:false }));
+dummy.scale.set(0,0,0); dummy.position.set(0,-50,0); dummy.updateMatrix();
+for (let i = 0; i < ITEM_MAX; i++) { itemMesh.setMatrixAt(i, dummy.matrix); itemMesh.setColorAt(i, tmpColor.setHex(0xffffff)); }
+scene.add(itemMesh);
+
+function launchItem(r, k){
+  const slot = items.findIndex(it => !it.active);
+  const rack = r.rack, st = r.station, sku = rack.skus[k];
+  sku.qty = Math.max(0, sku.qty - 1); rack.dirty = true;
+  st.human.reach = .85;
+  if (slot < 0) return;
+  const side = st.side;
+  const start = new V3(rack.pos.x + side*.55, rack.pos.y + SHELF_Y[k] + .2, rack.pos.z + rr(-.3,.3));
+  const hand = new V3(side*(HUMAN_X - .35), 1.45, st.z + rr(-.15,.15));
+  const drop = new V3(side*BELT_X, .685, st.z + rr(-.25,.25));
+  const it = items[slot];
+  Object.assign(it, {
+    active:true, phase:'toBelt', t:0, dur:1.0, station:st, side,
+    curve:new THREE.CatmullRomCurve3([start, hand, drop.clone().add(new V3(0,.5,0)), drop]),
+    belt:[drop, new V3(side*BELT_X, .685, BELT_Z_END), new V3(side*1.2, .685, BELT_Z_END)], s:0,
+    spin:new V3(rr(-3,3), rr(-3,3), rr(-3,3)), rot:new V3()
+  });
+  itemMesh.setColorAt(slot, tmpColor.setHex(sku.color).lerp(new THREE.Color(0xffffff), .25));
+  itemMesh.instanceColor.needsUpdate = true;
+}
+const beltPos = (pts, s) => {
+  const segA = pts[0].distanceTo(pts[1]);
+  if (s <= segA) return _pt.copy(pts[0]).lerp(pts[1], s/segA);
+  const segB = pts[1].distanceTo(pts[2]);
+  return _pt.copy(pts[1]).lerp(pts[2], Math.min(1, (s-segA)/segB));
+};
+function updateItems(dt){
+  for (let i = 0; i < ITEM_MAX; i++) {
+    const it = items[i]; if (!it.active) continue;
+    if (it.phase === 'toBelt' || it.phase === 'toPack') {
+      it.t += dt / it.dur;
+      it.curve.getPoint(easeInOut(Math.min(1, it.t)), _pt);
+      it.rot.addScaledVector(it.spin, dt);
+      if (it.t >= 1) {
+        if (it.phase === 'toBelt') {
+          it.phase = 'belt'; it.s = 0; it.rot.set(0,0,0);
+          it.L = it.belt[0].distanceTo(it.belt[1]) + it.belt[1].distanceTo(it.belt[2]);
+          spawnPulse(it.side*HUMAN_X, it.station.z, 0xffb020);     // item dropped at the station
+          it.station.flash = .35;
+        } else {
+          it.active = false; shipped++;
+          spawnPulse(0, 13.8, 0x00e5ff, 1.3);
+          packer.reach = .7;
+          dummy.scale.set(0,0,0); dummy.position.set(0,-50,0); dummy.updateMatrix(); itemMesh.setMatrixAt(i, dummy.matrix);
+          continue;
+        }
+      }
+    } else {                                                     // riding the belt
+      it.s += BELT_SPEED * dt;
+      beltPos(it.belt, it.s);
+      if (it.s >= it.L) {
+        const a = it.belt[2].clone(), b = new V3(it.side*.55, 1.12, 13.75);
+        it.curve = new THREE.QuadraticBezierCurve3(a, a.clone().lerp(b,.5).add(new V3(0,.9,0)), b);
+        it.phase = 'toPack'; it.t = 0; it.dur = .6;
+      }
+    }
+    dummy.position.copy(_pt); dummy.rotation.set(it.rot.x, it.rot.y, it.rot.z); dummy.scale.set(1,1,1); dummy.updateMatrix();
+    itemMesh.setMatrixAt(i, dummy.matrix);
+  }
+  itemMesh.instanceMatrix.needsUpdate = true;
+}
+
+/* =========================================================================
+   Pulse rings, dust particles, humans, belts
+   ========================================================================= */
+const pulseGeo = new THREE.RingGeometry(.82, 1, 48); pulseGeo.rotateX(-Math.PI/2);
+const pulses = Array.from({ length:16 }, () => {
+  const m = new THREE.Mesh(pulseGeo, new THREE.MeshBasicMaterial({ color:0xffb020, transparent:true, opacity:0, depthWrite:false, blending:THREE.AdditiveBlending }));
+  m.visible = false; m.renderOrder = 6; scene.add(m);
+  return { mesh:m, t:1, size:1 };
+});
+function spawnPulse(x, z, color, size = 1){
+  const p = pulses.find(q => q.t >= 1) || pulses[0];
+  p.t = 0; p.size = size; p.mesh.position.set(x, .03, z); p.mesh.material.color.setHex(color); p.mesh.visible = true;
+}
+function updatePulses(dt){
+  for (const p of pulses) {
+    if (p.t >= 1) continue;
+    p.t = Math.min(1, p.t + dt/.9);
+    p.mesh.scale.setScalar((.35 + 1.9*easeInOut(p.t)) * p.size);
+    p.mesh.material.opacity = .9 * (1 - p.t);
+    if (p.t >= 1) p.mesh.visible = false;
+  }
+}
+
+const DUST_MAX = 360;
+const dustPos = new Float32Array(DUST_MAX*3).fill(-100), dustCol = new Float32Array(DUST_MAX*3);
+const dustGeo = new THREE.BufferGeometry();
+dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+dustGeo.setAttribute('color', new THREE.BufferAttribute(dustCol, 3));
+const dustPts = new THREE.Points(dustGeo, new THREE.PointsMaterial({ size:.24, map:dotTex, vertexColors:true, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending }));
+dustPts.frustumCulled = false; scene.add(dustPts);
+const dust = Array.from({ length:DUST_MAX }, () => ({ life:0, max:1, x:0, y:0, z:0, vx:0, vy:0, vz:0 }));
+let dustCursor = 0;
+function spawnDust(r){
+  const bx = r.group.position.x - Math.sin(r.heading)*.45, bz = r.group.position.z - Math.cos(r.heading)*.45;
+  for (let n = 0; n < 5; n++) {
+    const d = dust[dustCursor]; dustCursor = (dustCursor + 1) % DUST_MAX;
+    Object.assign(d, { life:rr(.5,.9), x:bx + rr(-.2,.2), y:.05, z:bz + rr(-.2,.2), vx:rr(-.5,.5) - Math.sin(r.heading)*.6, vy:rr(.2,.6), vz:rr(-.5,.5) - Math.cos(r.heading)*.6 });
+    d.max = d.life;
+  }
+}
+function updateDust(dt){
+  for (let i = 0; i < DUST_MAX; i++) {
+    const d = dust[i];
+    if (d.life <= 0) { dustPos[i*3+1] = -100; continue; }
+    d.life -= dt; d.x += d.vx*dt; d.y += d.vy*dt; d.z += d.vz*dt; d.vx *= .95; d.vz *= .95; d.vy *= .97;
+    const a = Math.max(0, d.life/d.max) * .45;
+    dustPos[i*3] = d.x; dustPos[i*3+1] = d.y; dustPos[i*3+2] = d.z;
+    dustCol[i*3] = .62*a; dustCol[i*3+1] = .6*a; dustCol[i*3+2] = .55*a;
+  }
+  dustGeo.attributes.position.needsUpdate = true; dustGeo.attributes.color.needsUpdate = true;
+}
+
+function animateHuman(h, dt){
+  h.phase += dt;
+  h.reach = Math.max(0, h.reach - dt);
+  const k = h.reach > 0 ? Math.sin(Math.PI * (1 - h.reach/.85)) : 0;
+  h.armR.rotation.x = -1.35*k + .05*Math.sin(h.phase*1.7);
+  h.armL.rotation.x = -.6*k + .05*Math.sin(h.phase*1.7 + 1);
+}
+function updateHumans(dt){
+  for (const s of stations) {
+    animateHuman(s.human, dt);
+    s.flash = Math.max(0, s.flash - dt);
+    const busy = s.queue.length && s.queue[0].state === STATE.DROPPING;
+    s.lampMat.color.setHex(s.flash > 0 ? 0x39ff88 : busy ? 0xffb020 : 0x6a4a10);
+  }
+  animateHuman(packer, dt);
+  for (const d of docks) {
+    const charging = d.occupant && d.occupant.state === STATE.CHARGING;
+    const k = charging ? .55 + .45*Math.sin(simTime*6) : 0;
+    d.barMat.color.setHex(charging ? 0x39ff88 : 0x1d7a46).multiplyScalar(charging ? .5 + .5*k : 1);
+    d.contactMat.color.setHex(charging ? 0x39ff88 : 0x1d7a46);
+  }
+}
+// Belt animation: map.offset.x moves the texture along local +x (the travel direction)
+function updateBelts(dt){ for (const b of belts) b.tex.offset.x = (b.tex.offset.x - BELT_SPEED*dt/BELT_TEX_UNIT) % 1; }
+
+/* =========================================================================
+   Traffic heat map (accumulates always, drawn when toggled)
+   ========================================================================= */
+const HEAT_N = 96;
+const heat = new Float32Array(HEAT_N*HEAT_N);
+const heatCanvas = document.createElement('canvas'); heatCanvas.width = heatCanvas.height = HEAT_N;
+const heatCtx = heatCanvas.getContext('2d');
+const heatImg = heatCtx.createImageData(HEAT_N, HEAT_N);
+const heatTex = new THREE.CanvasTexture(heatCanvas);
+const heatPlane = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshBasicMaterial({ map:heatTex, transparent:true, opacity:.9, depthWrite:false, blending:THREE.AdditiveBlending }));
+heatPlane.rotation.x = -Math.PI/2; heatPlane.position.y = .01; heatPlane.renderOrder = 2; heatPlane.visible = false;
+scene.add(heatPlane); floorOverlays.push(heatPlane);
+const HEAT_LUT = (() => {
+  const stops = [[0,[0,0,0]],[.15,[12,30,110]],[.4,[0,140,225]],[.65,[30,220,190]],[.85,[255,196,40]],[1,[255,70,50]]];
+  const lut = new Uint8Array(256*3);
+  for (let i = 0; i < 256; i++) {
+    const t = i/255; let j = 0; while (j < stops.length-2 && t > stops[j+1][0]) j++;
+    const [t0,c0] = stops[j], [t1,c1] = stops[j+1], f = (t-t0)/(t1-t0);
+    for (let c = 0; c < 3; c++) lut[i*3+c] = Math.round(c0[c] + (c1[c]-c0[c])*f);
+  }
+  return lut;
+})();
+const KERNEL = [[-1,-1,1],[0,-1,2],[1,-1,1],[-1,0,2],[0,0,4],[1,0,2],[-1,1,1],[0,1,2],[1,1,1]];
+function depositHeat(x, z, dt){
+  const ci = Math.floor((x+20)/40*HEAT_N), cj = Math.floor((z+20)/40*HEAT_N);
+  for (const [di,dj,w] of KERNEL) {
+    const i = ci+di, j = cj+dj;
+    if (i >= 0 && j >= 0 && i < HEAT_N && j < HEAT_N) heat[j*HEAT_N + i] += w/16*dt;
+  }
+}
+let heatClock = 0;
+function updateHeat(dt){
+  heatClock += dt;
+  if (heatClock < .25) return;
+  const decay = Math.exp(-heatClock/240); heatClock = 0;   // ~3 min half-life
+  let max = 0;
+  for (let i = 0; i < heat.length; i++) { heat[i] *= decay; if (heat[i] > max) max = heat[i]; }
+  if (!heatPlane.visible) return;
+  const inv = 1 / Math.max(max, .5), d = heatImg.data;
+  for (let i = 0; i < heat.length; i++) {
+    const v = Math.min(255, Math.round(Math.sqrt(heat[i]*inv) * 255));
+    d[i*4] = HEAT_LUT[v*3]; d[i*4+1] = HEAT_LUT[v*3+1]; d[i*4+2] = HEAT_LUT[v*3+2]; d[i*4+3] = 255;
+  }
+  heatCtx.putImageData(heatImg, 0, 0); heatTex.needsUpdate = true;
+}
+
+/* =========================================================================
+   Selection, inspector, camera follow
+   ========================================================================= */
+let selection = null;
+const selRing = new THREE.Mesh(new THREE.RingGeometry(.62, .7, 48).rotateX(-Math.PI/2), new THREE.MeshBasicMaterial({ color:0xffffff, transparent:true, opacity:.85, depthWrite:false }));
+selRing.visible = false; selRing.renderOrder = 6; scene.add(selRing);
+const selBox = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1.36, 2.5, 1.36)), new THREE.LineBasicMaterial({ color:0x00e5ff }));
+selBox.visible = false; scene.add(selBox);
+const inspector = document.getElementById('inspector');
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+let downXY = null;
+canvas.addEventListener('pointerdown', e => { downXY = [e.clientX, e.clientY]; });
+canvas.addEventListener('pointerup', e => {
+  if (!downXY || Math.hypot(e.clientX-downXY[0], e.clientY-downXY[1]) > 6) return;
+  ndc.set(e.clientX/innerWidth*2 - 1, -(e.clientY/innerHeight)*2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const hits = raycaster.intersectObjects([...robotBodies, shelfMesh, legMesh, binMesh], false);
+  if (!hits.length) return;
+  const h = hits[0];
+  if (h.object.userData.robot) select({ type:'robot', ref:h.object.userData.robot });
+  else if (h.instanceId != null) select({ type:'rack', ref:racks[Math.floor(h.instanceId / (h.object === binMesh ? 8 : 4))] });
+});
+function select(sel){
+  selection = sel;
+  if (sel.type === 'robot' && camMode === 'follow') followTarget = sel.ref;
+  inspector.classList.remove('hidden');
+  renderInspector();
+}
+function clearSelection(){
+  selection = null; inspector.classList.add('hidden'); selRing.visible = false; selBox.visible = false;
+}
+inspector.addEventListener('click', e => {
+  const a = e.target.closest('[data-action]'); if (!a) return;
+  if (a.dataset.action === 'close') clearSelection();
+  if (a.dataset.action === 'follow') { if (camMode === 'follow' && followTarget === selection.ref) setCamMode('orbit'); else { followTarget = selection.ref; setCamMode('follow'); } }
+});
+const fmtAgo = t => t == null ? 'Not picked yet' : `${Math.round(simTime - t)} s ago`;
+function robotTarget(r){
+  switch (r.state) {
+    case STATE.TRAVELING_TO_RACK: case STATE.LIFTING: return r.task ? `${r.task.rack.id} (pick-up)` : '–';
+    case STATE.TRAVELING_TO_STATION: case STATE.DROPPING: return r.station ? `${r.rack.id} → ${r.station.id}` : '–';
+    case STATE.RETURNING: case STATE.LOWERING: return r.rack ? `${r.rack.id} → home slot` : '–';
+    case STATE.TO_CHARGER: case STATE.CHARGING: return r.dock ? r.dock.id : '–';
+    case STATE.PARKING: return r.spot ? r.spot.id : 'Parking';
+    case STATE.YIELDING: return 'Holding for traffic';
+    default: return r.battery < MIN_BATT ? 'Waiting for a free dock' : 'Awaiting task';
+  }
+}
+function renderInspector(){
+  if (!selection) return;
+  if (selection.type === 'robot') {
+    const r = selection.ref, col = hex(STATE_COLOR[r.state]);
+    const bc = r.battery > 50 ? 'var(--green)' : r.battery > 25 ? 'var(--amber)' : 'var(--red)';
+    const following = camMode === 'follow' && followTarget === r;
+    inspector.innerHTML = `
+      <h2>Autonomous mobile robot <button class="drawer-btn" style="display:inline-block" data-action="close" aria-label="Close">✕</button></h2>
+      <div class="insp-title"><h3>${r.name}</h3><span class="chip" style="color:${col}"><i class="dot" style="background:${col}"></i>${r.state}</span></div>
+      <div class="grid2">
+        <div class="cell"><div class="k">Tasks done</div><div class="v">${r.tasksDone}</div></div>
+        <div class="cell"><div class="k">Speed</div><div class="v">${r.v.toFixed(1)} m/s</div></div>
+        <div class="cell wide"><div class="k">Battery</div><div class="v">${r.battery.toFixed(0)} %</div><div class="meter"><i style="width:${r.battery}%;background:${bc}"></i></div></div>
+        <div class="cell wide"><div class="k">Current target</div><div class="v">${robotTarget(r)}</div></div>
+        <div class="cell"><div class="k">Carrying</div><div class="v">${r.rack ? r.rack.id : '–'}</div></div>
+        <div class="cell"><div class="k">Odometer</div><div class="v">${r.odometer.toFixed(0)} m</div></div>
+      </div>
+      <div class="btns"><button class="btn" data-action="follow">${following ? 'Stop following' : 'Follow this AMR'}</button><button class="btn ghost" data-action="close">Close</button></div>`;
+  } else {
+    const k = selection.ref;
+    const total = k.skus.reduce((a,s) => a + s.qty, 0), max = k.skus.reduce((a,s) => a + s.max, 0), pct = total/max*100;
+    const status = k.carrier ? `Carried by ${k.carrier.name}` : k.reserved ? 'Reserved for a pick' : 'In slot';
+    inspector.innerHTML = `
+      <h2>Storage rack <button class="drawer-btn" style="display:inline-block" data-action="close" aria-label="Close">✕</button></h2>
+      <div class="insp-title"><h3>${k.id}</h3><span class="chip" style="color:${k.carrier ? 'var(--amber)' : 'var(--cyan)'}">${status}</span></div>
+      <div class="grid2">
+        <div class="cell"><div class="k">Location</div><div class="v">Zone ${k.zone} · R${k.row} C${k.col}</div></div>
+        <div class="cell"><div class="k">Times picked</div><div class="v">${k.picks}</div></div>
+        <div class="cell wide"><div class="k">Stock level</div><div class="v">${total} / ${max} units</div><div class="meter"><i style="width:${pct}%;background:${pct > 40 ? 'var(--cyan)' : 'var(--amber)'}"></i></div></div>
+        <div class="cell wide"><div class="k">Last picked</div><div class="v">${fmtAgo(k.lastPicked)}${k.lastPicker ? ' · ' + k.lastPicker : ''}</div></div>
+      </div>
+      <table><thead><tr><th>Shelf</th><th>SKU</th><th>Item</th><th style="text-align:right">Qty</th></tr></thead><tbody>
+        ${k.skus.map((s,i) => `<tr><td class="mono">L${i+1}</td><td class="mono"><span class="sw" style="background:${hex(s.color)}"></span>${s.sku}</td><td>${s.name}</td><td class="mono" style="text-align:right">${s.qty}</td></tr>`).join('')}
+      </tbody></table>
+      <div class="btns"><button class="btn ghost" data-action="close">Close</button></div>`;
+  }
+}
+
+let camMode = 'orbit', followTarget = null;
+const followLook = new V3();
+document.querySelectorAll('[data-cam]').forEach(b => b.addEventListener('click', () => setCamMode(b.dataset.cam)));
+function setCamMode(m){
+  if (m === 'follow') {
+    if (!followTarget || !robots.includes(followTarget)) followTarget = selection && selection.type === 'robot' ? selection.ref : robots[0];
+    if (!followTarget) return;
+    followLook.copy(controls.target);
+    controls.enabled = false; controls.autoRotate = false;
+    if (!selection || selection.ref !== followTarget) select({ type:'robot', ref:followTarget });
+  } else {
+    controls.target.copy(followLook); controls.enabled = true; resumeOrbitAt = performance.now() + 4000;
+  }
+  camMode = m;
+  document.querySelectorAll('[data-cam]').forEach(b => b.classList.toggle('on', b.dataset.cam === m));
+  renderInspector();
+}
+const _desired = new V3(), _look = new V3();
+// Camera loop: orbit (with idle auto-rotate) or a damped chase cam behind the followed AMR
+function updateCamera(dt){
+  if (camMode === 'follow') {
+    if (!robots.includes(followTarget)) { setCamMode('orbit'); return; }
+    const r = followTarget, fx = Math.sin(r.heading), fz = Math.cos(r.heading);
+    _desired.set(r.group.position.x - fx*5.5, r.rack ? 4.4 : 3.4, r.group.position.z - fz*5.5);
+    _look.set(r.group.position.x + fx*2, .6, r.group.position.z + fz*2);
+    const k = 1 - Math.exp(-dt*3);
+    camera.position.lerp(_desired, k); followLook.lerp(_look, k);
+    camera.lookAt(followLook);
+  } else {
+    if (!controls.autoRotate && performance.now() > resumeOrbitAt) controls.autoRotate = true;
+    controls.update();
+  }
+}
+
+/* =========================================================================
+   UI wiring
+   ========================================================================= */
+const ui = { paths:false, heat:false, labels:true };
+const fleet = document.getElementById('fleet'), fleetOut = document.getElementById('fleetOut');
+fleet.addEventListener('input', () => { fleetOut.textContent = fleet.value; setFleetSize(+fleet.value); });
+function bindSwitch(id, key, apply){
+  const el = document.getElementById(id);
+  el.addEventListener('click', () => { ui[key] = !ui[key]; el.setAttribute('aria-checked', ui[key]); apply(ui[key]); });
+}
+bindSwitch('tPaths', 'paths', v => robots.forEach(r => { if (r.pathPts) r.pathPts.visible = v; }));
+bindSwitch('tHeat', 'heat', v => { heatPlane.visible = v; heatClock = 1; });
+bindSwitch('tLabels', 'labels', v => { labelsEl.style.display = v ? '' : 'none'; });
+const rushBtn = document.getElementById('rush'), rushBar = document.getElementById('rushBar');
+rushBtn.addEventListener('click', () => { rush.active ? endRush() : startRush(); });
+// Rush hour: order intake ×3 and the whole simulation runs 1.6× faster for 45 s
+function startRush(){ rush.active = true; rush.t = RUSH_SECONDS; document.body.classList.add('rush'); for (let i = 0; i < robots.length; i++) createTask(); }
+function endRush(){ rush.active = false; rush.t = 0; document.body.classList.remove('rush'); rushBtn.textContent = 'Rush hour'; rushBar.style.width = '0'; }
+const drawerBtn = document.getElementById('drawerBtn'), controlsEl = document.getElementById('controls');
+drawerBtn.addEventListener('click', () => {
+  const c = controlsEl.classList.toggle('collapsed');
+  drawerBtn.textContent = c ? 'Show' : 'Hide'; drawerBtn.setAttribute('aria-expanded', !c);
+});
+if (innerWidth < 820) { controlsEl.classList.add('collapsed'); drawerBtn.textContent = 'Show'; }
+addEventListener('keydown', e => { if (e.key === 'Escape') { if (camMode === 'follow') setCamMode('orbit'); else clearSelection(); } });
+
+const $id = id => document.getElementById(id);
+const kEls = { active:$id("kActive"), rate:$id("kRate"), cycle:$id("kCycle"), backlog:$id("kBacklog"), shipped:$id("kShipped"), clock:$id("kClock") };
+function updateKPIs(){
+  const active = robots.filter(r => r.state !== STATE.IDLE && r.state !== STATE.CHARGING && r.state !== STATE.PARKING).length;
+  while (completions.length && completions[0] < simTime - 60) completions.shift();
+  const window_ = Math.min(60, Math.max(simTime, 1));
+  const rate = simTime > 8 ? Math.round(completions.length * 60 / window_) : 0;
+  const avg = cycles.length ? cycles.reduce((a,b) => a+b, 0) / cycles.length : 0;
+  kEls.active.innerHTML = `${active}<small> / ${robots.length}</small>`;
+  kEls.rate.textContent = rate;
+  kEls.cycle.textContent = avg ? Math.round(avg) + 's' : '–';
+  kEls.backlog.textContent = pending.length;
+  kEls.shipped.textContent = shipped;
+  const s = Math.floor(simTime);
+  kEls.clock.textContent = `${pad2(Math.floor(s/3600))}:${pad2(Math.floor(s/60)%60)}:${pad2(s%60)}`;
+  if (rush.active) { rushBtn.textContent = `Rush hour · ${Math.ceil(rush.t)} s`; rushBar.style.width = (rush.t / RUSH_SECONDS * 100) + '%'; }
+}
+
+/* ---------- floating task labels ---------- */
+const _proj = new V3();
+function labelText(r){
+  switch (r.state) {
+    case STATE.TRAVELING_TO_RACK: return `→ ${r.task.rack.id}`;
+    case STATE.LIFTING: return `Lifting ${r.task.rack.id}`;
+    case STATE.TRAVELING_TO_STATION: return r.waitingSlot > 0 ? `Queued ${r.station.id} #${r.waitingSlot}` : `${r.rack.id} → ${r.station.id}`;
+    case STATE.DROPPING: return `Picking @ ${r.station.id}`;
+    case STATE.RETURNING: return `${r.rack.id} → slot`;
+    case STATE.LOWERING: return `Stowing ${r.rack.id}`;
+    case STATE.TO_CHARGER: return `→ ${r.dock.id} · ${Math.round(r.battery)}%`;
+    case STATE.CHARGING: return `Charging ${Math.round(r.battery)}%`;
+    case STATE.PARKING: return `→ ${r.spot ? r.spot.id : 'park'}`;
+    case STATE.YIELDING: return 'Yielding';
+    default: return r.battery < MIN_BATT ? 'Low battery' : 'Idle';
+  }
+}
+function updateLabels(){
+  if (!ui.labels) return;
+  const w = innerWidth, h = innerHeight;
+  for (const r of robots) {
+    _proj.set(r.group.position.x, r.rack ? 2.95 : 1.0, r.group.position.z).project(camera);
+    const el = r.label.el;
+    if (_proj.z > 1 || Math.abs(_proj.x) > 1.1 || Math.abs(_proj.y) > 1.1) { el.style.display = 'none'; continue; }
+    el.style.display = '';
+    el.style.transform = `translate(${(_proj.x*.5+.5)*w}px,${(-_proj.y*.5+.5)*h}px) translate(-50%,-100%)`;
+    const t = labelText(r);
+    if (t !== r.labelText) { r.label.text.textContent = t; r.labelText = t; }
+    const c = hex(STATE_COLOR[r.state]);
+    if (r.label.dot.dataset.c !== c) { r.label.dot.style.background = c; r.label.dot.style.color = c; r.label.dot.dataset.c = c; }
+    el.classList.toggle('sel', !!selection && selection.ref === r);
+  }
+}
+
+/* =========================================================================
+   Simulation step + render loop
+   ========================================================================= */
+// One simulation tick. Ordering matters: orders arrive, idle robots are matched,
+// conflicts are evaluated from last tick's velocities, then every robot advances.
+function update(dt){
+  simTime += dt;
+  if (rush.active) { rush.t -= dt; if (rush.t <= 0) endRush(); }
+  genAcc += dt * TASKS_PER_ROBOT_MIN * robots.length * (rush.active ? RUSH_TASK_MULT : 1) / 60;
+  while (genAcc >= 1) { genAcc -= 1; createTask(); }
+  assignTasks();
+  avoidCollisions(dt);
+  for (const r of robots) updateRobot(r, dt);
+  flushRacks();
+  updateItems(dt); updateDust(dt); updatePulses(dt); updateHumans(dt); updateBelts(dt); updateHeat(dt);
+}
+
+// Adaptive quality: drop pixel ratio, then the floor reflection, if frames run long.
+let quality = 2, fpsFrames = 0, fpsClock = 0, lowStreak = 0;
+const fpsEl = document.getElementById('fps');
+function adaptQuality(realDt){
+  // Background tabs throttle rAF; that says nothing about GPU headroom.
+  if (document.hidden) { fpsFrames = 0; fpsClock = 0; lowStreak = 0; return; }
+  fpsFrames++; fpsClock += realDt;
+  if (fpsClock < 1.5) return;
+  const fps = fpsFrames / fpsClock; fpsFrames = 0; fpsClock = 0;
+  fpsEl.textContent = `${Math.round(fps)} fps · Q${quality}`;
+  if (fps < 48 && performance.now() > 5000) lowStreak++; else lowStreak = 0;
+  if (lowStreak >= 2 && quality > 0) {
+    quality--; lowStreak = 0;
+    if (quality === 1) { pixelRatio = 1; renderer.setPixelRatio(1); composer.setPixelRatio(1); onResize(); }
+    if (quality === 0) { reflector.visible = false; floorMat.opacity = 1; }
+  }
+}
+function onResize(){
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
+}
+addEventListener('resize', onResize);
+
+let last = performance.now(), uiClock = 0;
+function frame(now){
+  requestAnimationFrame(frame);
+  const realDt = Math.min(.05, (now - last) / 1000); last = now;
+  const dt = realDt * (rush.active ? RUSH_TIMESCALE : 1);
+  update(dt);
+  updateCamera(realDt);
+  // Selection markers follow their target every frame
+  if (selection && selection.type === 'robot') { selRing.visible = true; selRing.position.set(selection.ref.group.position.x, .025, selection.ref.group.position.z); selRing.material.opacity = .55 + .3*Math.sin(now/180); }
+  else selRing.visible = false;
+  if (selection && selection.type === 'rack') { selBox.visible = true; selBox.position.set(selection.ref.pos.x, selection.ref.pos.y + 1.25, selection.ref.pos.z); }
+  else selBox.visible = false;
+  updateLabels();
+  uiClock += realDt;
+  if (uiClock > .25) { uiClock = 0; updateKPIs(); renderInspector(); }
+  adaptQuality(realDt);
+  composer.render();
+}
+
+// Initial fleet and a starting backlog so the floor is busy on load
+setFleetSize(12);
+for (let i = 0; i < 8; i++) createTask();
+document.getElementById('boot').classList.add('done');
+requestAnimationFrame(frame);
+
+// Headless hooks for verification: advance the sim without rendering and inspect state.
+window.__sim = {
+  robots, racks, stations, docks, pending, STATE,
+  get simTime(){ return simTime; }, get shipped(){ return shipped; }, completions, cycles,
+  advance(seconds, step = 1/30){ for (let t = 0; t < seconds; t += step) update(step); },
+  setFleetSize, startRush, camera,
+  benchRender(n = 60, o = {}){
+    const prev = [reflector.visible, bloom.enabled, renderer.shadowMap.enabled];
+    if (o.noReflect) reflector.visible = false; if (o.noBloom) bloom.enabled = false; if (o.noShadow) renderer.shadowMap.enabled = false;
+    const gl = renderer.getContext(); gl.finish(); const t = performance.now();
+    for (let i = 0; i < n; i++) { update(1/60); o.direct ? renderer.render(scene, camera) : composer.render(); }
+    gl.finish(); const ms = (performance.now() - t) / n;
+    [reflector.visible, bloom.enabled, renderer.shadowMap.enabled] = prev; return ms;
+  },
+  screenOf(v){ camera.updateMatrixWorld(); const p = v.clone().project(camera); return { x:(p.x*.5+.5)*innerWidth, y:(-p.y*.5+.5)*innerHeight }; }
+};
+})();
+</script>
+</body>
+</html>
