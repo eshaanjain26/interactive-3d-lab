@@ -1,6 +1,6 @@
 # SkyOps architecture
 
-SkyOps is a browser-based simulation of a fictional international airport, SKY International (runway 09/27). Pass 1 ships the core engine and a fully working International Departures vertical slice. Every other zone is placed on the map as massing and marked for a later pass.
+SkyOps is a browser-based simulation of a fictional international airport, SKY International (runway 09/27). Pass 1 shipped the core engine and International Departures; pass 2 added arrivals, baggage claim and customs; pass 3 added cargo, maintenance, fuel, fire and rescue, the operations centre and utilities. Every zone is now live.
 
 ## Tech stack
 
@@ -34,6 +34,7 @@ src/
   world/airfield.js     apron, stands, jet bridges, taxiways, runway, lights, tower, future-zone massing
   world/aircraft.js     aircraft factory and the flight movement state machine
   world/arrivals.js     pass 2: arrivals corridor, immigration, claim, customs, hall, pickup, inbound bags
+  world/support.js      pass 3: cargo + freighters, hangar, fuel farm + dispensers, ARFF + drills, ops centre, utilities
   sim/crowd.js          instanced human + dog renderer
   sim/agents.js         agent movement, passenger lifecycle, staff behaviours
   sim/bags.js           baggage handling system and follow-a-bag tracking
@@ -88,7 +89,12 @@ scene
 | Arrivals corridor | z -41.4 at y 5.2, x -97..172, then to the east pier | 2 |
 | Arrivals immigration, claim, customs, hall | x 190..290, z -10..50 | 2 |
 | Pickup curb + road | x 292..307 | 2 |
-| Cargo terminal, fuel farm, hangar, fire station, EOC | airfield edges | 3 |
+| Cargo terminal + stand C1 | x 290..390, z -130..-30 | 3 |
+| Maintenance hangar | x -350..-250, z -120..-40 | 3 |
+| Fuel farm + pipe rack | x 330..390, z 40..100; rack at 8.8 m | 3 |
+| ARFF fire station | x 20..60, z -186..-166 | 3 |
+| Operations centre | x 140..162, z -30..-14 | 3 |
+| Central utility plant | x -205..-155, z 92..132 | 3 |
 
 ## Time model
 

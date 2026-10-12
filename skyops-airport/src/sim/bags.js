@@ -225,7 +225,7 @@ SK.bags = (function () {
     // loaders appear beside parked aircraft
     Object.keys(loaders).forEach((id) => { const fl = loaders[id]; fl.visible = false; });
     SK.aircraft.planes.forEach((p) => {
-      if (p.state !== 'parked' || p.g.bus) return;
+      if (p.state !== 'parked' || p.g.bus || p.g.cargo) return;
       const l = loaderFor(p), h = SK.aircraft.holdPos(p);
       l.visible = true;
       l.position.set(h.x, 0, h.z);

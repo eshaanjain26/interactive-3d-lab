@@ -68,6 +68,12 @@ SK.crowd = (function () {
     r_ramp: { torso: 0xe8e23a, legs: 0x2a2f3a, band: 0xd9dde2 },
     r_bhs: { torso: 0xff8a2a, legs: 0x2a2f3a, band: 0xd9dde2 },
     r_paramedic: { torso: 0x2f8f5b, legs: 0x2f8f5b, band: 0xd8e03a },
+    r_cargo: { torso: 0xff8a2a, legs: 0x2a2f3a, band: 0xd9dde2 },
+    r_fueler: { torso: 0xe8e23a, legs: 0x1f2329, band: 0xd9dde2 },
+    r_firefighter: { torso: 0x1f2a38, legs: 0x1f2a38, band: 0xd8e03a, cap: 0xc8261f },
+    r_aoc: { torso: 0xe9edf2, legs: 0x1f2329, band: 0x1f5fbf },
+    r_customs: { torso: 0x24364f, legs: 0x1c2533, cap: 0x24364f, band: 0xc7a64a },
+    r_bservices: { torso: 0x9c2f35, legs: 0x1f2329 },
   };
   C.dress = function (a) {
     const r = SK.rng;

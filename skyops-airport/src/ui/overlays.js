@@ -38,7 +38,7 @@ SK.overlays = (function () {
   // ---------- minimap ----------
   const mc = document.getElementById('miniCanvas'), mx = mc.getContext('2d');
   const W = mc.width, H = mc.height;
-  const view = { x0: -300, x1: 300, z0: -262, z1: 175 };
+  const view = { x0: -370, x1: 410, z0: -262, z1: 306 };
   const toMap = (x, z) => [((x - view.x0) / (view.x1 - view.x0)) * W, ((z - view.z0) / (view.z1 - view.z0)) * H];
   const toWorld = (px, pz) => [view.x0 + (px / W) * (view.x1 - view.x0), view.z0 + (pz / H) * (view.z1 - view.z0)];
   const bg = document.createElement('canvas'); bg.width = W; bg.height = H;
@@ -61,7 +61,7 @@ SK.overlays = (function () {
       c.globalAlpha = 1;
     });
     c.fillStyle = '#ffffff'; c.font = 'bold 15px system-ui, sans-serif'; c.textAlign = 'center';
-    [['Check-in', 0, 44], ['Security', -10, 16], ['Gates', 0, -33], ['Runway 27', 0, L.runway.z + 5], ['BHS', 121, 10], ['Garage', 0, 116], ['Rail', -130, 42], ['Arrivals', 240, 22]].forEach(([t, x, z]) => { const [a, b] = toMap(x, z); c.fillText(t, a, b); });
+    [['Check-in', 0, 44], ['Security', -10, 16], ['Gates', 0, -33], ['Runway 27', 0, L.runway.z + 5], ['BHS', 121, 10], ['Garage', 0, 116], ['Rail', -130, 42], ['Arrivals', 240, 22], ['Cargo', 340, -45], ['Hangar', -300, -80], ['Fuel', 360, 70], ['ARFF', 40, -176]].forEach(([t, x, z]) => { const [a, b] = toMap(x, z); c.fillText(t, a, b); });
   }
   drawBg();
   SK.bus.on('settings', drawBg);
@@ -168,6 +168,7 @@ SK.overlays = (function () {
     flowGroup.visible = l.flow;
     SK.terminal.roof.visible = l.roof;
     if (SK.arrivals) SK.arrivals.roof.visible = l.roof;
+    if (SK.support) SK.support.roof.visible = l.roof;
     SK.landside.vehicles.forEach((v) => (v.g.visible = l.vehicles));
   };
   let tHeat = 0, tMini = 0;

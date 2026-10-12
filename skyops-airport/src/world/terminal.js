@@ -140,6 +140,12 @@ SK.terminal = (function () {
     c.fillText(SK.fmtTime(now), 870, 38);
     c.font = 'bold 22px system-ui, sans-serif'; c.fillStyle = '#7f93a8';
     ['TIME', 'FLIGHT', 'DESTINATION', 'GATE', 'STATUS'].forEach((h, i) => c.fillText(h, [30, 140, 300, 640, 750][i], 86));
+    if (SK.ops && SK.ops.holds.fidsDown) {
+      c.fillStyle = '#ff6b5c'; c.font = 'bold 44px system-ui, sans-serif'; c.fillText('SYSTEM OFFLINE', 300, 260);
+      c.fillStyle = '#9fb3c8'; c.font = 'bold 28px system-ui, sans-serif'; c.fillText('Please listen for announcements or ask staff', 240, 320);
+      fidsTex.needsUpdate = true;
+      return;
+    }
     const list = flights.filter((f) => !f.departed || now - f.offBlockAt < 600).slice(0, 9);
     list.forEach((f, r) => {
       const y = 128 + r * 50;

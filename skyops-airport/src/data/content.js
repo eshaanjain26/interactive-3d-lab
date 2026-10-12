@@ -1,6 +1,6 @@
 // SkyOps learn content: zones, entries (SOP, rules, data, roles, explainer), glossary, quiz. Pure data.
 // Figures are typical published ranges, labelled with their source. Airport, airlines and flights are fictional.
-SK.BUILT_PASS = 2;   // zones with pass <= this are live; later passes are massing only
+SK.BUILT_PASS = 3;   // zones with pass <= this are live; later passes are massing only
 (function () {
   const L = SK.L;
   const g = (id) => L.gates.find((x) => x.id === id);
@@ -26,11 +26,12 @@ SK.BUILT_PASS = 2;   // zones with pass <= this are live; later passes are massi
     { id: 'claim', name: 'Baggage claim', group: 'landside', pass: 2, x: 250, z: 22, d: 62, b: [236, 264, -10, 50] },
     { id: 'customs', name: 'Customs', group: 'security', pass: 2, x: 268, z: 18, d: 40, b: [264, 272, -10, 50] },
     { id: 'corridor', name: 'Arrivals corridor', group: 'airside', pass: 2, x: 120, z: -41, d: 120, y: 5, b: [-100, 190, -43, 22] },
-    { id: 'cargo', name: 'Cargo terminal', group: 'ops', pass: 3, x: 330, z: -70, d: 120, b: [280, 380, -110, -30] },
+    { id: 'cargo', name: 'Cargo terminal', group: 'ops', pass: 3, x: 340, z: -70, d: 120, b: [290, 390, -130, -30] },
     { id: 'hangar', name: 'Maintenance hangar', group: 'ops', pass: 3, x: -300, z: -80, d: 120, b: [-350, -250, -120, -40] },
     { id: 'fuel', name: 'Fuel farm', group: 'ops', pass: 3, x: 360, z: 70, d: 90, b: [330, 390, 40, 100] },
     { id: 'fire', name: 'Fire station (ARFF)', group: 'ops', pass: 3, x: 40, z: -176, d: 70, b: [20, 60, -186, -166] },
-    { id: 'eoc', name: 'Operations centre (SOC/EOC)', group: 'ops', pass: 3, x: 150, z: -40, d: 50, b: [140, 162, -48, -32] },
+    { id: 'eoc', name: 'Operations centre (SOC/EOC)', group: 'ops', pass: 3, x: 151, z: -22, d: 50, b: [140, 162, -30, -14] },
+    { id: 'utility', name: 'Central utility plant', group: 'ops', pass: 3, x: -180, z: 112, d: 70, b: [-205, -155, 92, 132] },
   ];
 
   const C = {};
@@ -186,14 +187,78 @@ SK.BUILT_PASS = 2;   // zones with pass <= this are live; later passes are massi
     data: [{ k: 'Radar rotation', v: 'Terminal surveillance radars sweep every 4 to 5 seconds' }],
     roles: ['r_atc'], keywords: 'atc tower air traffic control radar',
   });
-  ['cargo', 'hangar', 'fuel', 'fire', 'eoc'].forEach((id) => {
-    const z = SK.ZONES.find((q) => q.id === id);
-    add(id, {
-      kind: 'zone', name: z.name, zone: id, at: { x: z.x, z: z.z }, future: z.pass > SK.BUILT_PASS ? z.pass : 0,
-      summary: z.name + ' is placed on the map as massing and is scheduled for pass ' + z.pass + '. It will get the same depth as Departures: live agents, SOPs, rules, data and an explainer.',
-      keywords: id,
-    });
+  // ================= SUPPORT AND BACK OF HOUSE (pass 3) =================
+  add('cargo', {
+    kind: 'zone', name: 'Cargo terminal', zone: 'cargo', at: { x: 340, z: -70 },
+    summary: 'About half of world air cargo flies in passenger bellies; the rest flies on freighters like the one on stand C1. The cargo terminal breaks down import pallets, builds export ones, screens freight and holds goods in a customs-bonded area until they are cleared.',
+    sop: ['Freighter blocks in; the main-deck door opens and a high loader lowers each ULD.', 'Dollies tow ULDs to the terminal for breakdown.', 'Import freight waits in the bonded area until customs clears it.', 'Export freight is screened, built up on pallets and containers, weighed and tagged.', 'The load controller plans weight and balance; ULDs go up in load-plan order.', 'Air waybills and the cargo manifest go to customs before departure.'],
+    regs: [{ src: 'ICAO Annex 17', text: 'Cargo is screened unless it comes through a secure supply chain (regulated agent / known consignor).' }, { src: 'IATA Dangerous Goods Regulations', text: 'Classification, packing, labelling and loading limits for dangerous goods.' }, { src: 'WCO / customs', text: 'Bonded warehouses hold uncleared imports under customs control.' }],
+    data: [{ k: 'Freighters here', v: 'About three wide-body freighter turns a day on stand C1' }, { k: 'Common ULDs', v: 'AKE (LD3) containers and PMC pallets' }],
+    roles: ['r_cargo', 'r_customs', 'r_ramp'], keywords: 'cargo freight freighter uld warehouse bonded awb',
+    explainer: [
+      { x: 345, z: -95, d: 70, text: 'The freighter parks nose-in at stand C1.' },
+      { x: 330, z: -82, d: 30, text: 'A high loader lowers each container from the main-deck door onto a dolly.' },
+      { x: 340, z: -64, d: 34, text: 'Tugs tow dolly trains to the terminal doors for breakdown.' },
+      { x: 365, z: -45, d: 30, text: 'Imports wait in the bonded area until customs releases them.' },
+    ],
   });
+  add('hangar', {
+    kind: 'zone', name: 'Maintenance hangar', zone: 'hangar', at: { x: -300, z: -80 },
+    summary: 'Heavier maintenance happens in the hangar: scheduled checks, engine changes and repairs that cannot be done on the ramp between flights. Every task ends with a licensed engineer signing the aircraft back into service.',
+    sop: ['Tow the aircraft in; chock, earth and power it.', 'Open panels and cowlings per the work package.', 'Inspect, repair and replace parts with certified components.', 'Duplicate inspection of flight-control work.', 'Close up, run engine and systems tests.', 'Certificate of Release to Service signed by an authorised engineer.'],
+    regs: [{ src: 'EASA Part-145 / FAA Part 145', text: 'Approved maintenance organisations and repair stations.' }, { src: 'EASA Part-66', text: 'Licensing of aircraft maintenance engineers.' }, { src: 'Minimum Equipment List (MEL)', text: 'Defines which items may be inoperative for dispatch, and for how long.' }],
+    data: [{ k: 'Typical A-check', v: 'Overnight, every few hundred flight hours' }, { k: 'Typical C-check', v: 'Several weeks, every one to two years' }],
+    roles: ['r_mechanic'], keywords: 'hangar maintenance mro check engine mechanic engineer',
+    explainer: [
+      { x: -300, z: -100, d: 60, text: 'The hangar doors open toward the taxiway so aircraft can be towed in.' },
+      { x: -300, z: -80, d: 30, text: 'Work stands surround the aircraft; an engine cowling is open.' },
+      { x: -288, z: -78, d: 16, text: 'Engineers work to the task cards; a licensed engineer signs the release.' },
+    ],
+  });
+  add('fuel', {
+    kind: 'zone', name: 'Fuel farm', zone: 'fuel', at: { x: 360, z: 70 },
+    summary: 'Jet fuel arrives by pipeline or truck, settles in the farm tanks, is tested, and flows through an underground hydrant network to every stand. A dispenser truck connects the hydrant pit to the aircraft.',
+    sop: ['Receive fuel; sample and test before it enters storage.', 'Settle and drain water from tank sumps daily.', 'Pump into the hydrant ring main.', 'At the stand: bond the dispenser to the aircraft, connect to the hydrant pit and the wing.', 'Deliver the uplift the crew requested; check for water; sign the fuel receipt.'],
+    regs: [{ src: 'ASTM D1655 / DEF STAN 91-091', text: 'Jet A and Jet A-1 specifications.' }, { src: 'JIG standards', text: 'Joint Inspection Group standards for airport fuel storage and into-plane operations.' }, { src: 'NFPA 407', text: 'Standard for aircraft fuel servicing.' }],
+    data: [{ k: 'Typical uplift modelled', v: 'About 12,000 L narrow-body, 80,000 L wide-body long-haul' }],
+    roles: ['r_fueler'], keywords: 'fuel farm jet a1 hydrant tank dispenser refuel',
+    explainer: [
+      { x: 360, z: 70, d: 60, text: 'Storage tanks inside a bund wall that would contain a spill.' },
+      { x: 300, z: 0, d: 120, text: 'An underground hydrant ring main runs to every stand.' },
+      { x: -18, z: -70, d: 30, text: 'At the stand, a dispenser truck links the hydrant pit to the wing.' },
+    ],
+  });
+  add('fire', {
+    kind: 'zone', name: 'ARFF fire station', zone: 'fire', at: { x: 40, z: -176 },
+    summary: 'Aircraft rescue and fire fighting crews sit between the taxiway and the runway so they can reach any point on the runway within minutes. Their trucks carry water, foam and dry powder and can spray while driving.',
+    sop: ['Alarm from the tower: local standby, full emergency or aircraft accident.', 'Crews turn out; trucks take the tower-cleared route.', 'Position upwind, attack with foam, protect the escape routes.', 'Support evacuation and hand over to medical services.', 'Runway inspection before it reopens.'],
+    regs: [{ src: 'ICAO Annex 14, Chapter 9', text: 'Response time objective of 2 minutes, not exceeding 3 minutes, to any point of each operational runway.' }, { src: 'FAA Part 139.319', text: 'First truck must reach the midpoint of the farthest runway within 3 minutes of the alarm.' }, { src: 'ICAO RFF category', text: 'The fire category (1 to 10) follows the largest aircraft using the airport and sets water, foam and truck numbers.' }],
+    data: [{ k: 'Trucks here', v: '3 crash tenders' }],
+    roles: ['r_firefighter'], keywords: 'arff fire station rescue crash tender foam',
+  });
+  add('eoc', {
+    kind: 'zone', name: 'Operations centre (SOC/EOC)', zone: 'eoc', at: { x: 151, z: -22 },
+    summary: 'The airport operations centre watches the whole airport on one video wall: flights, stands, queues, bags, CCTV and alarms. Security staff run access control and cameras from here, and in a major incident it becomes the emergency operations centre.',
+    sop: ['Monitor flights, stands and resources; resolve conflicts.', 'Share milestones with airlines, handlers and ATC (A-CDM).', 'Watch CCTV and access-control alarms.', 'In an emergency: activate the EOC, call the agencies in the airport emergency plan, keep the log.'],
+    regs: [{ src: 'ICAO Annex 14', text: 'Every airport needs an emergency plan, tested by a full-scale exercise at least every two years.' }, { src: 'EUROCONTROL A-CDM', text: 'Airport Collaborative Decision Making: shared milestones and target off-block times.' }],
+    data: [{ k: 'Video wall', v: 'Live map, KPIs, flights and alarms in this sim' }],
+    roles: ['r_aoc', 'r_police'], keywords: 'operations centre aoc soc eoc control room video wall cdm',
+  });
+  add('utility', {
+    kind: 'zone', name: 'Central utility plant', zone: 'utility', at: { x: -180, z: 112 },
+    summary: 'Power, cooling, heating and water for the terminals. Airfield lighting and critical systems have backup power that switches over automatically if the grid fails.',
+    sop: ['Two independent grid feeds where possible.', 'Standby generators start automatically on a power loss.', 'Chillers and boilers keep the terminal at set temperatures.', 'Water treatment for potable water supplied to aircraft and terminals.'],
+    regs: [{ src: 'ICAO Annex 14', text: 'Secondary power for airfield lighting, with maximum switch-over times set by the type of approach.' }],
+    keywords: 'power plant utility hvac chiller generator water',
+  });
+  add('freighter', { name: 'Wide-body freighter', zone: 'cargo', at: { x: 345, z: -95 }, summary: 'A freighter version of a twin-aisle jet, with a large main-deck cargo door and no passenger windows in use. It carries about 100 tonnes on long-haul routes.', sop: ['Unload imports.', 'Load exports in load-plan order.', 'Weight and balance sign-off.'], roles: ['r_cargo'], keywords: 'freighter cargo plane' });
+  add('uld', { name: 'ULD on dolly', zone: 'cargo', at: { x: 330, z: -70 }, summary: 'Unit Load Devices are the containers and pallets that fit the aircraft hold. Each has an ID like AKE 12345 SK, tracked like a bag.', sop: ['Check the ULD is serviceable.', 'Build up within the contour and weight limits.', 'Net or close it and attach the tag.'], keywords: 'uld container pallet ake ld3 pmc dolly' });
+  add('kloader', { name: 'High loader', zone: 'cargo', at: { x: 330, z: -82 }, summary: 'A scissor-lift platform with powered rollers that raises ULDs to the main-deck door.', roles: ['r_cargo'], keywords: 'k loader high loader main deck loader' });
+  add('bonded', { name: 'Bonded area', zone: 'cargo', at: { x: 365, z: -45 }, summary: 'A fenced area under customs control where imported goods wait before duties are paid and they are released.', regs: [{ src: 'Customs law', text: 'Goods in a bonded area have not yet entered free circulation.' }], roles: ['r_customs'], keywords: 'bonded warehouse customs' });
+  add('mro_aircraft', { name: 'Aircraft on a maintenance check', zone: 'hangar', at: { x: -300, z: -80 }, summary: 'An aircraft in the hangar for a scheduled check, with work stands, an open engine cowling and engineers at work.', roles: ['r_mechanic'], keywords: 'maintenance check aircraft hangar' });
+  add('dispenser', { name: 'Hydrant dispenser', zone: 'fuel', at: { x: -18, z: -70 }, summary: 'A small truck with a filter and meter that connects the hydrant pit to the wing refuelling point; it has no tank of its own.', sop: ['Bond to the aircraft.', 'Connect hydrant and wing couplings.', 'Deliver the requested uplift; check for water.'], roles: ['r_fueler'], keywords: 'fuel dispenser hydrant truck' });
+  add('arff_truck', { name: 'Crash tender', zone: 'fire', at: { x: 40, z: -176 }, summary: 'An all-wheel-drive fire truck with thousands of litres of water and foam concentrate and a roof turret that sprays while driving.', roles: ['r_firefighter'], keywords: 'fire truck crash tender arff' });
+  add('videowall', { name: 'Ops video wall', zone: 'eoc', at: { x: 151, z: -26 }, summary: 'The live picture of the airport: map, flights, queues, bags and alarms. In this sim it shows the same data as your dashboard.', keywords: 'video wall dashboard' });
 
   // ================= CHECK-IN OBJECTS =================
   add('kiosk', {
@@ -445,6 +510,11 @@ SK.BUILT_PASS = 2;   // zones with pass <= this are live; later passes are massi
   role('r_customs', 'Customs officer', 'customs', 'Controls goods entering the country, collects duty and tax, and stops smuggling of drugs, cash, weapons and protected species.', ['Watch the channels and select passengers on risk.', 'Search bags with the passenger present.', 'Assess duty in the red channel.', 'Seize prohibited goods.']);
   role('r_bservices', 'Baggage services agent', 'claim', 'Handles missing, delayed and damaged bags: files the PIR, traces the bag and arranges delivery.', ['Match tag stub to record.', 'File the PIR.', 'Trace and deliver.']);
   role('r_greeter', 'Greeter', 'arrivals', 'Friends, family and drivers meeting arriving passengers in the public hall.', ['Wait behind the barrier.']);
+  role('r_cargo', 'Cargo handler', 'cargo', 'Breaks down and builds up ULDs, drives forklifts, high loaders and dolly trains, and handles dangerous goods to the rules.', ['Check documents against the freight.', 'Build ULDs within contour and weight.', 'Load in load-plan order.']);
+  role('r_mechanic', 'Aircraft maintenance engineer', 'hangar', 'Inspects and repairs aircraft to approved task cards; licensed engineers certify the aircraft as airworthy.', ['Follow the task card.', 'Use certified parts and calibrated tools.', 'Sign for the work.']);
+  role('r_fueler', 'Into-plane fueller', 'fuel', 'Delivers fuel to aircraft from the hydrant system and checks quality on every delivery.', ['Bond, connect, deliver.', 'Water check and receipt.']);
+  role('r_firefighter', 'Airport firefighter', 'fire', 'Trained for aircraft fires, rescue and medical first response; turns out in seconds.', ['Respond to alarms.', 'Fight fires and rescue.', 'Inspect the runway after incidents.']);
+  role('r_aoc', 'Operations controller', 'eoc', 'Runs the day from the operations centre: stands, delays, resources and incident coordination.', ['Watch the wall.', 'Coordinate with airlines, handlers and ATC.', 'Activate the emergency plan.']);
   role('r_driver', 'Driver', 'curb', 'Taxi, shuttle and bus drivers who bring passengers to the curb.', ['Stop only in the assigned bay.', 'Unload and move on.']);
 
   SK.CONTENT = C;
@@ -508,6 +578,20 @@ SK.BUILT_PASS = 2;   // zones with pass <= this are live; later passes are massi
     ['Red channel', 'Customs exit for passengers with goods to declare.'],
     ['Reclaim', 'Baggage claim; the carousels where passengers collect hold bags.'],
     ['Deplaning', 'Passengers leaving the aircraft after arrival.'],
+    ['AKE / LD3', 'The most common lower-deck baggage and cargo container.'],
+    ['PMC', 'A standard 96 x 125 inch cargo pallet.'],
+    ['Air waybill', 'The contract and tracking document for an air cargo shipment.'],
+    ['Bonded warehouse', 'Customs-controlled storage for imports not yet cleared.'],
+    ['A-check', 'A light scheduled maintenance check, often done overnight.'],
+    ['C-check', 'A heavy scheduled check that takes the aircraft out of service for weeks.'],
+    ['CRS', 'Certificate of Release to Service, signed after maintenance.'],
+    ['MEL', 'Minimum Equipment List: what may be inoperative for a flight, and for how long.'],
+    ['Jet A-1', 'The standard kerosene jet fuel used outside North America (Jet A in the US).'],
+    ['Hydrant system', 'Underground pipes that bring fuel from the farm to each stand.'],
+    ['Bonding', 'Connecting fuel truck and aircraft electrically so static cannot spark.'],
+    ['RFF category', 'The airport fire category, set by the largest aircraft using it.'],
+    ['A-CDM', 'Airport Collaborative Decision Making: shared milestones between airport, airlines, handlers and ATC.'],
+    ['TOBT', 'Target Off-Block Time, the airline\'s estimate of when the aircraft will be ready.'],
     ['On-blocks', 'The moment an arriving aircraft stops on its stand; bag delivery times are measured from here.'],
     ['Sterile area', 'The screened zone between security and the aircraft.'],
     ['Taxiway', 'Paved path aircraft use to move between runway and apron.'],
@@ -544,5 +628,10 @@ SK.BUILT_PASS = 2;   // zones with pass <= this are live; later passes are massi
     { q: 'What does a passenger do if their bag does not arrive?', o: ['Wait until tomorrow', 'File a Property Irregularity Report at baggage services', 'Call the police', 'Go back airside'], a: 1, why: 'The PIR starts the trace in WorldTracer and the airline delivers the bag.', ref: 'bservices' },
     { q: 'In the dual-channel customs system, the red channel is for…', o: ['Crew only', 'Goods to declare', 'Diplomats', 'Transfer passengers'], a: 1, why: 'Green means nothing to declare; red means goods to declare (WCO Revised Kyoto Convention).', ref: 'customs' },
     { q: 'Bag delivery times are usually measured from…', o: ['Landing', 'On-blocks', 'Passport control', 'Gate close'], a: 1, why: 'Service targets for first and last bag count from on-blocks.', ref: 'claim' },
+    { q: 'What is the ICAO response time objective for airport fire fighting?', o: ['1 minute', '2 minutes, not exceeding 3, to any point of each runway', '5 minutes', '10 minutes'], a: 1, why: 'ICAO Annex 14 Chapter 9 sets the objective.', ref: 'fire' },
+    { q: 'What is a bonded warehouse?', o: ['A warehouse with insurance', 'Customs-controlled storage for goods not yet cleared', 'A cold store', 'A mail sorting centre'], a: 1, why: 'Imports wait under customs control until released.', ref: 'bonded' },
+    { q: 'Why is a fuel dispenser bonded to the aircraft before fuelling?', o: ['To stop it rolling', 'To equalise static electricity so it cannot spark', 'To measure the fuel', 'To tow the aircraft'], a: 1, why: 'Bonding is a basic into-plane fuelling safety step.', ref: 'dispenser' },
+    { q: 'Who can release an aircraft back to service after maintenance?', o: ['Any mechanic', 'An authorised licensed engineer signing a CRS', 'The captain', 'The airport'], a: 1, why: 'Part-145 and Part-66 rules require certifying staff.', ref: 'hangar' },
+    { q: 'How often must an airport run a full-scale emergency exercise under ICAO Annex 14?', o: ['Every month', 'At least every two years', 'Every ten years', 'Never'], a: 1, why: 'The emergency plan is tested by a full-scale exercise at intervals not exceeding two years.', ref: 'eoc' },
   ];
 })();

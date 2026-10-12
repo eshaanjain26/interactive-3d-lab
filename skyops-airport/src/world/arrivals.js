@@ -247,6 +247,7 @@ SK.arrivals = (function () {
   const carouselLoad = [0, 0, 0];
   SK.bus.on('blockIn', (p) => {
     const f = p.f;
+    if (f.cargo) return;
     const kind = f.wide ? 'wide' : 'narrow';
     const seats = SK.AIRCRAFT_TYPES[kind].seats;
     const figures = Math.max(6, Math.round((seats * SK.rng.range(0.7, 0.92)) / P));

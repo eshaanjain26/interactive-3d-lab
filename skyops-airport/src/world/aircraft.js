@@ -121,16 +121,20 @@ SK.aircraft = (function () {
   const holdZ = RW.z + RW.w / 2 + 14;
   function inboundPath(g) {
     if (g.bus) return path([[RW.exitX, RW.z], [RW.exitX + 6, RW.z + 30], [RW.exitX + 30, TW], [-130, TW], [-120, TW + 8], [-120, TL - 6], [-128, -100], [-140, -84], [-152, -78.5], [L.remote.x - 8, L.remote.z]]);
-    return path([[RW.exitX, RW.z], [RW.exitX + 6, RW.z + 30], [RW.exitX + 30, TW], [-130, TW], [-120, TW + 8], [-118, TL - 2], [-104, TL], [g.x - 26, TL], [g.x - 6, TL + 6], [g.x, TL + 20], [g.x, L.stand.noseZ - 18]]);
+    return path([[RW.exitX, RW.z], [RW.exitX + 6, RW.z + 30], [RW.exitX + 30, TW], [-130, TW], [-120, TW + 8], [-118, TL - 2], [-104, TL], [g.x - 26, TL], [g.x - 6, TL + 6], [g.x, TL + 20], [g.x, (g.noseZ || L.stand.noseZ) - 18]]);
   }
   function standFinal(g) {
     if (g.bus) return null;
-    return path([[g.x, L.stand.noseZ - 18], [g.x, L.stand.noseZ]]);
+    const nz = g.noseZ || L.stand.noseZ;
+    return path([[g.x, nz - 18], [g.x, nz]]);
   }
   function pushPath(g) {
+    // the cargo stand pushes back the other way so the freighter faces west, toward the runway connector
+    if (g.cargo) return path([[g.x, g.noseZ], [g.x, -100], [g.x + 7, -114], [g.x + 24, TL]]);
     return path([[g.x, L.stand.noseZ], [g.x, -96], [g.x - 7, -113], [g.x - 24, TL]]);
   }
   function taxiOutPath(g) {
+    if (g.cargo) return path([[g.x + 24, TL], [316, TL], [302, TL - 8], [300, TW + 10], [312, TW], [RW.holdX - 14, TW], [RW.holdX, TW - 12], [RW.holdX, holdZ]]);
     const start = g.bus ? [[L.remote.x - 8, L.remote.z], [L.remote.x - 26, L.remote.z - 2], [-196, -96], [-188, TL + 1], [-170, TL]] : [[g.x - 24, TL]];
     return path(start.concat([[g.x - 4, TL], [280, TL], [296, TL - 8], [300, TW + 10], [312, TW], [RW.holdX - 14, TW], [RW.holdX, TW - 12], [RW.holdX, holdZ]]));
   }
@@ -140,7 +144,7 @@ SK.aircraft = (function () {
 
   // ---------- planes ----------
   A.spawnInbound = function (f) {
-    const g = L.gates.find((x) => x.id === f.gate);
+    const g = f.gateObj || L.gates.find((x) => x.id === f.gate);
     const kind = f.wide ? 'wide' : 'narrow';
     const grp = build(kind, f.airline);
     root.add(grp);
@@ -317,7 +321,7 @@ SK.aircraft = (function () {
   function arrive(p, now) {
     p.state = 'parked'; p.speed = 0;
     p.f.blockIn = now;
-    if (!p.g.bus) SK.airfield.dock(p.g.id, A.doorPos(p));
+    if (!p.g.bus && !p.g.cargo) SK.airfield.dock(p.g.id, A.doorPos(p));
     SK.bus.emit('ops', { t: now, kind: 'info', msg: p.f.num + ' on blocks at ' + (p.g.bus ? 'R1' : p.g.id) + ', turnaround started' });
     SK.bus.emit('blockIn', p);
   }
@@ -327,6 +331,8 @@ SK.aircraft = (function () {
     p.f.delayMin = Math.max(0, Math.round((now - p.f.std) / 60));
     SK.bus.emit('offBlock', p.f);
   }
+  A.build = build;
+  A.DIM = DIM;
   A.root = root;
   return A;
 })();

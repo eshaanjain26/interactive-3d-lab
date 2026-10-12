@@ -91,6 +91,9 @@ SK.edu = (function () {
         ${card('Commercial', '$' + Math.round(k.retail + k.food).toLocaleString(), 'Duty free $' + Math.round(k.retail).toLocaleString() + ' · food $' + Math.round(k.food).toLocaleString())}
         ${card('Staffing', '$' + (k.staffCost || 0).toLocaleString() + '/hr', 'Labour so far $' + Math.round(SK.ops.money.staff).toLocaleString())}
         ${card('Boarded', (k.boarded || 0).toLocaleString(), (k.missed || 0) + ' missed their flight')}
+        ${card('Cargo', (k.cargoT || 0) + ' t handled', (k.ulds || 0) + ' ULDs · ' + (k.freighters || 0) + ' freighters dispatched')}
+        ${card('Fuel', (k.fuelM3 || 0) + ' m³ delivered', (k.fuelings || 0) + ' hydrant fuellings')}
+        ${card('Arrivals', (k.arrived || 0).toLocaleString() + ' arrived', 'First bag ' + (k.firstBag == null ? '–' : k.firstBag + ' min') + ' · last bag ' + (k.lastBag == null ? '–' : k.lastBag + ' min') + ' · ' + (k.pir || 0) + ' PIRs')}
         ${card('Screening outcomes', SK.agents.stats.secondary * P + ' bag searches', SK.agents.stats.patdown * P + ' pat-downs · ' + SK.agents.stats.k9 + ' K9 alerts')}
       </div>`;
     }

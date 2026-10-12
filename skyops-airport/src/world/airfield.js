@@ -1,4 +1,4 @@
-// SkyOps airfield: apron, stands, jet bridges, taxiways, runway 09/27 + lighting, tower, future-zone massing.
+// SkyOps airfield: apron, stands, jet bridges, taxiways, runway 09/27 + lighting, tower.
 SK.airfield = (function () {
   const K = SK.kit, M = K.mat, L = SK.L, E = SK.engine;
   const A = { bridges: {} };
@@ -193,26 +193,7 @@ SK.airfield = (function () {
   K.hit(8, 2.5, 3, TW.x, TW.h + 9.4, TW.z, root, 'radar');
   K.hit(30, 0.2, 30, TW.x, 0, TW.z + 20, root, 'tower');
 
-  // ---------- future-zone massing ----------
-  function future(id, x0, x1, z0, z1, h, mat, title, pass) {
-    B.box(x1 - x0, h, z1 - z0, mat, (x0 + x1) / 2, 0, (z0 + z1) / 2);
-    const s = K.sign([title, 'Pass ' + pass + ' · coming next'], 12, 2.6, { bg: '#2f3a48', fg: '#e7edf4', font: 'bold 64px system-ui, sans-serif', accent: '#f2b134' });
-    s.position.set((x0 + x1) / 2, h + 3, z1 + 0.1); root.add(s);
-    K.hit(x1 - x0, h, z1 - z0, (x0 + x1) / 2, 0, (z0 + z1) / 2, root, id);
-  }
-  future('cargo', 280, 380, -110, -30, 16, M.wallDark, 'Cargo terminal', 3);
-  future('eoc', 140, 162, -48, -32, 6, M.wallDark, 'SOC / EOC', 3);
-  future('fire', 20, 60, -186, -166, 8, M.red, 'ARFF fire station', 3);
-  // hangar: box with a curved roof
-  future('hangar', -350, -250, -120, -40, 18, M.wall, 'Maintenance hangar', 3);
-  const arch = new THREE.Mesh(new THREE.CylinderGeometry(40, 40, 100, 24, 1, false, -Math.PI / 2, Math.PI), M.steel);
-  arch.rotation.x = Math.PI / 2; arch.scale.set(1.25, 1, 0.25); arch.position.set(-300, 18, -80);
-  root.add(arch);
-  // fuel farm tanks
-  for (let i = 0; i < 4; i++) B.cyl(9, 12, M.white, 348 + (i % 2) * 24, 0, 57 + Math.floor(i / 2) * 26, 24);
-  K.hit(60, 12, 60, 360, 0, 70, root, 'fuel');
-  const fs = K.sign(['Fuel farm', 'Pass 3 · coming next'], 10, 2.4, { bg: '#2f3a48', font: 'bold 64px system-ui, sans-serif', accent: '#f2b134' });
-  fs.position.set(360, 16, 102); root.add(fs);
+  // pass 3 support zones (cargo, hangar, fuel, fire, ops centre, utilities) live in world/support.js
 
   B.build(root);
 

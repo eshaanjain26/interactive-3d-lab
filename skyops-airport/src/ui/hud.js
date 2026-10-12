@@ -136,6 +136,7 @@ SK.ui = (function () {
     if (!e.future && (e.explainer || e.sop.length)) acts.push(`<button class="btn primary" data-act="explain">▶ Explainer</button>`);
     if (ctx.agent || ctx.bag || ctx.plane) acts.push(`<button class="btn" data-act="follow">Follow</button>`);
     if (SK.QUIZ.some((q) => q.ref === e.id)) acts.push(`<button class="btn" data-act="quiz">Quiz me</button>`);
+    if (e.id === 'fire' || e.id === 'arff_truck') acts.push(`<button class="btn" data-act="drill">Run response drill</button>`);
     $('infoActs').innerHTML = acts.join('');
     $('infoActs').querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => act(b.dataset.act)));
     const tabs = tabsFor(e, ctx);
@@ -220,6 +221,11 @@ SK.ui = (function () {
     }
     if (a === 'explain') SK.edu.explain(e);
     if (a === 'quiz') SK.edu.openLearn('quiz', e.id);
+    if (a === 'drill') {
+      SK.support.drill({ x: SK.L.runway.x0 + 40, z: SK.L.runway.z }, 'response drill to the far end of runway 27');
+      SK.cam.flyTo({ x: -150, z: -205 }, { dist: 260 });
+      setTimeout(() => SK.support.recall(), 45000);
+    }
     if (a === 'follow') {
       if (ctx.agent) U.followAgent(ctx.agent);
       else if (ctx.bag) U.followBag(ctx.bag);

@@ -179,6 +179,58 @@ SK.crisis = (function () {
       end() { OPS.holds.pushback = false; log('Vehicle removed; runway inspection complete, 27 reopened', 'go'); },
       sop: ['Controller sees the conflict: go-around for the arriving aircraft, stop departures.', 'Order the vehicle off the runway.', 'Runway inspection before reopening.', 'File an incursion report; investigate signage, clearance and radio procedures.'],
     },
+    {
+      id: 'birdstrike', title: 'Bird strike on approach', ref: 'fire', at: { x: 40, z: -200 }, dist: 260,
+      brief: 'An arriving aircraft reports a bird strike on short final: vibration in the left engine and a burning smell in the cabin. The crew asks for fire services on landing.',
+      start(c) { c.p = SK.aircraft.planes.find((q) => q.state === 'approach' || q.state === 'queued'); log((c.p ? c.p.f.num : 'Arriving aircraft') + ' reports bird strike, requests fire services'); },
+      steps: [
+        {
+          text: 'You are the tower supervisor. What alert do you declare?',
+          opts: [
+            { t: 'Full emergency: ARFF to pre-planned runway positions before the aircraft lands', s: 2, why: 'Correct. An engine problem with smoke smell is a full emergency; crash tenders wait beside the runway so they can attack within seconds of touchdown.', fx: () => SK.support.drill({ x: 60, z: SK.L.runway.z }, 'full emergency, positions beside runway 27') },
+            { t: 'Local standby: crews ready in the station', s: 1, why: 'Local standby fits a minor defect. With possible engine damage and smoke the right call is a full emergency so trucks are already beside the runway.', fx: () => SK.support.drill({ x: 60, z: SK.L.runway.z }, 'late turn-out after upgrade to full emergency') },
+            { t: 'No alert: bird strikes are common', s: 0, why: 'Most bird strikes are harmless, but this crew reported vibration and smoke. Under-reacting costs minutes if the engine catches fire.' },
+          ],
+        },
+        {
+          text: 'The aircraft has landed and vacated the runway. Bird remains are reported near the touchdown zone.',
+          opts: [
+            { t: 'Close the runway for an inspection and remove debris before the next movement', s: 2, why: 'Correct. A runway inspection removes foreign object debris (FOD) that could damage the next aircraft; the wildlife team logs the strike.', fx: (c) => { c.closed = true; SK.aircraft.runwayHolder = { state: 'inspection', f: { num: 'RWY' } }; } },
+            { t: 'Keep departures moving; inspect later', s: 0, why: 'Debris on a runway can burst tyres or be ingested by engines. Inspect first.' },
+            { t: 'Close the airport for the day', s: 1, why: 'A short inspection is enough; a full closure is out of proportion.' },
+          ],
+        },
+      ],
+      duration: 30,
+      end(c) { if (SK.aircraft.runwayHolder && SK.aircraft.runwayHolder.state === 'inspection') SK.aircraft.runwayHolder = null; SK.support.recall(); log('Runway 27 inspected and reopened; strike reported to the wildlife team', 'go'); },
+      sop: ['Crew declares the problem; tower declares local standby or full emergency.', 'ARFF to pre-planned positions; other traffic held.', 'Aircraft lands, stops or vacates; ARFF checks engines and brakes.', 'Runway inspection for debris and remains.', 'Report the strike (wildlife hazard management).'],
+    },
+    {
+      id: 'cyber', title: 'Ransomware hits airport IT', ref: 'eoc', at: { x: 151, z: -22 }, dist: 60,
+      brief: 'The operations centre sees flight displays freezing and check-in workstations showing a ransom note. The baggage system and security scanners are on separate networks and still running.',
+      start() { OPS.holds.fidsDown = true; OPS.svcMul.economy = 3; OPS.svcMul.priority = 3; OPS.svcMul.kiosk = 5; OPS.svcMul.bagdrop = 5; log('Cyber incident: FIDS and check-in systems infected'); },
+      steps: [
+        {
+          text: 'What is the first action from the operations centre?',
+          opts: [
+            { t: 'Isolate the infected networks, switch to manual check-in, whiteboards and PA announcements', s: 2, why: 'Correct. Contain the spread first, then keep passengers moving with manual procedures. Operational technology on separate networks keeps running.', fx: () => { OPS.svcMul.economy = 1.6; OPS.svcMul.priority = 1.6; OPS.svcMul.kiosk = 2; OPS.svcMul.bagdrop = 2; OPS.setOpen('economy', 10); } },
+            { t: 'Pay the ransom to get systems back fast', s: 0, why: 'Paying funds criminals, gives no guarantee of recovery and may be illegal. Follow the incident response plan.' },
+            { t: 'Shut down every system, including baggage screening', s: 1, why: 'Over-reaction. Isolate what is infected; unaffected safety systems such as hold-baggage screening should keep running.', fx: () => { OPS.holds.pushback = true; } },
+          ],
+        },
+        {
+          text: 'IT has contained the malware. How do you bring systems back?',
+          opts: [
+            { t: 'Restore from clean offline backups after forensic checks, then reconnect in stages', s: 2, why: 'Correct. Staged recovery from known-good backups avoids reinfection; report the incident to the national cyber authority.' },
+            { t: 'Reconnect everything at once to catch up', s: 0, why: 'Reconnecting unverified machines can reinfect the network.' },
+            { t: 'Wait until next week', s: 1, why: 'Recovery should start as soon as backups are verified; manual procedures cannot run for days without delays building.' },
+          ],
+        },
+      ],
+      duration: 40,
+      end() { OPS.holds.fidsDown = false; OPS.holds.pushback = false; ['economy', 'priority', 'kiosk', 'bagdrop'].forEach((k) => (OPS.svcMul[k] = 1)); log('Systems restored from clean backups; normal operations resumed', 'go'); },
+      sop: ['Detect and confirm: operations and IT security centres.', 'Contain: isolate infected networks.', 'Continue: manual check-in, whiteboards, PA.', 'Recover: clean backups, staged reconnection.', 'Report to the national cyber authority and the regulator.'],
+    },
   ];
   CR.scenarios = SCEN;
   OPS.svcMul = OPS.svcMul || {};
