@@ -1,6 +1,6 @@
 # Interactive 3D Lab
 
-Twenty-one interactive Three.js explorers covering chips, quantum computing, AI, robotics, audio, anatomy, cardiology, embryology, energy, logistics, global trade, space and U.S. immigration law. Each one is a single self-contained HTML file.
+Twenty-two interactive Three.js explorers covering chips, quantum computing, AI, robotics, audio, anatomy, cardiology, embryology, energy, logistics, global trade, space and U.S. immigration law. Each one is a single self-contained HTML file.
 
 **Live site:** https://eshaanjain26.github.io/interactive-3d-lab/
 
@@ -26,7 +26,8 @@ Twenty-one interactive Three.js explorers covering chips, quantum computing, AI,
 | [Warehouse Dock Twin](https://eshaanjain26.github.io/interactive-3d-lab/warehouse-dock-twin/) | A six-bay warehouse dock as a digital twin: trucks run their own arrive, dock, unload, load and depart timelines while pallets flow from truck to conveyor to racking and forklifts work the aisles |
 | [Warehouse Ops Academy](https://eshaanjain26.github.io/interactive-3d-lab/warehouse-ops-academy/) | An end-to-end distribution center for teaching: gate check-in, intermodal rail and drayage, docking, receiving, putaway, pick-to-light, AMR goods-to-person, packing, sortation, shipping, cycle counts and andons, with 20+ animated workers, a guided tour and a walkable floor |
 | [Rocket Launch Broadcast](https://eshaanjain26.github.io/interactive-3d-lab/rocket-launch-broadcast/) | A heavy-lift launch from T-10 to orbit as a live broadcast: umbilicals and swing arms release, ignition and liftoff with flame-trench smoke, booster and stage separation, fairing deploy, then a pull-back to Earth's curvature, with telemetry, an altitude tape, a cutaway view and a scrubbable timeline |
-| [ChainVerse 3D](https://eshaanjain26.github.io/interactive-3d-lab/chainverse-3d/) | The global supply chain from mine to doorstep: a globe of real shipping lanes, ports and chokepoints with live traffic and toggleable disruptions, eleven zoom-in dioramas (container port, Suez, Panama locks, rail ramp, DC, last mile, air cargo and more), and five scored missions covering a Red Sea reroute, a cold chain, peak-season congestion and a customs hold |
+| [Fire Evacuation Drill](https://eshaanjain26.github.io/interactive-3d-lab/fire-evacuation-drill/) | A five-floor office in a fire drill: up to 200 occupants pick the nearest safe exit, queue in corridors and spiral down stairwells while fire and smoke spread, block routes and force reroutes |
+| [ChainVerse 3D](https://eshaanjain26.github.io/interactive-3d-lab/chainverse-3d/) | The global supply chain from mine to doorstep: a globe of real shipping lanes, ports and chokepoints with live traffic and toggleable disruptions, eleven zoom-in dioramas (container port, Suez, Panama locks, rail ramp, DC, last mile, air cargo and more), and five scored missions covering a Red Sea reroute, a cold chain, peak-season congestion and a customs hold. Missions are scored on landed cost (freight, duty, inventory carrying cost, EU ETS carbon, demurrage, late penalties), lead time, CO2 and service level. Photographic Earth, reflective ocean, sky lighting, and collapsible panels with a focus mode |
 
 ## Run locally
 

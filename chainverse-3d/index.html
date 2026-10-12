@@ -81,6 +81,36 @@
   .iconbtn { display: inline-flex; align-items: center; gap: 6px; }
   .iconbtn svg { width: 14px; height: 14px; fill: currentColor; }
 
+  /* collapsible panels and focus mode */
+  .pmin { position: sticky; top: -6px; float: right; margin: -6px -6px 4px 8px; width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: var(--panel); color: var(--muted); cursor: pointer; z-index: 2; }
+  .pmin svg { width: 14px; height: 14px; fill: currentColor; }
+  .pmin:hover { background: var(--chip); color: var(--ink); }
+  .pmin:focus-visible, .edgetab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .edgetab { display: none; top: 50%; transform: translateY(-50%); padding: 16px 9px; border-radius: 12px; cursor: pointer; font: 700 11px var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); writing-mode: vertical-rl; }
+  .edgetab:hover { color: var(--accent); }
+  #leftTab { left: 6px; transform: translateY(-50%) rotate(180deg); }
+  #rightTab { right: 6px; }
+  body.lc #left, body.rc #right { display: none; }
+  body.lc #leftTab, body.rc #rightTab { display: block; }
+  body.lc #card { left: 56px; }
+  body[data-view="diorama"]:not(.inmission) #leftTab { display: none; }
+  #kpiStrip { display: none; gap: 12px; font-size: 12px; white-space: nowrap; }
+  #kpiStrip span { display: inline-flex; gap: 4px; align-items: baseline; }
+  #kpiStrip small { color: var(--muted); font: 600 10px var(--sans); letter-spacing: .06em; text-transform: uppercase; }
+  #kpiStrip .bad { color: var(--fault); } #kpiStrip .good { color: var(--ok); }
+  body.focus #left, body.focus #right, body.focus .edgetab, body.focus .mtabs, body.focus #card { display: none !important; }
+  body.focus #topbar { left: 50%; right: auto; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 24px); height: 46px; }
+  body.focus .brand, body.focus #btnMissions, body.focus #btnLearn, body.focus .spacer { display: none; }
+  body.focus.inmission #kpiStrip { display: flex; }
+  #focusBtn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .cbar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; gap: 1px; background: var(--line); margin-top: 4px; }
+  .cbar i { display: block; min-width: 3px; }
+  .cleg { display: grid; gap: 3px; margin-top: 8px; font-size: 11.5px; }
+  .cleg span { display: grid; grid-template-columns: 10px 1fr auto; gap: 6px; align-items: center; color: var(--muted); }
+  .cleg span i { width: 9px; height: 9px; border-radius: 2px; }
+  .cleg b { font: 600 11.5px var(--mono); color: var(--ink); }
+  .cleg .tot { grid-template-columns: 1fr auto; border-top: 1px solid var(--line); padding-top: 4px; color: var(--ink); font-weight: 650; }
+
   /* left panel */
   #left { top: 78px; left: 12px; width: 300px; bottom: 12px; padding: 14px; overflow: auto; }
   .grp { margin-bottom: 14px; }
@@ -231,6 +261,10 @@
     .spacer { display: none; }
     .brand b { font-size: 13px; }
     .hide-sm { display: none !important; }
+    .pmin { display: grid; } .edgetab { display: none !important; }
+    body.lc #left, body.rc #right { display: none; }
+    body.focus #topbar { height: auto; flex-wrap: nowrap; }
+    body.focus.inmission #kpiStrip { display: none; }
     #left, #right { top: auto; bottom: 12px; left: 12px; right: 12px; width: auto; max-height: 40vh; display: none; padding: 12px; }
     body[data-tab="left"] #left, body[data-tab="right"] #right { display: block; }
     .mtabs { display: flex; position: fixed; left: 12px; right: 12px; bottom: 12px; gap: 6px; z-index: 6; justify-content: center; }
@@ -266,12 +300,16 @@
     <button data-s="2" aria-pressed="false">2×</button>
     <button data-s="4" aria-pressed="false">4×</button>
   </div>
+  <div id="kpiStrip" class="mono" aria-live="off"></div>
+  <button id="focusBtn" class="btn iconbtn" aria-pressed="false" title="Focus mode: hide panels (F)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 1h5v2H3v3H1zm9 0h5v5h-2V3h-3zM1 10h2v3h3v2H1zm12 0h2v5h-5v-2h3z"/></svg><span class="hide-sm" id="focusLabel">Focus</span></button>
   <button id="btnMissions" class="btn primary">Missions</button>
   <button id="btnLearn" class="btn">Learn</button>
 </header>
 
-<aside id="left" class="glass" aria-label="Network and mission plan"></aside>
-<aside id="right" class="glass" aria-label="KPIs and tracking"></aside>
+<aside id="left" class="glass" aria-label="Network and mission plan"><button class="pmin" data-side="left" aria-label="Minimize left panel" title="Minimize"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5 5 8l5.5 5.5-1.4 1.4L2.2 8l6.9-6.9z"/></svg></button><div id="leftBody"></div></aside>
+<aside id="right" class="glass" aria-label="KPIs and tracking"><button class="pmin" data-side="right" aria-label="Minimize right panel" title="Minimize"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 2.5 11 8l-5.5 5.5 1.4 1.4L13.8 8 6.9 1.1z"/></svg></button><div id="rightBody"></div></aside>
+<button id="leftTab" class="edgetab glass" data-side="left" aria-label="Show left panel"><span id="leftTabLabel">Network</span></button>
+<button id="rightTab" class="edgetab glass" data-side="right" aria-label="Show right panel"><span>KPIs</span></button>
 
 <div class="mtabs" role="group" aria-label="Panels">
   <button data-tab="left" aria-pressed="false" id="mtabLeft">Network</button>
@@ -284,6 +322,8 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Sky.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
 <script>
 'use strict';
@@ -309,6 +349,8 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'hi
 renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 host.appendChild(renderer.domElement);
@@ -557,7 +599,19 @@ const MODEL = {
   tonnesPerTeu: 10,
   lastMile: { van: { cost: 950, co2: 0.42, days: 1.0 }, drone: { cost: 1150, co2: 0.12, days: 0.6 } },
   airHandlingDays: 1.5,
+  seaBasePerTeuKm: 0.04,   // vessel, crew, port calls
+  seaFuelPerTeuKm: 0.045,  // bunker fuel at 16 knots; scales with speed squared per km
+  carryRatePerYear: 0.25,  // capital, insurance, obsolescence
+  etsUsdPerT: 80,          // EU allowance price assumption
+  freeDays: 4,             // terminal free time before demurrage
+  demurragePerDay: 150,
+  seaDelayMean: 0.03,      // voyages run a little long on average
+  seaDelaySd: 0.06,
 };
+const SPEED_Q = { k: 'kn', q: 'Ocean service speed', opts: [
+  { v: 16, l: 'Standard (16 knots)', d: 'The usual slow-steaming service speed.' },
+  { v: 14, l: 'Eco (14 knots)', d: 'About 23% less fuel and CO2 per km, about 14% more days at sea.' },
+  { v: 20, l: 'Express (20 knots)', d: 'About 56% more fuel and CO2 per km, 20% fewer days at sea.' } ] };
 
 /* ---------- knowledge base: every clickable thing and glossary term ---------- */
 const INFO = {
@@ -657,14 +711,24 @@ const INFO = {
   coldchain: { g: 'Operations', t: 'Cold chain', b: 'The unbroken temperature-controlled path from farm or plant to shelf. A breach anywhere, even a few hours unplugged at a port, can cut shelf life or ruin the load. Data loggers prove the chain held.', rel: ['reefer'] },
   drayage: { g: 'Operations', t: 'Drayage', b: 'Short truck moves of containers between ports, rail ramps and nearby warehouses. Small in distance, large in cost per km and in congestion impact.', rel: ['chassis', 'gate'] },
   crossdock: { g: 'Operations', t: 'Cross-docking', b: 'Moving goods from inbound to outbound docks with little or no storage. It cuts inventory but needs reliable arrival times.', rel: ['dc'] },
-  demurrage: { g: 'Costs', t: 'Demurrage and detention', b: 'In common US usage, demurrage is charged when a container stays inside the terminal beyond its free days; detention is charged when the shipper keeps the carrier\'s box outside the terminal too long. Congestion can trigger both even when the shipper did nothing wrong.', rel: ['yard', 'congestion'] },
+  demurrage: { g: 'Costs', t: 'Demurrage and detention', b: 'Terminals and carriers give a few free days, then charge by the day. In common US usage, demurrage is charged when a container stays inside the terminal beyond its free days; detention is charged when the shipper keeps the carrier\'s box outside the terminal too long. Congestion can trigger both even when the shipper did nothing wrong.', rel: ['yard', 'congestion'] },
   congestion: { g: 'Operations', t: 'Port congestion', b: 'When arrivals beat terminal capacity, ships queue, yards fill, and empty containers pile up in the wrong places. Effects ripple for months because ships and boxes run late on their next loops.', rel: ['anchorage', 'demurrage'] },
   strike: { g: 'Operations', t: 'Labour disruption', b: 'Strikes and slowdowns at ports or railroads stop flows fast. In October 2024 a three-day strike closed ports on the US East and Gulf coasts, and backlogs took weeks to clear.', rel: ['worker'] },
   bullwhip: { g: 'Operations', t: 'Bullwhip effect', b: 'Small changes in consumer demand get amplified into large swings in orders further up the chain, because each tier adds safety stock and batches orders. Shared demand data dampens it.', rel: ['leadtime'] },
   leadtime: { g: 'KPIs', t: 'Lead time', b: 'Elapsed days from the start of the order (here: raw materials or harvest) to delivery at the doorstep. Variability matters as much as the average, because safety stock grows with it.', rel: ['servicelevel'] },
   costteu: { g: 'KPIs', t: 'Cost per TEU', b: 'Door-to-door logistics cost divided by TEU shipped. In this model it includes freight, handling, customs fees, surcharges and last mile, and excludes import duty, which is shown separately.', rel: ['tariff', 'teu'] },
   co2: { g: 'KPIs', t: 'Carbon footprint', b: 'Emissions per TEU from each leg: distance × tonnes × a factor per mode. Ocean is lowest per tonne-km, air is highest by far. Companies report with the GLEC Framework and ISO 14083. The factors in this model are illustrative.', rel: ['cape', 'air'] },
-  servicelevel: { g: 'KPIs', t: 'Service level', b: 'Share of the volume delivered on time and in sellable condition. Spoiled or late units count as misses.', rel: ['leadtime', 'coldchain'] },
+  servicelevel: { g: 'KPIs', t: 'Service level', b: 'Share of demand served on time and in sellable condition. In this model every day a unit arrives late loses a slice of its sales (5 to 15% a day by mission), and spoiled units count as lost.', rel: ['leadtime', 'coldchain', 'safetystock'] },
+  landed: { g: 'KPIs', t: 'Landed cost', b: 'Everything it costs to put a unit on the shelf beyond its purchase price: freight, handling, fees, duty, inventory carrying cost and carbon. In this model it is shown per TEU and also includes late penalties. A cheap slow route can lose on landed cost once carrying cost and lost sales are counted.', rel: ['carrying', 'tariff', 'ets'] },
+  carrying: { g: 'Costs', t: 'Inventory carrying cost', b: 'Goods tie up money. Carrying cost is commonly put at 20 to 30% of inventory value a year: capital, insurance, storage and obsolescence. Goods at sea count too. One extra week at sea on $200,000 of laptops costs about $1,000 at 25% a year.', rel: ['landed', 'safetystock'] },
+  safetystock: { g: 'Operations', t: 'Safety stock', b: 'Extra inventory held to cover swings in demand and lead time. Longer and less reliable supply lines need more of it, which is a hidden cost of every reroute and delay.', rel: ['reliability', 'bullwhip'] },
+  slowsteam: { g: 'Operations', t: 'Slow steaming', b: 'Fuel burn per hour rises roughly with the cube of speed, so per kilometre it rises with the square. Since the late 2000s carriers have cut speeds to save fuel and absorb surplus ships. At 14 knots a ship burns about a quarter less fuel per km than at 16.', rel: ['co2', 'ets'] },
+  ets: { g: 'Costs', t: 'EU ETS for shipping', b: 'Since 2024 the EU Emissions Trading System covers large ships calling at EU ports: 100% of emissions on voyages between EU ports and 50% on voyages into or out of the EU. Carriers surrender allowances for 40% of 2024 emissions, 70% of 2025 and 100% from 2026, and pass the cost to shippers as a surcharge. This model assumes $80 per tonne.', rel: ['co2', 'slowsteam'] },
+  reliability: { g: 'KPIs', t: 'Schedule reliability', b: 'The share of ships arriving within a day of schedule. Sea-Intelligence data shows it fell to about a third in early 2022, recovered to roughly two thirds in 2023, then dipped again with the Red Sea diversions. In this model every voyage runs a little late or early against plan.', rel: ['safetystock', 'leadtime'] },
+  imbalance: { g: 'Operations', t: 'Equipment imbalance', b: 'More full boxes flow from Asia to North America and Europe than back, so empties pile up at import ports and run short at export hubs. Carriers pay to reposition empties. In 2020 and 2021 shortages pushed shippers to buy their own boxes.', rel: ['teu', 'demurrage'] },
+  generalavg: { g: 'Costs', t: 'General average', b: 'An old maritime rule: when part of the ship or cargo is sacrificed to save the voyage, for example after a fire or grounding, every cargo owner shares the cost in proportion to value. The Ever Given\'s owners declared general average in 2021, so cargo owners had to post security before release. Cargo insurance covers it.', rel: ['suez', 'incoterms'] },
+  cyber: { g: 'Operations', t: 'Cyber disruption', b: 'In 2017 the NotPetya malware shut down Maersk\'s systems worldwide. In November 2023 a cyber incident halted DP World\'s Australian terminals for several days. Gates, cranes, bookings and customs all run on software, so an attack stops a terminal as surely as a strike.', rel: ['port', 'edi'] },
+  tariffshock: { g: 'Customs', t: 'Tariff changes', b: 'Duty rates can change with short notice. Importers respond by pulling shipments forward before an effective date, rushing entries, switching sourcing countries, or holding goods in bonded warehouses and foreign-trade zones to defer duty.', rel: ['tariff', 'hs'] },
 };
 
 const GLOSSARY_ORDER = ['Trade terms', 'Customs', 'Documents', 'Data', 'Roles', 'Units', 'Equipment', 'Operations', 'Costs', 'KPIs'];
@@ -691,12 +755,19 @@ const INCOTERMS = {
 const mv = (id, mode, from, to, o) => Object.assign({ id, kind: 'move', mode, from, to }, o || {});
 const dw = (id, node, label, days, o) => Object.assign({ id, kind: 'dwell', node, label, days }, o || {});
 
+function tariffCheck(m) {
+  if (m.flags.tariffDay && m.day > m.flags.tariffDay) {
+    m.dutyPerTeu = m.valuePerTeu * 0.265;
+    m.note(`Entry filed on day ${m.day.toFixed(1)}, after the tariff change. Duty now 26.5%: ${fmt$(m.dutyPerTeu)}/TEU.`, 'bad');
+  }
+}
+
 const MISSIONS = [
   {
     id: 'first_box', n: 1, title: 'First Box', sub: 'Laptops from a Dongguan factory to a Chicago doorstep',
     cargo: 'Laptops', hs: '8471.30', teu: 4, value: 900000, incoterm: 'FOB', incoPlace: 'Yantian', you: 'US importer (buyer)',
     brief: 'Follow one shipment end to end: rare earths from the mine, assembly in Dongguan, ocean to Los Angeles, inland to Chicago and out to the customer. No disruptions. Choose the inland mode and last-mile method and watch what each choice does to the numbers.',
-    tags: ['Tutorial', 'Transpacific', 'FOB'], targets: { lead: 38, cost: 5500, co2: 3.2, sl: 95 },
+    tags: ['Tutorial', 'Transpacific', 'FOB'], targets: { lead: 39, landed: 11100, co2: 3.2, sl: 95 }, dutyRate: 0, dutyNote: 'HTS 8471.30: laptops enter the US duty free', lostPerDay: 0.05,
     plan: [
       { k: 'inland', q: 'Los Angeles to Chicago', opts: [
         { v: 'rail', l: 'Double-stack rail', d: 'About 4 days on rail plus a ramp transfer. Cheaper and lower-carbon.' },
@@ -704,6 +775,7 @@ const MISSIONS = [
       { k: 'lm', q: 'Last mile in Chicago', opts: [
         { v: 'van', l: 'Delivery vans', d: 'Next-day drops on dense routes.' },
         { v: 'drone', l: 'Drone hub for small parcels', d: 'Faster and lower-carbon per parcel, higher cost per TEU of volume.' } ] },
+      SPEED_Q,
     ],
     build(p) {
       const legs = [
@@ -713,7 +785,7 @@ const MISSIONS = [
         mv('dray1', 'truck', 'factory_dongguan', 'yantian', { label: 'Drayage to Yantian', ediEnd: 'I' }),
         dw('pol', 'yantian', 'Export clearance, yard, load on board', 3, { info: 'port', cost: 300, ediEnd: 'AE' }),
         mv('sea', 'sea', 'yantian', 'lalb', { lane: 'yantian_lalb', ediStart: 'VD', ediEnd: 'VA' }),
-        dw('pod', 'lalb', 'Discharge, customs entry, release', 3, { info: 'port', cost: 420, ediStart: 'UV', ediEnd: 'OA' }),
+        dw('pod', 'lalb', 'Discharge, customs entry, release', 3, { info: 'port', cost: 420, ediStart: 'UV', ediEnd: 'OA', term: 1 }),
       ];
       if (p.inland === 'rail') legs.push(mv('rail', 'rail', 'lalb', 'rail_chicago', { label: 'Double-stack rail to Chicago' }), dw('ramp', 'rail_chicago', 'Ramp lift, dray to DC', 1, { cost: 180 }), mv('dray2', 'truck', 'rail_chicago', 'dc_chicago'));
       else legs.push(mv('road', 'truck', 'lalb', 'dc_chicago', { label: 'Truckload to Chicago' }));
@@ -724,14 +796,14 @@ const MISSIONS = [
     },
     events: [],
     tips: { pol: 'At Yantian the box clears export customs and meets the VGM cut-off before it can load. Enter the port to watch the cranes.', sea: 'Ocean is the longest leg by days but the cheapest per TEU-km. Click the ship on the globe to ride along.', pod: 'Under FOB you, the buyer, own the shipment from the moment it was loaded in Yantian, and you handle US customs.' },
-    lessons: ['Ocean is most of the days and little of the carbon.', 'Rail vs truck inland is a classic cost and carbon trade with little time difference over 3,000 km.', 'Under FOB the buyer carries ocean risk and pays freight, so the buyer also chooses the carrier.'],
+    lessons: ['Ocean is most of the days and little of the carbon.', 'Rail vs truck inland is a classic cost and carbon trade with little time difference over 3,000 km.', 'Under FOB the buyer carries ocean risk and pays freight, so the buyer also chooses the carrier.', 'High-value cargo makes every day at sea expensive: inventory carrying cost on laptops rivals the freight bill.'],
   },
   {
     id: 'red_sea', n: 2, title: 'Red Sea Detour', sub: 'Machine parts from Suzhou to an Eindhoven plant',
     cargo: 'Gearbox parts', hs: '8483.40', teu: 10, value: 1400000, incoterm: 'CIF', incoPlace: 'Rotterdam', you: 'Chinese exporter (seller)',
-    brief: 'Ten TEU of gearbox parts must reach a Dutch customer\'s assembly line. Under CIF you, the seller, pay freight and insurance to Rotterdam. Mid-voyage the Red Sea route closes. Your call decides whether the line in Eindhoven stops.',
-    tags: ['Disruption', 'Suez', 'CIF'], targets: { lead: 49, cost: 4300, co2: 3.8, sl: 95 },
-    plan: [],
+    brief: 'Ten TEU of gearbox parts must reach a Dutch customer\'s assembly line by day 50. Under CIF you, the seller, pay freight and insurance to Rotterdam. The contract has a line-down penalty of $400 per TEU for every day late, and the voyage into the EU pays for its carbon under the EU ETS. Mid-voyage the Red Sea route closes.',
+    tags: ['Disruption', 'Suez', 'CIF'], targets: { lead: 50, landed: 9000, co2: 3.8, sl: 95 }, dutyNote: 'EU duty is paid by the buyer under CIF and is not modelled', lostPerDay: 0.1, latePerTeuDay: 400,
+    plan: [SPEED_Q],
     build() {
       return [{ name: 'Main', share: 1, legs: [
         dw('fac', 'factory_suzhou', 'Machine, pack and stuff', 2, { info: 'factory', cost: 80 }),
@@ -739,7 +811,7 @@ const MISSIONS = [
         dw('pol', 'shanghai', 'Export clearance and loading', 2, { info: 'port', cost: 300, ediEnd: 'AE' }),
         mv('sea1', 'sea', 'shanghai', 'jct_lk', { lane: 'shanghai_lk', label: 'Shanghai to Sri Lanka via Singapore', ediStart: 'VD' }),
         mv('sea2', 'sea', 'jct_lk', 'rotterdam', { lane: 'lk_rotterdam_suez', label: 'Via Suez to Rotterdam', ediEnd: 'VA' }),
-        dw('pod', 'rotterdam', 'Discharge, EU customs, release', 3, { info: 'port', cost: 380, ediStart: 'UV', ediEnd: 'OA' }),
+        dw('pod', 'rotterdam', 'Discharge, EU customs, release', 3, { info: 'port', cost: 380, ediStart: 'UV', ediEnd: 'OA', term: 1 }),
         mv('t2', 'truck', 'rotterdam', 'dc_venlo', { label: 'Truck to Venlo DC' }),
         dw('dc', 'dc_venlo', 'Cross-dock to customer', 1, { cost: 140 }),
         mv('t3', 'truck', 'dc_venlo', 'city_eindhoven', { label: 'Line-side delivery' }),
@@ -748,7 +820,7 @@ const MISSIONS = [
     },
     events: [
       { id: 'redsea', leg: 'sea2', at: 0, closes: 'suez', info: 'bab', title: 'Red Sea transit suspended',
-        body: 'Security threats near Bab-el-Mandeb: the carrier will not send ships through the Red Sea. Your vessel is off Sri Lanka. The customer needs the parts by day 49.',
+        body: 'Security threats near Bab-el-Mandeb: the carrier will not send ships through the Red Sea. Your vessel is off Sri Lanka. The customer needs the parts by day 50.',
         choices: [
           { l: 'Reroute around the Cape of Good Hope', fx: 'Longer voyage, more fuel and CO2', apply(m) { m.replaceLane('sea2', 'lk_rotterdam_cape', 'Around Africa via the Cape'); m.addCost(350, 'Contingency surcharge for Cape routing'); } },
           { l: 'Wait at anchor for the route to reopen', fx: 'Uncertain: 5 to 20 days', apply(m) { const d = Math.round(5 + m.rand() * 15); m.insertBefore('sea2', dw('wait', 'jct_lk', 'Waiting at anchor (Red Sea closed)', d, { cost: 0, info: 'bab' })); m.addCost(220, 'War-risk insurance surcharge'); m.note(`Route reopened after ${d} days at anchor.`); } },
@@ -769,8 +841,8 @@ const MISSIONS = [
     id: 'cold_chain', n: 3, title: 'Cold Chain', sub: 'Bananas from El Oro to Amsterdam stores',
     cargo: 'Bananas (reefer)', hs: '0803.90', teu: 40, value: 520000, incoterm: 'FOB', incoPlace: 'Guayaquil', you: 'European importer (buyer)', reefer: { set: 13.3, greenLife: 26 },
     brief: 'Twenty reefer FEU of bananas leave El Oro at 13.3 °C. They must reach the Venlo ripening rooms while still green, within 26 days of harvest. The Panama Canal is short of water and a reefer unit will fail. Protect the cold chain and the service level.',
-    tags: ['Cold chain', 'Panama', 'FOB'], targets: { lead: 30, cost: 3200, co2: 2.0, sl: 92 },
-    plan: [],
+    tags: ['Cold chain', 'Panama', 'FOB'], targets: { lead: 30, landed: 4300, co2: 2.0, sl: 92 }, dutyPerTeu: 810, dutyNote: 'EU duty on Ecuadorian bananas: about €75 per tonne under the EU trade agreement', lostPerDay: 0.1,
+    plan: [SPEED_Q],
     build() {
       return [{ name: 'Main', share: 1, legs: [
         dw('farm', 'farm_machala', 'Harvest, pack, pre-cool', 1, { info: 'farm', cost: 60 }),
@@ -779,7 +851,7 @@ const MISSIONS = [
         mv('sea1', 'sea', 'guayaquil', 'panama', { lane: 'gye_panama', ediStart: 'VD' }),
         dw('canal', 'panama', 'Panama Canal transit', 1, { info: 'panama', cost: 150 }),
         mv('sea2', 'sea', 'panama', 'rotterdam', { lane: 'panama_rotterdam', ediEnd: 'VA' }),
-        dw('pod', 'rotterdam', 'Discharge, plug-in, EU customs', 2, { info: 'port', cost: 400, ediStart: 'UV', ediEnd: 'OA' }),
+        dw('pod', 'rotterdam', 'Discharge, plug-in, EU customs', 2, { info: 'port', cost: 400, ediStart: 'UV', ediEnd: 'OA', term: 1 }),
         mv('t2', 'truck', 'rotterdam', 'dc_venlo', { label: 'Reefer trucks to Venlo' }),
         dw('ripen', 'dc_venlo', 'Ripening rooms (ethylene, 4 to 6 days)', 5, { cost: 260, ripen: 1 }),
         mv('t3', 'truck', 'dc_venlo', 'city_ams', { label: 'Store deliveries' }),
@@ -807,13 +879,14 @@ const MISSIONS = [
   {
     id: 'peak', n: 4, title: 'Peak Season Crunch', sub: 'Holiday toys from Dongguan to Chicago',
     cargo: 'Toys', hs: '9503.00', teu: 20, value: 1600000, incoterm: 'FOB', incoPlace: 'Yantian', you: 'US retailer (buyer)',
-    brief: 'Twenty TEU of holiday toys must hit Chicago stores by day 42. Los Angeles and Long Beach are congested and a rail strike is threatened. Decide how much to fly, which coast to land on and how to move inland.',
-    tags: ['Congestion', 'Strike', 'Air expedite'], targets: { lead: 42, cost: 6000, co2: 4.0, sl: 90 },
+    brief: 'Twenty TEU of holiday toys must hit Chicago stores by day 44. Los Angeles and Long Beach are congested and a rail strike is threatened. Decide how much to fly, which coast to land on and how to move inland.',
+    tags: ['Congestion', 'Strike', 'Air expedite'], targets: { lead: 44, landed: 8600, co2: 4.0, sl: 90 }, dutyNote: 'Not modelled: US tariffs on Chinese toys changed repeatedly in 2025', lostPerDay: 0.15,
     plan: [
       { k: 'air', q: 'Share of volume to air-expedite from Hong Kong', opts: [
         { v: 0, l: 'None', d: 'All ocean. Lowest cost and carbon, all eggs in one basket.' },
         { v: 0.15, l: '15% (top sellers)', d: 'Protects the fastest movers at a large cost per kg.' },
         { v: 0.3, l: '30%', d: 'Big insurance policy, big bill, big carbon.' } ] },
+      SPEED_Q,
     ],
     build(p) {
       const out = [{ name: 'Ocean', share: 1 - p.air, legs: [
@@ -821,7 +894,7 @@ const MISSIONS = [
         mv('dray1', 'truck', 'factory_dongguan', 'yantian', { ediEnd: 'I' }),
         dw('pol', 'yantian', 'Export clearance and loading', 2, { info: 'port', cost: 300, ediEnd: 'AE' }),
         mv('sea', 'sea', 'yantian', 'lalb', { lane: 'yantian_lalb', ediStart: 'VD', ediEnd: 'VA' }),
-        dw('pod', 'lalb', 'Discharge, customs, release', 3, { info: 'port', cost: 420, ediStart: 'UV', ediEnd: 'OA' }),
+        dw('pod', 'lalb', 'Discharge, customs, release', 3, { info: 'port', cost: 420, ediStart: 'UV', ediEnd: 'OA', term: 1 }),
         mv('rail', 'rail', 'lalb', 'rail_chicago', { label: 'Double-stack rail to Chicago' }),
         dw('ramp', 'rail_chicago', 'Ramp lift, dray to DC', 1, { cost: 180 }),
         mv('dray2', 'truck', 'rail_chicago', 'dc_chicago'),
@@ -843,6 +916,13 @@ const MISSIONS = [
       return out;
     },
     events: [
+      { id: 'empties', leg: 'pol', at: 0, closes: 'empties', info: 'imbalance', title: 'No empty 40-foot boxes at Yantian',
+        body: 'Peak season has drained the depot. Empties are piling up in the US instead, because more full boxes flow east than west. Your booking has no equipment.',
+        choices: [
+          { l: 'Buy shipper-owned containers', fx: 'About +$280 per TEU, no delay', apply(m) { m.addCost(280, 'Shipper-owned containers'); } },
+          { l: 'Wait for repositioned empties', fx: '+3 days at origin', apply(m) { m.insertBefore('pol', dw('mt', 'yantian', 'Waiting for empty containers', 3, { info: 'imbalance' })); } },
+          { l: 'Load into 20-foot boxes instead', fx: 'About +$140 per TEU handling, +1 day', apply(m) { m.addCost(140, 'Extra handling for 20-foot boxes'); m.insertBefore('pol', dw('mt', 'yantian', 'Re-planning loads into 20-foot boxes', 1, { info: 'teu' })); } },
+        ] },
       { id: 'queue', leg: 'sea', at: 0, closes: 'lalb', info: 'anchorage', title: 'LA / Long Beach: 12-day anchorage queue',
         body: 'Your carrier warns that ships arriving at San Pedro Bay are waiting about 12 days for a berth. The ship has not sailed yet, so you can still change the booking.',
         choices: [
@@ -851,7 +931,7 @@ const MISSIONS = [
               mv('sea', 'sea', 'yantian', 'panama', { lane: 'yantian_panama', ediStart: 'VD' }),
               dw('canal', 'panama', 'Panama Canal transit', 1, { info: 'panama', cost: 150 }),
               mv('sea3', 'sea', 'panama', 'savannah', { lane: 'panama_savannah', ediEnd: 'VA' }),
-              dw('pod', 'savannah', 'Discharge, customs, release', 2, { info: 'port', cost: 400, ediStart: 'UV', ediEnd: 'OA' }),
+              dw('pod', 'savannah', 'Discharge, customs, release', 2, { info: 'port', cost: 400, ediStart: 'UV', ediEnd: 'OA', term: 1 }),
               mv('rail', 'rail', 'savannah', 'rail_chicago', { label: 'Rail Savannah to Chicago' }),
               dw('ramp', 'rail_chicago', 'Ramp lift, dray to DC', 1, { cost: 180 }),
               mv('dray2', 'truck', 'rail_chicago', 'dc_chicago'),
@@ -874,7 +954,7 @@ const MISSIONS = [
     id: 'customs', n: 5, title: 'Customs Hold', sub: 'Cotton T-shirts into Los Angeles',
     cargo: 'Men\'s cotton T-shirts, knitted', hs: null, teu: 2, value: 90000, incoterm: null, incoPlace: '', you: 'US apparel brand (buyer)', duty: 0.165,
     brief: 'You import two TEU of knitted cotton T-shirts from Dongguan. Before the box sails you must classify the goods, pick the Incoterm and decide on the ISF filing. Customs in Los Angeles will check your work.',
-    tags: ['HS codes', 'Incoterms', 'ISF'], targets: { lead: 28, cost: 3500, co2: 2.1, sl: 95 },
+    tags: ['HS codes', 'Incoterms', 'ISF', 'Tariffs'], targets: { lead: 28, landed: 12000, co2: 2.1, sl: 95 }, dutyNote: 'US general duty rate for HTS 6109.10 is 16.5%', lostPerDay: 0.05,
     plan: [
       { k: 'hs', q: 'Classify the goods (HS subheading)', quiz: 1, opts: [
         { v: '6109.10', l: '6109.10', d: 'T-shirts, singlets and other vests, knitted or crocheted, of cotton' },
@@ -895,7 +975,7 @@ const MISSIONS = [
         mv('dray1', 'truck', 'factory_dongguan', 'yantian', { ediEnd: 'I' }),
         dw('pol', 'yantian', 'Export clearance and loading', p.inco === 'EXW' ? 4 : 2, { info: 'port', cost: p.inco === 'EXW' ? 800 : 300, ediEnd: 'AE' }),
         mv('sea', 'sea', 'yantian', 'lalb', { lane: 'yantian_lalb', ediStart: 'VD', ediEnd: 'VA' }),
-        dw('pod', 'lalb', 'Discharge, CBP entry, release', 2, { info: 'port', cost: 420, ediStart: 'UV', ediEnd: 'OA' }),
+        dw('pod', 'lalb', 'Discharge, CBP entry, release', 2, { info: 'port', cost: 420, ediStart: 'UV', ediEnd: 'OA', term: 1, onExit: tariffCheck }),
         mv('dray2', 'truck', 'lalb', 'dc_ie', { label: 'Drayage to Inland Empire' }),
         dw('dc', 'dc_ie', 'Receive, pick, pack', 1, { cost: 160 }),
         mv('lm', 'van', 'dc_ie', 'city_la', { label: 'Parcel deliveries' }),
@@ -911,16 +991,23 @@ const MISSIONS = [
       { id: 'isfpen', leg: 'sea', at: 0, when: m => m.plan.isf === 'skip', info: 'isf', title: 'No ISF on file',
         body: 'The box loaded in Yantian without an Importer Security Filing. CBP issues a claim for liquidated damages and places a hold that will trigger an exam on arrival.', auto: 1,
         apply(m) { m.addCost(5000 / m.def.teu, 'ISF liquidated damages ($5,000)'); m.flags.exam = 1; } },
+      { id: 'tariff', leg: 'sea', at: 0.5, info: 'tariffshock', title: 'Tariff increase announced',
+        prepare(m) { const c = m.main; m.flags.tariffDay = m.day + (c.legs[c.i].days - c.t) + 1.2; },
+        bodyFn: m => `The government announces a 10-point duty increase on knitted cotton apparel, effective for entries filed after day ${m.flags.tariffDay.toFixed(1)}. Your ship is mid-Pacific. A normal entry would be filed after that.`,
+        choices: [
+          { l: 'Pay for priority discharge and a pre-filed entry', fx: 'About +$250 per TEU, entry a day sooner', apply(m) { m.addCost(250, 'Priority discharge and pre-filed entry'); m.setDays('pod', 1); } },
+          { l: 'File normally and pay the new rate', fx: 'Duty rate rises from 16.5% to 26.5%', apply() {} },
+        ] },
       { id: 'exam', leg: 'pod', at: 0, info: 'xray', title: 'CBP review on arrival', auto: 1, dyn: 1,
         apply(m) {
           const wrong = m.plan.hs !== '6109.10';
-          if (wrong) { m.insertBefore('dray2', dw('hold', 'lalb', 'Customs hold: reclassification', 6, { info: 'xray', cost: 380 })); m.addCost(1200, 'Penalty and broker fees for misclassification'); m.eventText = `The entry declared ${m.plan.hs}. The officer's exam shows knitted cotton T-shirts, heading 6109.10. The entry is corrected, the duty difference collected and a penalty issued. Six days on hold.`; }
-          else if (m.flags.exam) { m.insertBefore('dray2', dw('hold', 'lalb', 'CBP intensive exam', 4, { info: 'xray', cost: 450 })); m.eventText = 'Because no ISF was filed, the container is pulled for an intensive exam at a centralized exam station. Classification checks out as 6109.10. Four days and exam fees.'; }
+          if (wrong) { m.insertBefore('dray2', dw('hold', 'lalb', 'Customs hold: reclassification', 6, { info: 'xray', cost: 380, term: 1 })); m.addCost(1200, 'Penalty and broker fees for misclassification'); m.eventText = `The entry declared ${m.plan.hs}. The officer's exam shows knitted cotton T-shirts, heading 6109.10. The entry is corrected, the duty difference collected and a penalty issued. Six days on hold.`; }
+          else if (m.flags.exam) { m.insertBefore('dray2', dw('hold', 'lalb', 'CBP intensive exam', 4, { info: 'xray', cost: 450, term: 1 })); m.eventText = 'Because no ISF was filed, the container is pulled for an intensive exam at a centralized exam station. Classification checks out as 6109.10. Four days and exam fees.'; }
           else m.eventText = 'Your ISF was on time and the entry declares 6109.10, matching the goods. The risk score is low and CBP releases the box without an exam.';
         } },
     ],
     tips: { pol: 'Under EXW the buyer is responsible even for export clearance in China, which a foreign buyer usually cannot do directly.', pod: 'The importer of record pays duty: you under FOB or EXW, the seller under DDP.' },
-    lessons: ['The HS code is the first thing customs checks and the most expensive thing to get wrong.', 'DDP moves duty and clearance to the seller, who prices that risk in.', 'ISF is a hard requirement for US ocean imports; skipping it buys holds and fines.'],
+    lessons: ['The HS code is the first thing customs checks and the most expensive thing to get wrong.', 'Holds at the terminal burn through free time fast; after that, demurrage runs every day.', 'DDP moves duty and clearance to the seller, who prices that risk in.', 'ISF is a hard requirement for US ocean imports; skipping it buys holds and fines.'],
   },
 ];
 
@@ -931,6 +1018,8 @@ const DISRUPTIONS = [
   { id: 'lalb', l: 'LA / Long Beach congestion', d: 'Ships wait at anchor', node: 'lalb' },
   { id: 'strike', l: 'US East Coast port strike', d: 'Savannah stops working ships', node: 'savannah' },
   { id: 'storm', l: 'North Pacific storm', d: 'Transpacific ships slow down', node: null },
+  { id: 'cyber', l: 'Terminal cyber incident', d: 'Rotterdam gates and cranes stop', node: 'rotterdam' },
+  { id: 'empties', l: 'Empty container shortage', d: 'No empty boxes at Yantian or Shanghai', node: 'yantian', also: ['shanghai'] },
 ];
 /* ================= KIT: low-poly models for dioramas ================= */
 const MATS = {};
@@ -960,15 +1049,24 @@ const REEFER = '#e9eef2';
 let _ribTex;
 function ribTex() {
   if (_ribTex) return _ribTex;
-  const c = document.createElement('canvas'); c.width = 64; c.height = 32;
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64;
   const g = c.getContext('2d');
-  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 64, 32);
-  for (let x = 0; x < 64; x += 4) { g.fillStyle = 'rgba(0,0,0,.16)'; g.fillRect(x, 0, 1.5, 32); }
-  g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 0, 64, 2); g.fillRect(0, 30, 64, 2);
-  _ribTex = new THREE.CanvasTexture(c); _ribTex.encoding = THREE.sRGBEncoding;
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 256, 64);
+  // corrugation: each rib lit on one face, shaded on the other
+  for (let x = 0; x < 256; x += 8) {
+    const gr = g.createLinearGradient(x, 0, x + 8, 0);
+    gr.addColorStop(0, 'rgba(255,255,255,.18)'); gr.addColorStop(0.45, 'rgba(0,0,0,0)'); gr.addColorStop(0.55, 'rgba(0,0,0,.2)'); gr.addColorStop(1, 'rgba(0,0,0,.05)');
+    g.fillStyle = gr; g.fillRect(x, 4, 8, 56);
+  }
+  g.fillStyle = 'rgba(0,0,0,.32)'; g.fillRect(0, 0, 256, 4); g.fillRect(0, 60, 256, 4); g.fillRect(0, 0, 3, 64); g.fillRect(253, 0, 3, 64);
+  const grime = g.createLinearGradient(0, 30, 0, 64); grime.addColorStop(0, 'rgba(60,40,20,0)'); grime.addColorStop(1, 'rgba(60,40,20,.22)');
+  g.fillStyle = grime; g.fillRect(0, 0, 256, 64);
+  const r = rng(11);
+  for (let i = 0; i < 90; i++) { g.fillStyle = `rgba(${90 + r() * 40},${45 + r() * 20},20,${0.15 + r() * 0.25})`; g.fillRect(r() * 256, r() * 64, 1 + r() * 2, 1 + r() * 3); }
+  _ribTex = new THREE.CanvasTexture(c); _ribTex.encoding = THREE.sRGBEncoding; _ribTex.anisotropy = 4;
   return _ribTex;
 }
-const ctrMat = hex => mat(hex, { map: ribTex(), roughness: 0.6 });
+const ctrMat = hex => mat(hex, { map: ribTex(), roughness: 0.55, metalness: 0.25 });
 function container(hex, feet = 40) {
   const L = feet === 40 ? 12.19 : 6.06;
   const m = mesh(boxG(L, 2.59, 2.44), ctrMat(hex || BOX_COLORS[(Math.random() * BOX_COLORS.length) | 0]));
@@ -998,72 +1096,154 @@ function stackBlock(bays, rows, maxTier, opts = {}) {
   return im;
 }
 
-function hullShape(L, B, bow) {
-  const s = new THREE.Shape();
-  s.moveTo(-L / 2, -B / 2); s.lineTo(L / 2 - bow, -B / 2); s.quadraticCurveTo(L / 2, -B / 4, L / 2, 0);
-  s.quadraticCurveTo(L / 2, B / 4, L / 2 - bow, B / 2); s.lineTo(-L / 2 + 3, B / 2); s.lineTo(-L / 2, B / 2 - 3); s.lineTo(-L / 2, -B / 2 + 3); s.closePath();
-  return s;
+// Box between two points; used for lattice members and stays
+const _Y = new THREE.Vector3(0, 1, 0);
+function strut(a, b, t, hex, o) {
+  const d = new THREE.Vector3().subVectors(b, a), len = d.length();
+  const m = mesh(boxG(t, 1, t), mat(hex, o));
+  m.scale.y = len; m.position.copy(a).addScaledVector(d, 0.5);
+  m.quaternion.setFromUnitVectors(_Y, d.normalize());
+  return m;
 }
-// Container ship, bow toward +x. Returns group with userData.deck height.
+const paint = hex => mat(hex, { metalness: 0.35, roughness: 0.5 });
+const glass = () => mat('#1b2734', { metalness: 0.7, roughness: 0.08 });
+// Hull from cross-sections: flared bow, transom stern, antifouling below the waterline
+function hullGeo(L, B, H, hullHex) {
+  const N = 56, wl = H * 0.42, pos = [], col = [];
+  const cHull = C(hullHex), cRed = C('#7a2a22'), cDeck = C('#4a5258'), cBoot = C('#d6d9dc');
+  const sec = t => {
+    const bow = t > 0.78 ? (t - 0.78) / 0.22 : 0;
+    const hbD = B / 2 * (bow ? Math.pow(Math.cos(bow * Math.PI / 2), 0.55) : t < 0.04 ? 0.9 + t / 0.4 : 1);
+    const hbW = hbD * (bow ? lerp(1, 0.7, bow) : 1);
+    const hbB = hbD * (bow ? lerp(0.9, 0.2, bow) : t < 0.14 ? lerp(0.45, 0.92, t / 0.14) : 0.92);
+    const ky = t < 0.06 ? H * 0.3 * (1 - t / 0.06) : 0;
+    return [[-hbD, H], [-hbW, wl + 0.5], [-hbW, wl], [-hbB, H * 0.12 + ky], [-hbB * 0.75, ky], [hbB * 0.75, ky], [hbB, H * 0.12 + ky], [hbW, wl], [hbW, wl + 0.5], [hbD, H]];
+  };
+  const band = [cHull, cBoot, cRed, cRed, cRed, cRed, cRed, cBoot, cHull];
+  const push = (p, c) => { pos.push(...p); col.push(c.r, c.g, c.b); };
+  for (let i = 0; i < N; i++) {
+    const t0 = i / N, t1 = (i + 1) / N, x0 = -L / 2 + t0 * L, x1 = -L / 2 + t1 * L, s0 = sec(t0), s1 = sec(t1);
+    for (let k = 0; k < s0.length - 1; k++) {
+      const a = [x0, s0[k][1], s0[k][0]], b = [x1, s1[k][1], s1[k][0]], c = [x1, s1[k + 1][1], s1[k + 1][0]], d = [x0, s0[k + 1][1], s0[k + 1][0]];
+      [a, b, c, a, c, d].forEach(p => push(p, band[k]));
+    }
+    const dl0 = [x0, H, s0[0][0]], dr0 = [x0, H, s0[9][0]], dl1 = [x1, H, s1[0][0]], dr1 = [x1, H, s1[9][0]];
+    [dl0, dr0, dr1, dl0, dr1, dl1].forEach(p => push(p, cDeck));
+  }
+  const st = sec(0), cx = [-L / 2, H * 0.55, 0];
+  for (let k = 0; k < st.length - 1; k++) [cx, [-L / 2, st[k][1], st[k][0]], [-L / 2, st[k + 1][1], st[k + 1][0]]].forEach(p => push(p, cHull));
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  return g;
+}
+let _shipWin;
+function shipWinTex() {
+  if (_shipWin) return _shipWin;
+  const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+  const g = c.getContext('2d'); g.fillStyle = '#f1f3f4'; g.fillRect(0, 0, 64, 64);
+  g.fillStyle = '#26323e'; for (let y = 8; y < 64; y += 16) for (let x = 4; x < 64; x += 10) g.fillRect(x, y, 6, 5);
+  _shipWin = new THREE.CanvasTexture(c); _shipWin.encoding = THREE.sRGBEncoding; _shipWin.wrapS = _shipWin.wrapT = THREE.RepeatWrapping;
+  return _shipWin;
+}
+// Container ship, bow toward +x
 function ship(L = 200, opts = {}) {
   const B = L * 0.15, H = L * 0.07, g = new THREE.Group();
-  const shape = hullShape(L, B, L * 0.14);
-  const lower = new THREE.ExtrudeGeometry(shape, { depth: H * 0.45, bevelEnabled: false });
-  lower.rotateX(-Math.PI / 2);
-  const upper = new THREE.ExtrudeGeometry(shape, { depth: H * 0.55, bevelEnabled: false });
-  upper.rotateX(-Math.PI / 2); upper.translate(0, H * 0.45, 0);
-  g.add(mesh(lower, mat('#8c2a22')), mesh(upper, mat(opts.hull || '#1e3a5f')));
-  // bridge near the stern
-  const bx = -L / 2 + L * 0.13;
-  g.add(box(L * 0.06, H * 1.6, B * 0.9, '#f2f4f6', bx, H, 0));
-  g.add(box(L * 0.065, 1.2, B * 1.05, '#30475e', bx, H + H * 1.6 - 2.2, 0));
-  g.add(box(L * 0.03, H * 0.9, B * 0.25, '#2b2f36', bx - L * 0.05, H, 0));
+  const hull = new THREE.Mesh(hullGeo(L, B, H, opts.hull || '#1d3550'), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.2 }));
+  hull.castShadow = true; hull.receiveShadow = true; g.add(hull);
+  const bulb = mesh(new THREE.SphereGeometry(1, 16, 10), mat('#7a2a22', { roughness: 0.6 }), L / 2 - L * 0.035, H * 0.2, 0);
+  bulb.scale.set(L * 0.06, H * 0.2, B * 0.11); g.add(bulb);
+  // accommodation block with window rows, bridge deck and wings
+  const bx = -L / 2 + L * 0.15, accH = H * 1.7;
+  const wt = shipWinTex().clone(); wt.needsUpdate = true; wt.repeat.set(2, 4);
+  const acc = mesh(boxG(L * 0.06, accH, B * 0.82), new THREE.MeshStandardMaterial({ color: 0xffffff, map: wt, roughness: 0.5, emissive: C('#ffd59a'), emissiveMap: wt, emissiveIntensity: isDark() ? 0.9 : 0 }), bx, H + accH / 2, 0);
+  acc.userData.night = true; g.add(acc);
+  g.add(box(L * 0.065, 2.2, B * 1.12, '#eef0f1', bx, H + accH, 0));
+  g.add(mesh(boxG(0.3, 1.4, B * 1.0), glass(), bx + L * 0.033, H + accH + 1.0, 0));
+  g.add(cyl(0.35, 9, '#e9ecee', bx, H + accH + 2.2, 0, 8), box(0.5, 0.5, 6, '#2b2f36', bx, H + accH + 9, 0));
+  // funnel aft of the accommodation
+  const fx = bx - L * 0.07;
+  g.add(box(L * 0.035, H * 1.1, B * 0.3, '#30363d', fx, H, 0), box(L * 0.036, 2, B * 0.31, opts.band || '#c23b30', fx, H + H * 0.8, 0));
+  g.add(box(L * 0.05, 1.2, B * 0.9, '#7b8288', fx - L * 0.03, H, 0));
+  // forecastle and breakwater
+  const fc = L / 2 - L * 0.1;
+  g.add(box(L * 0.09, 2.6, B * 0.62, '#4a5258', fc + L * 0.02, H, 0));
+  for (const s of [-1, 1]) { const w = box(B * 0.42, 3.4, 0.4, '#d6d9dc', fc - L * 0.03, H, s * B * 0.16); w.rotation.y = s * 0.55; g.add(w); }
   if (opts.cargo !== false) {
-    const bays = Math.floor((L * 0.66) / 12.8), rows = Math.max(3, Math.floor(B / 2.6) - 1);
-    const st = stackBlock(bays, rows, opts.tiers || 6, { rand: opts.rand, color: opts.reefer ? REEFER : null });
-    st.position.set(bx + L * 0.06, H, -((rows - 1) * 2.59) / 2);
+    const bayL = 12.8, bays = Math.floor((L * 0.6) / bayL), rows = Math.max(3, Math.floor(B / 2.6) - 1), x0 = bx + L * 0.06;
+    for (let b = 0; b < bays; b++) {
+      g.add(box(12.4, 0.7, B * 0.88, '#5d666e', x0 + b * bayL + 6.1, H, 0));
+      if (b % 2 === 0) for (const s of [-1, 1]) g.add(box(0.35, 6, 0.35, '#c9a223', x0 + b * bayL - 0.3, H + 0.7, s * B * 0.42));
+    }
+    const st = stackBlock(bays, rows, opts.tiers || 6, { rand: opts.rand, color: opts.reefer ? REEFER : null, gap: 0.61 });
+    st.position.set(x0, H + 0.7, -((rows - 1) * 2.59) / 2);
     g.add(st);
   }
   g.userData.deck = H;
   g.userData.L = L;
-  return g;
+  return bake(g);
 }
 
 // Ship-to-shore crane; boom along -z over the water. Returns parts for animation.
 function stsCrane(opts = {}) {
-  const g = new THREE.Group(), c = opts.color || '#d64b2a', gauge = 30, span = 16, legH = 46;
-  for (const x of [-span / 2, span / 2]) for (const z of [-gauge / 2, gauge / 2]) g.add(box(1.4, legH, 1.4, c, x, 0, z));
-  for (const z of [-gauge / 2, gauge / 2]) g.add(box(span + 1.4, 1.6, 1.6, c, 0, legH - 1.6, z));
-  for (const x of [-span / 2, span / 2]) g.add(box(1.4, 1.4, gauge, c, x, 18, 0));
-  g.add(box(span * 0.9, 2.4, 105, c, 0, legH, -22.5));
-  g.add(box(10, 8, 12, '#eceff1', 0, legH + 2.4, 24));
-  for (const x of [-4, 4]) g.add(box(0.8, 20, 0.8, c, x, legH, 6));
-  g.add(box(3, 2.6, 3, '#eceff1', 0, legH - 5, -12));
-  const trolley = group(box(7, 2.2, 5, '#33393f', 0, -2.2, 0), box(3.4, 2.4, 3, '#f1f3f4', 0, -4.8, 1.6));
+  const g = new THREE.Group(), c = opts.color || '#d64b2a', P = { metalness: 0.35, roughness: 0.5 }, legH = 46, Z = 15, X = 8;
+  for (const x of [-X, X]) for (const z of [-Z, Z]) g.add(box(1.6, legH, 1.6, c, x, 0, z, P));
+  for (const z of [-Z, Z]) g.add(box(2 * X + 1.6, 1.8, 1.8, c, 0, legH - 1.8, z, P));
+  for (const x of [-X, X]) {
+    g.add(box(1.4, 1.4, 2 * Z, c, x, 18, 0, P), box(1.2, 1.2, 2 * Z, c, x, 2.5, 0, P));
+    g.add(strut(V3k(x, 3, -Z), V3k(x, 18, Z), 0.7, c, P), strut(V3k(x, 3, Z), V3k(x, 18, -Z), 0.7, c, P));
+    g.add(strut(V3k(x, 19, -Z), V3k(x, legH - 2, Z), 0.7, c, P), strut(V3k(x, 19, Z), V3k(x, legH - 2, -Z), 0.7, c, P));
+  }
+  // twin boom girders with cross members
+  for (const x of [-4, 4]) g.add(box(1.2, 2.6, 106, c, x, legH, -22, P));
+  for (let z = -74; z <= 30; z += 8) g.add(box(8, 0.5, 0.5, c, 0, legH + 0.4, z, P));
+  // A-frame apex with fore and back stays
+  for (const x of [-5, 5]) {
+    const apex = V3k(x * 0.6, legH + 24, 4);
+    g.add(strut(V3k(x, legH + 1, -Z), apex, 1.0, c, P), strut(V3k(x, legH + 1, Z), apex, 1.0, c, P));
+    g.add(strut(apex, V3k(x * 0.8, legH + 2.6, -62), 0.45, '#2b2f36'), strut(apex, V3k(x * 0.8, legH + 2.6, 30), 0.45, '#2b2f36'));
+  }
+  g.add(box(11, 8, 12, '#eceff1', 0, legH + 2.6, 24, { roughness: 0.45, metalness: 0.2 }));
+  const red = mat('#ff2a2a', { emissive: C('#ff2a2a'), emissiveIntensity: 1.5 });
+  g.add(mesh(new THREE.SphereGeometry(0.6, 8, 6), red, 0, legH + 25, 4, false), mesh(new THREE.SphereGeometry(0.5, 8, 6), red, 0, legH + 3, -74, false));
+  const trolley = group(box(7, 2.2, 5, '#33393f', 0, -2.2, 0), mesh(boxG(3.4, 2.6, 3), mat('#f1f3f4'), 0, -3.6, 1.6), mesh(boxG(3.2, 1.6, 0.2), glass(), 0, -3.4, 0.05));
   trolley.position.set(0, legH, 0);
   g.add(trolley);
-  const cable = mesh(boxG(0.25, 1, 0.25), mat('#222')); cable.castShadow = false;
+  const cable = mesh(boxG(0.18, 1, 0.18), mat('#222')); cable.castShadow = false;
   trolley.add(cable);
-  const spreader = group(box(12.4, 0.8, 2.6, '#f2c230'));
+  const spreader = group(box(12.4, 0.8, 2.6, '#f2c230', 0, 0, 0, P));
   trolley.add(spreader);
   const setDrop = d => { spreader.position.y = -d; cable.scale.y = d; cable.position.y = -d / 2; };
   setDrop(12);
+  bake(g, [trolley]);
   return { g, trolley, spreader, setDrop, legH };
 }
+function V3k(x, y, z) { return new THREE.Vector3(x, y, z); }
 
 function wheel(r = 0.5, w = 0.4) { const m = mesh(cylG(r, r, w, 12), mat('#1d1f22')); m.rotation.x = Math.PI / 2; return m; }
 // Tractor + chassis, length along +x. Optional container.
+// Day-cab tractor + chassis, length along +x. Optional container.
 function truck(opts = {}) {
-  const g = new THREE.Group(), cab = opts.cab || '#e8eaed';
-  g.add(box(2.8, 2.6, 2.5, cab, 6.4, 0.9, 0), box(1.0, 1.1, 2.3, '#24313f', 7.9, 2.3, 0), box(2.6, 0.5, 2.4, '#3a3f45', 4.8, 0.7, 0));
-  g.add(box(12.2, 0.35, 2.3, '#4b4f54', -1.6, 1.0, 0));
+  const g = new THREE.Group(), cab = opts.cab || '#e8eaed', P = { metalness: 0.3, roughness: 0.35 };
+  g.add(box(2.8, 2.7, 2.5, cab, 6.4, 0.95, 0, P), box(0.4, 2.1, 2.4, cab, 7.95, 0.75, 0, P));
+  g.add(mesh(boxG(0.12, 1.1, 2.2), glass(), 7.85, 2.75, 0));
+  for (const z of [-1.27, 1.27]) g.add(mesh(boxG(1.4, 0.9, 0.06), glass(), 6.7, 2.7, z));
+  g.add(box(0.25, 0.9, 2.0, '#2b2f36', 8.2, 0.75, 0), box(0.3, 0.35, 2.5, '#9aa3ab', 8.25, 0.45, 0, { metalness: 0.8, roughness: 0.3 }));
+  const lamp = mat('#fff6dc', { emissive: C('#fff1c8'), emissiveIntensity: 0.6 });
+  for (const z of [-0.95, 0.95]) g.add(mesh(boxG(0.1, 0.22, 0.4), lamp, 8.33, 1.05, z, false), box(0.5, 0.7, 0.08, '#2b2f36', 7.4, 2.4, z * 1.42));
+  g.add(cyl(0.18, 3.4, '#b8bec4', 5.0, 2.0, -1.0, 8, { metalness: 0.9, roughness: 0.25 }));
+  const tank = mesh(cylG(0.5, 0.5, 1.6, 12), mat('#c9ced3', { metalness: 0.85, roughness: 0.25 }), 5.2, 0.8, 1.15); tank.rotation.z = Math.PI / 2; g.add(tank);
+  g.add(box(2.6, 0.45, 2.4, '#3a3f45', 4.8, 0.7, 0));
+  g.add(box(12.2, 0.35, 2.3, '#3f4348', -1.6, 1.0, 0, P));
+  for (const z of [-1.15, 1.15]) g.add(box(0.06, 0.6, 0.5, '#1d1f22', -6.4, 0.3, z));
   for (const x of [7.2, 4.6, -5.6, -6.8]) for (const z of [-1.1, 1.1]) { const w = wheel(); w.position.set(x, 0.5, z); g.add(w); }
   if (opts.load !== false) {
     const c = opts.reefer ? container(REEFER) : container(opts.color);
     c.position.set(-1.6, 1.35, 0);
     g.add(c); g.userData.box = c;
   }
-  return g;
+  return bake(g, [g.userData.box]);
 }
 function van(hex = '#f4f6f8') {
   const g = new THREE.Group();
@@ -1099,7 +1279,17 @@ function walkPose(w, ph, amp = 0.6) {
   w.userData.legs[0].rotation.z = s; w.userData.legs[1].rotation.z = -s;
   w.userData.arms[0].rotation.z = -s * 0.8; w.userData.arms[1].rotation.z = s * 0.8;
 }
-function tree(h = 6, hex = '#3f8f4a') { return group(cyl(0.25, h * 0.45, '#6b4f35'), mesh(new THREE.ConeGeometry(h * 0.28, h * 0.7, 7), mat(hex), 0, h * 0.75, 0)); }
+const TREE_GREENS = ['#3f7d3c', '#4a8a3f', '#356b35', '#5a8f45', '#2f6234'];
+function tree(h = 6, hex) {
+  const r = Math.random, g = new THREE.Group(), col = hex || TREE_GREENS[(r() * TREE_GREENS.length) | 0];
+  g.add(cyl(0.22 + h * 0.02, h * 0.45, '#5b4330', 0, 0, 0, 7));
+  for (let i = 0; i < 3; i++) {
+    const m = mesh(new THREE.ConeGeometry(h * (0.3 - i * 0.06), h * 0.42, 8), mat(TREE_GREENS[((r() * 5) | 0)], { roughness: 0.9 }), (r() - 0.5) * 0.3, h * (0.52 + i * 0.17), (r() - 0.5) * 0.3);
+    m.rotation.y = r() * 3; g.add(m);
+  }
+  g.scale.setScalar(0.85 + r() * 0.35);
+  return bake(g);
+}
 function drone() {
   const g = new THREE.Group();
   g.add(box(0.7, 0.25, 0.7, '#f4f6f8'), box(0.4, 0.35, 0.4, '#ff7a1a', 0, -0.35, 0));
@@ -1133,7 +1323,7 @@ function train(cars = 10, opts = {}) {
     for (let t = 0; t < 2; t++) { const c = container(BOX_COLORS[(rand() * BOX_COLORS.length) | 0]); c.position.set(x, 1.0 + t * 2.59, 0); g.add(c); }
   }
   g.userData.len = 22 + cars * 21;
-  return g;
+  return bake(g);
 }
 function building(w, h, d, hex = '#c9d1da', win = true) {
   const g = group(box(w, h, d, hex));
@@ -1161,13 +1351,39 @@ function winTex() {
 
 function mergeGeos(list) {
   const parts = list.map(g => g.index ? g.toNonIndexed() : g);
+  const withUv = parts.every(g => g.attributes.uv), withCol = parts.every(g => g.attributes.color);
   let n = 0; parts.forEach(g => { n += g.attributes.position.count; });
-  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3);
+  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = withUv ? new Float32Array(n * 2) : null, col = withCol ? new Float32Array(n * 3) : null;
   let o = 0;
-  parts.forEach(g => { pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3); o += g.attributes.position.count; });
+  parts.forEach(g => {
+    pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3);
+    if (uv) uv.set(g.attributes.uv.array, o * 2);
+    if (col) col.set(g.attributes.color.array, o * 3);
+    o += g.attributes.position.count;
+  });
   const out = new THREE.BufferGeometry();
   out.setAttribute('position', new THREE.BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  if (uv) out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  if (col) out.setAttribute('color', new THREE.BufferAttribute(col, 3));
   return out;
+}
+// Merge a model's static meshes into one mesh per material (draw calls drop by 10x or more).
+// Children listed in keep (and their subtrees) stay separate so they can still animate.
+function bake(root, keep = []) {
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), skip = new Set();
+  keep.forEach(k => k && k.traverse(o => skip.add(o)));
+  const buckets = new Map(), drop = [];
+  root.traverse(o => {
+    if (!o.isMesh || o.isInstancedMesh || skip.has(o) || o.userData.night) return;
+    const g = o.geometry.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
+    const k = o.material.uuid;
+    if (!buckets.has(k)) buckets.set(k, { m: o.material, list: [] });
+    buckets.get(k).list.push(g); drop.push(o);
+  });
+  drop.forEach(o => o.parent.remove(o));
+  buckets.forEach(({ m, list }) => { const mm = new THREE.Mesh(mergeGeos(list), m); mm.castShadow = true; mm.receiveShadow = true; root.add(mm); });
+  return root;
 }
 function bananaCrown() {
   const leaves = [];
@@ -1210,12 +1426,106 @@ class Mover {
     if (this.walk) { this.ph += dt * this.speed * 4; walkPose(this.obj, this.ph); }
   }
 }
+/* ================= ENV: sky, image-based light, ocean, ground textures ================= */
+const TEXBASE = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/';
+const texLoader = new THREE.TextureLoader();
+texLoader.setCrossOrigin('anonymous');
+const pmrem = new THREE.PMREMGenerator(renderer);
+
+const Env = {
+  _normals: null, waterOk: true, _env: {},
+  waterNormals() {
+    if (!this._normals) {
+      this._normals = texLoader.load(TEXBASE + 'waternormals.jpg', undefined, undefined, () => { this.waterOk = false; });
+      this._normals.wrapS = this._normals.wrapT = THREE.RepeatWrapping;
+    }
+    return this._normals;
+  },
+  // Lighting presets: light theme is a clear mid-morning, dark theme is the blue hour with lamps on
+  preset(dark, storm) {
+    if (storm) return { elev: 14, az: 200, turb: 14, ray: 3.5, mie: 0.02, exp: dark ? 0.32 : 0.42, sun: dark ? 0.5 : 1.0, hemi: dark ? 0.16 : 0.3, fog: dark ? '#1b222b' : '#6f7c88', lamps: true };
+    return dark
+      ? { elev: 2.5, az: 250, turb: 4, ray: 2.6, mie: 0.006, exp: 0.42, sun: 0.9, sunCol: '#ffb07a', hemi: 0.16, fog: '#40455a', lamps: true }
+      : { elev: 36, az: 135, turb: 5, ray: 1.4, mie: 0.004, exp: 0.5, sun: 2.0, sunCol: '#fff1de', hemi: 0.3, fog: '#b9cad8', lamps: false };
+  },
+  sunDir(p) {
+    const phi = (90 - p.elev) * DEG, th = p.az * DEG;
+    return new THREE.Vector3().setFromSphericalCoords(1, phi, th);
+  },
+  sky(p) {
+    const sky = new THREE.Sky();
+    sky.scale.setScalar(9000);
+    const u = sky.material.uniforms;
+    u.turbidity.value = p.turb; u.rayleigh.value = p.ray; u.mieCoefficient.value = p.mie; u.mieDirectionalG.value = 0.8;
+    u.sunPosition.value.copy(this.sunDir(p));
+    return sky;
+  },
+  // Pre-filtered sky so every PBR material picks up sky light and reflections
+  envMap(p, key) {
+    if (this._env[key]) return this._env[key];
+    const s = new THREE.Scene(); s.add(this.sky(p));
+    return (this._env[key] = pmrem.fromScene(s, 0.02).texture);
+  },
+};
+
+/* ---------- procedural ground textures (tinted by material colour) ---------- */
+const GTEX = {};
+function noiseCanvas(size, fn) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const g = c.getContext('2d'), img = g.createImageData(size, size), r = rng(size * 7 + fn.length);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const v = fn(x, y, r);
+    const i = (y * size + x) * 4; img.data[i] = img.data[i + 1] = img.data[i + 2] = clamp(v, 0, 255); img.data[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  return { c, g };
+}
+// tileable value noise
+function vnoise(size, cell, seed) {
+  const n = size / cell, r = rng(seed), grid = [];
+  for (let i = 0; i < n * n; i++) grid.push(r());
+  const at = (i, j) => grid[((j + n) % n) * n + ((i + n) % n)];
+  return (x, y) => {
+    const fx = x / cell, fy = y / cell, i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j;
+    const s = t => t * t * (3 - 2 * t);
+    return lerp(lerp(at(i, j), at(i + 1, j), s(u)), lerp(at(i, j + 1), at(i + 1, j + 1), s(u)), s(v));
+  };
+}
+function groundTex(kind) {
+  if (GTEX[kind]) return GTEX[kind];
+  const S = 256, n1 = vnoise(S, 64, 3), n2 = vnoise(S, 16, 9), n3 = vnoise(S, 4, 21);
+  let base;
+  if (kind === 'concrete') {
+    base = noiseCanvas(S, (x, y, r) => 205 + (n1(x, y) - 0.5) * 30 + (n2(x, y) - 0.5) * 18 + (r() - 0.5) * 16);
+    base.g.strokeStyle = 'rgba(40,40,40,.35)'; base.g.lineWidth = 1.5;
+    base.g.beginPath(); base.g.moveTo(0, 0.5); base.g.lineTo(S, 0.5); base.g.moveTo(0.5, 0); base.g.lineTo(0.5, S); base.g.stroke();
+    for (let i = 0; i < 5; i++) { base.g.fillStyle = 'rgba(30,30,30,.06)'; base.g.beginPath(); base.g.ellipse(Math.random() * S, Math.random() * S, 10 + Math.random() * 30, 6 + Math.random() * 18, Math.random() * 3, 0, 7); base.g.fill(); }
+  } else if (kind === 'asphalt') {
+    base = noiseCanvas(S, (x, y, r) => 190 + (n2(x, y) - 0.5) * 30 + (r() - 0.5) * 50);
+  } else if (kind === 'grass') {
+    base = noiseCanvas(S, (x, y, r) => 200 + (n1(x, y) - 0.5) * 70 + (n3(x, y) - 0.5) * 40 + (r() - 0.5) * 20);
+  } else if (kind === 'sand') {
+    base = noiseCanvas(S, (x, y, r) => 215 + (n1(x, y) - 0.5) * 30 + Math.sin((x + n2(x, y) * 40) * 0.25) * 8 + (r() - 0.5) * 14);
+  } else if (kind === 'dirt') {
+    base = noiseCanvas(S, (x, y, r) => 195 + (n1(x, y) - 0.5) * 60 + (n3(x, y) - 0.5) * 50 + (r() - 0.5) * 25);
+  } else {
+    base = noiseCanvas(S, (x, y, r) => 210 + (n1(x, y) - 0.5) * 40 + (n2(x, y) - 0.5) * 24 + (r() - 0.5) * 18);
+  }
+  const t = new THREE.CanvasTexture(base.c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.encoding = THREE.sRGBEncoding; t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return (GTEX[kind] = t);
+}
+function groundMat(hex, kind, w, d, tile = 24) {
+  const t = groundTex(kind).clone(); t.needsUpdate = true;
+  t.repeat.set(w / tile, d / tile);
+  return new THREE.MeshStandardMaterial({ color: C(hex), map: t, roughness: kind === 'asphalt' ? 0.9 : 0.96, metalness: 0 });
+}
 /* ================= GLOBE ================= */
 const Globe = (() => {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#040912');
-  const amb = new THREE.AmbientLight(0xffffff, 0.55);
-  const sun = new THREE.DirectionalLight(0xffffff, 0.85);
+  const amb = new THREE.AmbientLight(0xffffff, 0.35);
+  const sun = new THREE.DirectionalLight(0xffffff, 1.1);
   scene.add(amb, sun);
   const pickables = [];
 
@@ -1288,8 +1598,42 @@ const Globe = (() => {
     } catch (e) { paintLand(FALLBACK.map(r => [r])); }
   }
 
-  const earth = new THREE.Mesh(new THREE.SphereGeometry(R, 96, 64), new THREE.MeshPhongMaterial({ map: tex, specularMap: spec, specular: new THREE.Color('#2e4a66'), shininess: 14 }));
+  // Photographic Earth: day map, specular oceans, city lights on the night side
+  const sunDir = new THREE.Vector3(1, 0.3, 0).normalize();
+  const black = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1); black.needsUpdate = true;
+  const earthMat = new THREE.ShaderMaterial({
+    uniforms: { dayMap: { value: tex }, nightMap: { value: black }, specMap: { value: spec }, sunDir: { value: sunDir }, photo: { value: 0 } },
+    vertexShader: `varying vec2 vUv; varying vec3 vN; varying vec3 vW;
+      void main(){ vUv = uv; vN = normalize(mat3(modelMatrix) * normal); vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
+    fragmentShader: `uniform sampler2D dayMap; uniform sampler2D nightMap; uniform sampler2D specMap; uniform vec3 sunDir; uniform float photo;
+      varying vec2 vUv; varying vec3 vN; varying vec3 vW;
+      void main(){
+        vec3 n = normalize(vN); vec3 v = normalize(cameraPosition - vW);
+        float d = dot(n, normalize(sunDir));
+        float lit = smoothstep(-0.18, 0.22, d);
+        vec3 day = texture2D(dayMap, vUv).rgb;
+        vec3 night = texture2D(nightMap, vUv).rgb * vec3(1.0, 0.82, 0.55) * 1.6;
+        float sea = texture2D(specMap, vUv).r;
+        vec3 h = normalize(normalize(sunDir) + v);
+        float spec = pow(max(dot(n, h), 0.0), 60.0) * sea * 0.55 * lit;
+        vec3 col = mix(night + day * 0.035, day * (0.28 + 0.95 * max(d, 0.0)), lit) + vec3(1.0, 0.95, 0.85) * spec;
+        float rim = pow(1.0 - max(dot(n, v), 0.0), 3.0);
+        col += vec3(0.28, 0.58, 1.0) * rim * (0.15 + 0.5 * lit);
+        gl_FragColor = vec4(col, 1.0);
+      }`,
+  });
+  const earth = new THREE.Mesh(new THREE.SphereGeometry(R, 128, 96), earthMat);
   scene.add(earth);
+  const clouds = new THREE.Mesh(new THREE.SphereGeometry(R * 1.007, 96, 64), new THREE.MeshLambertMaterial({ transparent: true, opacity: 0.0, depthWrite: false }));
+  scene.add(clouds);
+  function loadPhoto() {
+    let failed = false;
+    const fail = () => { if (!failed) { failed = true; loadLand(); } };
+    texLoader.load(TEXBASE + 'planets/earth_atmos_2048.jpg', t => { t.anisotropy = 8; earthMat.uniforms.dayMap.value = t; earthMat.uniforms.photo.value = 1; }, undefined, fail);
+    texLoader.load(TEXBASE + 'planets/earth_specular_2048.jpg', t => { earthMat.uniforms.specMap.value = t; }, undefined, () => {});
+    texLoader.load(TEXBASE + 'planets/earth_lights_2048.png', t => { earthMat.uniforms.nightMap.value = t; }, undefined, () => {});
+    texLoader.load(TEXBASE + 'planets/earth_clouds_1024.png', t => { clouds.material.map = t; clouds.material.opacity = 0.75; clouds.material.needsUpdate = true; }, undefined, () => {});
+  }
   // atmosphere rim
   const atmo = new THREE.Mesh(new THREE.SphereGeometry(R * 1.06, 64, 48), new THREE.ShaderMaterial({
     side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -1316,9 +1660,9 @@ const Globe = (() => {
     g.position.copy(dir).multiplyScalar(R);
     g.quaternion.setFromUnitVectors(up, dir);
     const h = n.major ? 0.32 : 0.2;
-    const pole = new THREE.Mesh(cylG(0.012, 0.012, h, 6), new THREE.MeshBasicMaterial({ color: col })); pole.position.y = h / 2;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(n.major ? 0.07 : 0.05, 12, 10), new THREE.MeshBasicMaterial({ color: col })); head.position.y = h;
-    const ring = new THREE.Mesh(new THREE.RingGeometry(0.08, 0.11, 32), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }));
+    const pole = new THREE.Mesh(cylG(0.012, 0.012, h, 6), new THREE.MeshBasicMaterial({ color: col, toneMapped: false })); pole.position.y = h / 2;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(n.major ? 0.07 : 0.05, 12, 10), new THREE.MeshBasicMaterial({ color: col, toneMapped: false })); head.position.y = h;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.08, 0.11, 32), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }));
     ring.rotation.x = -Math.PI / 2; ring.position.y = 0.01;
     const hit = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = h * 0.6;
     g.add(pole, head, ring, hit);
@@ -1333,7 +1677,7 @@ const Globe = (() => {
   for (const id of Object.keys(LANES)) {
     const path = lanePath(id);
     const geo = new THREE.BufferGeometry().setFromPoints(path.points());
-    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0x5fd4f0, transparent: true, opacity: 0.28 }));
+    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0x7fe3ff, transparent: true, opacity: 0.42, toneMapped: false }));
     scene.add(line); laneLines[id] = line;
   }
 
@@ -1408,7 +1752,7 @@ const Globe = (() => {
       if (!on && queues[key]) { scene.remove(queues[key]); delete queues[key]; }
     }
     if (id === 'storm') { if (on && !storm) storm = makeStorm(); if (!on && storm) { scene.remove(storm); storm = null; } }
-    laneLines.lk_rotterdam_cape.material.opacity = state.closed.has('suez') ? 0.5 : 0.28;
+    laneLines.lk_rotterdam_cape.material.opacity = state.closed.has('suez') ? 0.7 : 0.42;
     laneLines.lk_rotterdam_suez.material.color.set(state.closed.has('suez') ? 0xff5566 : 0x5fd4f0);
     for (const [nid, m] of Object.entries(markers)) {
       const c = state.closed.has(nid);
@@ -1432,7 +1776,7 @@ const Globe = (() => {
       const pts = p.points();
       const done = li < c.i;
       const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), Math.max(12, pts.length), leg.mode === 'air' ? 0.018 : 0.026, 6, false),
-        new THREE.MeshBasicMaterial({ color: done ? 0x6b7a8c : ci === 0 ? 0xff7a1a : 0xffd21a, transparent: true, opacity: done ? 0.5 : 0.95 }));
+        new THREE.MeshBasicMaterial({ color: done ? 0x8a97a6 : ci === 0 ? 0xff7a1a : 0xffd21a, transparent: true, opacity: done ? 0.5 : 0.95, toneMapped: false }));
       route.add(tube);
     }));
   }
@@ -1467,7 +1811,10 @@ const Globe = (() => {
   function moverPos(i) { return movers[i] ? movers[i].obj.position : null; }
 
   function update(dt, t, simDt) {
-    sun.position.copy(camera.position).add(new THREE.Vector3(6, 8, 0)).normalize();
+    // sun sits ahead of the camera and to the east, so the view is lit and the terminator is in frame
+    sunDir.copy(camera.position).normalize().applyAxisAngle(_up, 1.05); sunDir.y += 0.25; sunDir.normalize();
+    sun.position.copy(sunDir);
+    clouds.rotation.y += dt * 0.004;
     for (const m of Object.values(markers)) {
       const s = 1 + ((t * 0.6 + m.phase) % 1) * 1.8;
       m.ring.scale.set(s, s, s); m.ring.material.opacity = 0.85 * (1 - ((t * 0.6 + m.phase) % 1));
@@ -1484,45 +1831,89 @@ const Globe = (() => {
     if (storm) storm.rotateZ(-dt * 0.4);
   }
 
-  loadLand();
+  const _up = new THREE.Vector3(0, 1, 0);
+  loadPhoto();
   return { scene, pickables, update, setDisruption, isClosed, drawRoute, syncMovers, updateMovers, moverPos, markers, earth };
 })();
 
 function modeName(m) { return { sea: 'Ocean', rail: 'Rail', truck: 'Truck', air: 'Air', van: 'Van', drone: 'Drone' }[m] || m; }
 /* ================= DIORAMAS: zoom-in scenes for each node kind ================= */
 function Stage(o = {}) {
-  const dark = isDark();
+  const dark = isDark(), p = Env.preset(dark, o.storm);
   const scene = new THREE.Scene();
-  const sky = new THREE.Color(dark ? (o.night || '#0d1726') : (o.sky || '#cfe2ef'));
-  scene.background = sky;
-  scene.fog = new THREE.Fog(sky, o.fogNear || 420, o.fogFar || 1100);
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x5d6b78, dark ? 0.45 : 0.6);
-  const sun = new THREE.DirectionalLight(dark ? 0xbfd2ff : 0xfff3e0, dark ? 0.7 : 0.9);
-  sun.position.set(140, 220, 90);
+  scene.environment = Env.envMap(p, (dark ? 'd' : 'l') + (o.storm ? 's' : ''));
+  scene.add(Env.sky(p));
+  const fogC = C(p.fog);
+  scene.background = fogC;
+  scene.fog = new THREE.Fog(fogC, o.fogNear || 500, o.fogFar || 1700);
+  const sunDir = Env.sunDir(p);
+  const hemi = new THREE.HemisphereLight(0xdfeaff, 0x4a4436, p.hemi);
+  const sun = new THREE.DirectionalLight(C(p.sunCol || '#ffffff'), p.sun);
+  sun.position.copy(sunDir).multiplyScalar(500);
   sun.castShadow = true;
-  const S = o.shadow || 230;
-  Object.assign(sun.shadow.camera, { left: -S, right: S, top: S, bottom: -S, near: 10, far: 700 });
-  sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0006;
+  const S = o.shadow || 240;
+  Object.assign(sun.shadow.camera, { left: -S, right: S, top: S, bottom: -S, near: 10, far: 1400 });
+  sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.4;
   scene.add(hemi, sun);
   const st = {
-    scene, pick: [], ups: [], hots: [], cam: o.cam || { pos: new THREE.Vector3(170, 120, 210), target: new THREE.Vector3(0, 0, 30) }, rand: rng(o.seed || 3),
+    scene, pick: [], ups: [], hots: [], dark, lamps: p.lamps, exposure: p.exp, sunDir,
+    cam: o.cam || { pos: new THREE.Vector3(170, 120, 210), target: new THREE.Vector3(0, 0, 30) }, rand: rng(o.seed || 3),
     add(...objs) { objs.forEach(x => scene.add(x)); return objs[0]; },
     hot(obj, key, label, off = 4) { tagPick(obj, key); st.pick.push(obj); if (label) st.hots.push({ obj, key, label, off }); return obj; },
     on(fn) { st.ups.push(fn); },
     update(dt, t) { for (const f of st.ups) f(dt, t); },
-    ground(hex, w = 2400, d = 2400, x = 0, z = 0, y = 0) {
-      const g = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat(hex, { roughness: 0.95 }));
+    ground(hex, w = 2400, d = 2400, x = 0, z = 0, y = 0, kind = 'noise') {
+      const g = new THREE.Mesh(new THREE.PlaneGeometry(w, d), groundMat(hex, kind, w, d));
       g.rotation.x = -Math.PI / 2; g.position.set(x, y, z); g.receiveShadow = true; scene.add(g); return g;
     },
-    water(w, d, x = 0, z = 0, y = -1.5, seg = 0) {
-      const geo = new THREE.PlaneGeometry(w, d, seg || 1, seg || 1); geo.rotateX(-Math.PI / 2);
-      const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: C(dark ? '#0f3550' : '#1f6189'), roughness: 0.22, metalness: 0.15 }));
-      m.position.set(x, y, z); m.receiveShadow = true; scene.add(m); return m;
+    water(w, d, x = 0, z = 0, y = -1.5, opt = {}) {
+      let m;
+      if (!opt.flat && Env.waterOk && THREE.Water) {
+        m = new THREE.Water(new THREE.PlaneGeometry(w, d), {
+          textureWidth: 512, textureHeight: 512, waterNormals: Env.waterNormals(), sunDirection: sunDir.clone(),
+          sunColor: C(p.sunCol || '#ffffff'), waterColor: C(opt.color || (dark ? '#03111b' : '#0a3a50')), distortionScale: opt.distort || 2.4, fog: true,
+        });
+        m.material.uniforms.size.value = opt.size || 1.4;
+        m.rotation.x = -Math.PI / 2;
+        st.on(dt => { m.material.uniforms.time.value += dt * (opt.speed || 0.45); });
+      } else {
+        m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ color: C(dark ? '#06202e' : '#1a5470'), roughness: 0.08, metalness: 0.2 }));
+        m.rotation.x = -Math.PI / 2; m.receiveShadow = true;
+      }
+      m.position.set(x, y, z); scene.add(m); return m;
+    },
+    // High-mast yard light; lamps glow in the blue-hour theme
+    mast(x, z, h = 32) {
+      const g = group(cyl(0.45, h, '#8a9097', 0, 0, 0, 8), box(4, 0.6, 4, '#5a6068', 0, h, 0));
+      const lamp = mesh(boxG(3.6, 0.4, 3.6), new THREE.MeshStandardMaterial({ color: C('#fff6e0'), emissive: C('#ffd9a0'), emissiveIntensity: p.lamps ? 2.2 : 0.05 }), 0, h - 0.2, 0, false);
+      g.add(lamp); g.position.set(x, 0, z); scene.add(g);
+      if (p.lamps && (st._pl = (st._pl || 0) + 1) <= 3) { const pl = new THREE.PointLight(0xffd59a, 2.2, 150, 2); pl.position.set(x, h - 2, z); scene.add(pl); }
+      return g;
     },
   };
   return st;
 }
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+// Rolling heightfield; edge = 'z+' or 'z-' makes that side fall to the shoreline
+function terrain(w, d, hmax, hex, kind, seed, edge) {
+  const seg = 96, geo = new THREE.PlaneGeometry(w, d, seg, seg);
+  geo.rotateX(-Math.PI / 2);
+  const n1 = vnoise(1024, 256, seed), n2 = vnoise(1024, 64, seed + 5), n3 = vnoise(1024, 16, seed + 9);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i);
+    const u = ((x / w + 0.5) * 1024 + 4096) % 1024, v = ((z / d + 0.5) * 1024 + 4096) % 1024;
+    let h = n1(u, v) * 0.65 + n2(u, v) * 0.28 + n3(u, v) * 0.07;
+    let f = 1;
+    if (edge) { const t = edge === 'z+' ? (z / d + 0.5) : (0.5 - z / d); f = clamp(t * 2.2, 0, 1); f = f * f * (3 - 2 * f); }
+    else { const ex = 1 - Math.abs(x / (w / 2)), ez = 1 - Math.abs(z / (d / 2)); f = clamp(Math.min(ex, ez) * 4, 0, 1); }
+    pos.setY(i, h * hmax * f - 3 * (1 - f));
+  }
+  geo.computeVertexNormals();
+  const m = new THREE.Mesh(geo, groundMat(hex, kind, w, d, 40));
+  m.receiveShadow = true; m.castShadow = true;
+  return m;
+}
 function workers(st, n, vest, pts, o = {}) {
   const out = [];
   for (let i = 0; i < n; i++) {
@@ -1545,11 +1936,12 @@ const DIO = {};
 /* ---------- PORT ---------- */
 DIO.port = (id, ctx) => {
   const n = NODES[id], st = Stage({ seed: id.length * 13 }), R0 = st.rand;
-  st.ground('#9ea5ac', 2400, 1200, 0, 600);
+  st.ground('#8e9296', 2400, 1200, 0, 600, 0, 'concrete');
+  for (const [x, z] of [[-150, 40], [-60, 40], [30, 40], [130, 40], [-150, 115], [30, 115], [60, 150]]) st.mast(x, z);
   st.water(2400, 1400, 0, -700);
   st.add(box(2400, 3, 4, '#8e959c', 0, -1.5, 1));
   // lane markings on the apron
-  for (let x = -180; x <= 180; x += 12) st.add(box(6, 0.05, 0.4, '#f4f4f4', x, 0.01, 10));
+  { const mk = group(); for (let x = -180; x <= 180; x += 12) mk.add(box(6, 0.05, 0.4, '#f4f4f4', x, 0.01, 10)); st.add(bake(mk)); }
   // ship at berth
   const sh = ship(220, { rand: R0, reefer: n.kind === 'port' && id === 'guayaquil' });
   sh.position.set(-10, -8, -24);
@@ -1616,12 +2008,13 @@ DIO.port = (id, ctx) => {
   for (let i = 0; i < 5; i++) gate.add(box(0.8, 8, 0.8, '#7b8590', -24 + i * 12, 0, -4), box(0.8, 8, 0.8, '#7b8590', -24 + i * 12, 0, 4), box(2, 2.6, 2, '#eceff1', -18 + i * 12, 0, 0));
   gate.add(box(54, 0.8, 12, '#0a8fb0', 0, 8, 0));
   gate.position.set(80, 0, 170); st.add(gate); st.hot(gate, 'gate', 'Terminal gate', 12);
+  if (ctx.gateDown) { for (let i = 0; i < 4; i++) gate.add(box(10, 0.4, 0.4, '#d8324a', -18 + i * 12, 1.2, -4)); st.hot(gate, id === 'rotterdam' ? 'cyber' : 'imbalance', id === 'rotterdam' ? 'Systems down: gate closed' : 'No empty boxes', 16); }
   st.add(box(30, 0.04, 600, '#4a4f55', 80, 0.02, 420));
   const truckPts = [V3(74, 0, 420), V3(74, 0, 170), V3(74, 0, 140), V3(60, 0, 120), V3(-40, 0, 120), V3(-40, 0, 135), V3(86, 0, 135), V3(86, 0, 420)];
-  const nT = ctx.closed ? 9 : 5;
+  const jam = ctx.closed || ctx.gateDown, nT = jam ? 9 : 5;
   for (let i = 0; i < nT; i++) {
     const tr = truck({ cab: ['#e8eaed', '#c23b30', '#2f6fde', '#2e9e5b'][i % 4], color: BOX_COLORS[(i * 7) % BOX_COLORS.length] }); st.add(tr);
-    const mv = new Mover(tr, truckPts, ctx.closed ? 4 : 12, { offset: i * (ctx.closed ? 26 : 120), stops: { 1: 2.5, 4: 3 } }); st.on(dt => mv.step(dt));
+    const mv = new Mover(tr, truckPts, ctx.gateDown ? 0 : jam ? 4 : 12, { offset: i * (jam ? 26 : 120), stops: { 1: 2.5, 4: 3 } }); st.on(dt => mv.step(dt));
     if (i === 0) st.hot(tr, 'drayage', 'Drayage truck', 6);
   }
   idleWorker(st, '#2f6fde', 74, 166, Math.PI / 2);
@@ -1650,14 +2043,14 @@ DIO.port = (id, ctx) => {
 DIO.mine = () => {
   const st = Stage({ sky: '#d9e3ea', seed: 5 });
   const earthA = '#b5835a', earthB = '#9c6a46';
-  const top = new THREE.Mesh(new THREE.RingGeometry(92, 1200, 64), mat('#a98e68', { roughness: 1 }));
+  const top = new THREE.Mesh(new THREE.RingGeometry(92, 1200, 64), groundMat('#b0916a', 'dirt', 600, 600, 40));
   top.rotation.x = -Math.PI / 2; top.receiveShadow = true; st.add(top);
   const radii = [92, 78, 64, 50, 37, 25], step = 7;
   radii.forEach((r, i) => {
-    const wall = new THREE.Mesh(new THREE.CylinderGeometry(r, r - 3, step, 48, 1, true), mat(i % 2 ? earthA : earthB, { side: THREE.DoubleSide, roughness: 1 }));
+    const wall = new THREE.Mesh(new THREE.CylinderGeometry(r, r - 3, step, 48, 1, true), Object.assign(groundMat(i % 2 ? earthA : earthB, 'dirt', 300, 30, 20), { side: THREE.DoubleSide }));
     wall.position.y = -step * i - step / 2; wall.receiveShadow = true; st.add(wall);
     const r2 = radii[i + 1] || 0;
-    const bench = new THREE.Mesh(r2 ? new THREE.RingGeometry(r2, r - 3, 48) : new THREE.CircleGeometry(r - 3, 48), mat(i % 2 ? '#c09068' : '#a8774f', { roughness: 1 }));
+    const bench = new THREE.Mesh(r2 ? new THREE.RingGeometry(r2, r - 3, 48) : new THREE.CircleGeometry(r - 3, 48), groundMat(i % 2 ? '#c09068' : '#a8774f', 'dirt', 200, 200, 20));
     bench.rotation.x = -Math.PI / 2; bench.position.y = -step * (i + 1); bench.receiveShadow = true; st.add(bench);
   });
   const floorY = -step * radii.length;
@@ -1724,7 +2117,7 @@ function R0n(st) { return st.rand(); }
 /* ---------- FARM ---------- */
 DIO.farm = () => {
   const st = Stage({ sky: '#cfe6ef', seed: 9 });
-  st.ground('#6c9a4c');
+  st.ground('#6f9a4a', 2400, 2400, 0, 0, 0, 'grass');
   const pts = [];
   for (let x = -200; x <= 40; x += 9) for (let z = -150; z <= 150; z += 9) if (Math.abs(z) > 10 && st.rand() > 0.08) pts.push([x + st.rand() * 3, z + st.rand() * 3]);
   const trunkG = new THREE.CylinderGeometry(0.35, 0.5, 4, 6); trunkG.translate(0, 2, 0);
@@ -1776,10 +2169,10 @@ DIO.farm = () => {
 /* ---------- FACTORY ---------- */
 DIO.factory = () => {
   const st = Stage({ seed: 11 });
-  st.ground('#8f979f');
-  st.add(box(160, 0.3, 80, '#aeb6be', 0, 0, 0));
+  st.ground('#868b90', 2400, 2400, 0, 0, 0, 'concrete');
+  st.add(box(160, 0.3, 80, '#b9bec3', 0, 0, 0));
   st.add(box(160, 5, 1, '#e6e9ec', 0, 0, -40), box(1, 5, 80, '#e6e9ec', -80, 0, 0), box(1, 5, 50, '#e6e9ec', 80, 0, -15), box(1, 5, 14, '#e6e9ec', 80, 0, 33));
-  for (let x = -80; x <= 80; x += 20) { st.add(box(1, 14, 1, '#7b8590', x, 0, -40), box(1, 14, 1, '#7b8590', x, 0, 40), box(0.6, 0.8, 80, '#7b8590', x, 14, 0)); }
+  { const fr = group(); for (let x = -80; x <= 80; x += 20) fr.add(box(1, 14, 1, '#7b8590', x, 0, -40), box(1, 14, 1, '#7b8590', x, 0, 40), box(0.6, 0.8, 80, '#7b8590', x, 14, 0)); st.add(bake(fr)); }
   // assembly line with robot arms
   const belt = box(120, 1, 3, '#3b4148', -10, 1, -10); st.add(belt); st.hot(belt, 'assembly', 'Assembly line', 5);
   const items = [];
@@ -1802,7 +2195,7 @@ DIO.factory = () => {
   st.on((dt, t) => items2.forEach((it, i) => { it.position.x = 30 - ((t * 4 + i * 8.3) % 100); }));
   for (let i = 0; i < 4; i++) idleWorker(st, '#2f6fde', -55 + i * 24, 17, -Math.PI / 2, { hat: '#eceff1' });
   // component racks on the back wall
-  for (let r = 0; r < 2; r++) for (let x = -74; x < 30; x += 2.6) for (let lv = 0; lv < 3; lv++) st.add(box(2.2, 1.2, 2, ['#c9a66b', '#2e9e5b', '#e67e22', '#5d6d7e'][(Math.abs(x | 0) + lv + r) % 4], x, 0.4 + lv * 2, -35 + r * 3.4));
+  { const bins = group(); for (let r = 0; r < 2; r++) for (let x = -74; x < 30; x += 2.6) for (let lv = 0; lv < 3; lv++) bins.add(box(2.2, 1.2, 2, ['#c9a66b', '#2e9e5b', '#e67e22', '#5d6d7e'][(Math.abs(x | 0) + lv + r) % 4], x, 0.4 + lv * 2, -35 + r * 3.4)); st.add(bake(bins)); }
   // tugger robots bringing parts to the lines
   for (let i = 0; i < 3; i++) {
     const tg = group(box(2.4, 0.8, 1.6, '#ff7a1a'), box(2, 1, 1.4, '#c9a66b', -2.6, 0.2, 0));
@@ -1837,29 +2230,24 @@ DIO.factory = () => {
 /* ---------- SEA / STRAIT ---------- */
 DIO.strait = (id, ctx) => {
   const st = Stage({ seed: 17, fogNear: ctx.storm ? 120 : 380, fogFar: ctx.storm ? 600 : 1300, sky: ctx.storm ? '#7d8a96' : '#cfe2ef', night: ctx.storm ? '#141c26' : '#0d1726' });
-  const sea = st.water(2400, 2400, 0, 0, 0, 90);
-  const pos = sea.geometry.attributes.position, base = Float32Array.from(pos.array);
+  st.water(6000, 6000, 0, 0, 0, { distort: ctx.storm ? 7 : 2.6, size: ctx.storm ? 0.9 : 1.2, speed: ctx.storm ? 1.2 : 0.5, color: ctx.storm ? '#16262f' : null });
   const amp = ctx.storm ? 2.4 : 0.7;
-  st.on((dt, t) => {
-    for (let i = 0; i < pos.count; i++) { const x = base[i * 3], z = base[i * 3 + 2]; pos.array[i * 3 + 1] = Math.sin(x * 0.02 + t * 0.9) * amp + Math.cos(z * 0.025 + t * 0.7) * amp * 0.6; }
-    pos.needsUpdate = true;
-  });
   const coast = (z, sgn, hex) => {
-    const g = group();
-    for (let i = 0; i < 18; i++) { const h = 20 + st.rand() * 50; const m = mesh(new THREE.ConeGeometry(40 + st.rand() * 50, h, 7), mat(hex, { roughness: 1 }), -600 + i * 70, h / 2 - 4, z + sgn * st.rand() * 60); g.add(m); }
-    st.add(g); return g;
+    const t = terrain(1800, 420, 70, hex, hex === '#3f7a45' ? 'grass' : 'dirt', z > 0 ? 11 : 17, sgn > 0 ? 'z-' : 'z+');
+    t.position.set(0, 0, z + sgn * 160); st.add(t); return t;
   };
   const info = NODES[id] ? NODES[id].info : 'ship';
   if (id === 'malacca' || id === 'bab' || id === 'hormuz') { const c1 = coast(-260, -1, id === 'malacca' ? '#3f7a45' : '#b49a6b'); coast(260, 1, id === 'malacca' ? '#3f7a45' : '#a88d60'); st.hot(c1, info, NODES[id].short, 60); }
   if (id === 'cape') {
     const c1 = coast(260, 1, '#6d7f4f');
-    const lh = group(cyl(3, 26, '#f4f4f4'), cyl(3.4, 4, '#c23b30', 0, 26, 0)); lh.position.set(40, 30, 230); st.add(lh);
+    const lh = group(cyl(3, 26, '#f4f4f4'), cyl(3.4, 4, '#c23b30', 0, 26, 0)); lh.position.set(40, 32, 215); st.add(lh);
+    const head = mesh(new THREE.ConeGeometry(46, 34, 9), groundMat('#6d6a5c', 'dirt', 90, 90, 20), 40, 15, 222); head.scale.y = 1; st.add(head);
     st.hot(lh, 'cape', 'Cape of Good Hope', 34);
   }
   const hero = ship(230, { rand: st.rand, reefer: ctx.reefer });
   st.add(hero); st.hot(hero, 'ship', ctx.mission ? 'Your vessel' : 'Container ship', 26);
   st.hero = hero;
-  const wake = mesh(new THREE.PlaneGeometry(240, 30), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 }), -230, 0.3, 0, false);
+  const wake = mesh(new THREE.PlaneGeometry(240, 30), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.1, depthWrite: false }), -230, 0.3, 0, false);
   wake.rotation.x = -Math.PI / 2; st.add(wake);
   st.on((dt, t) => { hero.position.y = -7 + Math.sin(t * 0.9) * amp * 0.4; hero.rotation.x = Math.sin(t * 0.7) * (ctx.storm ? 0.06 : 0.015); hero.rotation.z = Math.sin(t * 0.5) * (ctx.storm ? 0.03 : 0.006); });
   const others = [];
@@ -1883,9 +2271,9 @@ DIO.strait = (id, ctx) => {
 /* ---------- SUEZ ---------- */
 DIO.suez = (id, ctx) => {
   const st = Stage({ sky: '#e3dcc9', seed: 21 });
-  st.water(2400, 80, 0, 0, -3);
-  st.ground('#d9c08a', 2400, 1200, 0, 640, 0);
-  st.ground('#d4b97f', 2400, 1200, 0, -640, 0);
+  st.water(2400, 80, 0, 0, -3, { size: 2.2, distort: 1.4 });
+  st.ground('#d9c08a', 2400, 1200, 0, 640, 0, 'sand');
+  st.ground('#d4b97f', 2400, 1200, 0, -640, 0, 'sand');
   st.add(box(2400, 3, 4, '#c9ad73', 0, -3, 41), box(2400, 3, 4, '#c9ad73', 0, -3, -41));
   for (let i = 0; i < 26; i++) { const h = building(6 + st.rand() * 6, 4 + st.rand() * 6, 6 + st.rand() * 6, '#efe8da', false); h.position.set(-200 + st.rand() * 260, 0, 70 + st.rand() * 60); st.add(h); }
   for (let i = 0; i < 30; i++) { const p = tree(6, '#4c8a3e'); p.position.set(-300 + st.rand() * 500, 0, 52 + st.rand() * 10); st.add(p); }
@@ -1906,15 +2294,15 @@ DIO.suez = (id, ctx) => {
 /* ---------- PANAMA LOCKS ---------- */
 DIO.panama = (id, ctx) => {
   const st = Stage({ sky: '#cfe4ea', seed: 23 });
-  st.ground('#4f8a45');
+  st.ground('#4f8a45', 2400, 2400, 0, 0, 0, 'grass');
   const lakeY = ctx.closed ? 23 : 27, lv = [1, 9.7, 18.3, lakeY];
   const L = 200, W = 34, X0 = -212, lanes = [-24, 24];
   const cx = c => X0 + c * 212;
   st.water(1400, 2400, -1030, 0, 0.4);
   // Gatun Lake behind an embankment; in drought the drop shows as a pale band
   for (const z of [-188, 188]) { st.add(box(40, 30, 276, '#7a6a52', 340, 0, z)); if (ctx.closed) st.add(box(40.4, 4, 276.4, '#c9bfa8', 340, 23, z)); }
-  const lake = st.water(1400, 2400, 1012, 0, lakeY);
-  for (let i = 0; i < 26; i++) { const h = 20 + st.rand() * 40; st.add(mesh(new THREE.ConeGeometry(30 + st.rand() * 40, h, 7), mat('#3f7a3a', { roughness: 1 }), -300 + st.rand() * 640, h / 2, -140 - st.rand() * 260)); }
+  const lake = st.water(1400, 2400, 1012, 0, lakeY, { flat: true });
+  { const hills = terrain(1400, 500, 75, '#3f7a3a', 'grass', 41, 'z+'); hills.position.set(0, 0, -400); st.add(hills); }
   for (let i = 0; i < 50; i++) { const t2 = tree(8, '#2f6f35'); t2.position.set(-300 + st.rand() * 640, 0, (st.rand() < 0.5 ? 1 : -1) * (65 + st.rand() * 60)); st.add(t2); }
   const chambers = [[], []];
   for (let c = 0; c < 3; c++) {
@@ -1966,7 +2354,8 @@ DIO.panama = (id, ctx) => {
 /* ---------- RAIL ---------- */
 DIO.rail = () => {
   const st = Stage({ seed: 29 });
-  st.ground('#9a948a');
+  st.ground('#8f8a80', 2400, 2400, 0, 0, 0, 'dirt');
+  for (const x of [-120, 0, 120, 200]) st.mast(x, 38, 28);
   const tracks = [-30, -12, 6];
   tracks.forEach(z => { st.add(box(1400, 0.3, 0.3, '#5a5f66', 0, 0.3, z - 0.75), box(1400, 0.3, 0.3, '#5a5f66', 0, 0.3, z + 0.75)); });
   const sleepG = boxG(0.6, 0.2, 2.6), sl = new THREE.InstancedMesh(sleepG, mat('#4a3b2c'), 3 * 700);
@@ -2005,7 +2394,8 @@ DIO.rail = () => {
 /* ---------- DISTRIBUTION CENTER ---------- */
 DIO.dc = () => {
   const st = Stage({ seed: 31 });
-  st.ground('#8f979f');
+  st.ground('#7a7f85', 2400, 2400, 0, 0, 0, 'asphalt');
+  for (const x of [-90, 0, 90]) st.mast(x, 80, 22);
   st.add(box(180, 0.4, 90, '#b7bec6', 0, 0, 0));
   st.add(box(180, 12, 1, '#e6e9ec', 0, 0, -45), box(1, 6, 90, '#e6e9ec', -90, 0, 0), box(1, 6, 90, '#e6e9ec', 90, 0, 0));
   // dock doors with trailers
@@ -2024,7 +2414,7 @@ DIO.dc = () => {
       for (let x = -78; x < 0; x += 2.2) if (st.rand() > 0.25) racks.add(box(1.8, 1.6, 1.8, '#c9a66b', x, lv * 3 + 0.4, z));
     }
   }
-  st.add(racks); st.hot(racks, 'racks', 'Pallet racking', 12);
+  st.add(bake(racks)); st.hot(racks, 'racks', 'Pallet racking', 12);
   // forklifts between doors and racks
   for (let i = 0; i < 4; i++) {
     const f = forklift(['#f2b01e', '#2e9e5b', '#f2b01e', '#c23b30'][i]); st.add(f);
@@ -2052,7 +2442,7 @@ DIO.dc = () => {
 /* ---------- CITY LAST MILE ---------- */
 DIO.city = (id) => {
   const st = Stage({ seed: 37 });
-  st.ground('#8fa48a');
+  st.ground('#86a07f', 2400, 2400, 0, 0, 0, 'grass');
   const blocks = [-120, -40, 40, 120];
   blocks.forEach(x => st.add(box(12, 0.06, 360, '#3e4349', x - 40, 0.02, 0)));
   blocks.forEach(z => st.add(box(360, 0.06, 12, '#3e4349', 0, 0.03, z - 40)));
@@ -2109,7 +2499,7 @@ DIO.city = (id) => {
 /* ---------- AIR CARGO ---------- */
 DIO.airport = () => {
   const st = Stage({ seed: 41 });
-  st.ground('#8ea27f');
+  st.ground('#8ea27f', 2400, 2400, 0, 0, 0, 'grass');
   st.add(box(1400, 0.08, 46, '#3a3e44', 0, 0.02, -120));
   for (let x = -660; x < 660; x += 40) st.add(box(18, 0.05, 1.2, '#f4f4f4', x, 0.09, -120));
   st.add(box(500, 0.08, 120, '#a9aeb3', 0, 0.02, 40));
@@ -2150,15 +2540,26 @@ const Dio = {
 };
 /* ================= SIM: mission engine ================= */
 const DAYS_PER_SEC = 0.5;
+const EU_CC = new Set(['NL']);
+const KM_PER_DAY_PER_KNOT = 44.448;
 
-function resolveLeg(raw) {
+function resolveLeg(raw, m) {
   const l = Object.assign({}, raw);
   if (l.kind === 'move') {
     const path = l.lane ? lanePath(l.lane) : directPath(l.from, l.to, l.mode);
     l.km = path.km;
+    l.ets = 0;
     const lm = MODEL.lastMile[l.mode];
     if (lm) { l.days = lm.days; l.cost = lm.cost; l.co2 = lm.co2; }
-    else {
+    else if (l.mode === 'sea') {
+      const kn = (m && m.kn) || 16, f = Math.pow(kn / 16, 2);
+      l.kn = kn;
+      l.days = l.km / (kn * KM_PER_DAY_PER_KNOT);
+      l.cost = l.km * (MODEL.seaBasePerTeuKm + MODEL.seaFuelPerTeuKm * f) * (m && m.fuelIndex || 1);
+      l.co2 = l.km * MODEL.tonnesPerTeu * MODEL.co2gPerTkm.sea * f / 1e6;
+      // EU ETS: half of the emissions on voyages into or out of the EU
+      if (EU_CC.has(NODES[l.to].cc) !== EU_CC.has(NODES[l.from].cc)) l.ets = l.co2 * 0.5 * MODEL.etsUsdPerT;
+    } else {
       const sp = MODEL.speedKmDay[l.mode];
       l.days = l.mode === 'air' ? l.km / sp + 0.3 : l.mode === 'rail' ? l.km / sp + 0.5 : Math.max(0.25, l.km / sp);
       l.cost = l.km * MODEL.costPerTeuKm[l.mode] + (l.extraCost || 0);
@@ -2168,6 +2569,7 @@ function resolveLeg(raw) {
     l.days = Math.max(0.05, l.days);
     l.cost = l.cost || 0;
     l.co2 = 0.004 * l.days;
+    l.ets = 0;
   }
   return l;
 }
@@ -2179,25 +2581,33 @@ function legTitle(l) {
 class Mission {
   constructor(def, plan, seed, dry) {
     this.def = def; this.plan = plan; this.dry = !!dry;
+    this.kn = plan.kn || 16;
     this.rand = rng(seed || ((Math.random() * 1e9) | 0));
-    this.day = 0; this.cost = 0; this.co2 = 0; this.items = []; this.flags = {}; this.fired = new Set();
+    this.day = 0; this.cost = 0; this.co2 = 0; this.ets = 0; this.carry = 0; this.dem = 0;
+    this.items = []; this.flags = {}; this.fired = new Set();
     this.log = []; this.ms = []; this.decisions = []; this.done = false; this.blocked = null; this.version = 0;
-    this.dutyPerTeu = 0; this.temps = []; this.reeferLoss = 0; this.fault = null;
+    this.temps = []; this.reeferLoss = 0; this.fault = null;
+    this.valuePerTeu = def.value / def.teu;
+    this.dutyPerTeu = def.dutyPerTeu != null ? def.dutyPerTeu : def.dutyRate != null ? this.valuePerTeu * def.dutyRate : 0;
     const serial = 100000 + ((this.rand() * 899999) | 0);
     this.boxId = iso6346('CVL', serial);
     this.bol = 'CVLB' + String(serial * 7).slice(0, 9);
     this.seal = 'H' + String(((this.rand() * 1e7) | 0)).padStart(7, '0');
-    this.cohorts = def.build.call(def, plan, this).map(c => ({ name: c.name, share: c.share, legs: c.legs.map(resolveLeg), i: 0, t: 0, started: false, done: false, quality: 1, deliveredDay: null }));
+    this.cohorts = def.build.call(def, plan, this).map(c => this.cohort(c.name, c.share, c.legs.map(l => resolveLeg(l, this))));
     this.deadline = def.targets.lead;
   }
+  cohort(name, share, legs, quality = 1, termDays = 0) { return { name, share, legs, i: 0, t: 0, started: false, done: false, quality, deliveredDay: null, termDays }; }
   get main() { return this.cohorts[0]; }
+  get carryPerDay() { return this.valuePerTeu * MODEL.carryRatePerYear / 365; }
+
   // ---- effects API used by mission events ----
   find(id, c = this.cur || this.main) { for (let i = c.i; i < c.legs.length; i++) if (c.legs[i].id === id) return i; return -1; }
-  replaceLane(id, lane, label) { const c = this.cur || this.main, i = this.find(id, c); if (i < 0) return; c.legs[i] = resolveLeg(Object.assign({}, c.legs[i], { lane, label })); this.touch(); }
-  replaceMode(id, mode, label) { const c = this.cur || this.main, i = this.find(id, c); if (i < 0) return; c.legs[i] = resolveLeg(Object.assign({}, c.legs[i], { mode, label, lane: null })); this.touch(); }
+  replaceLane(id, lane, label) { const c = this.cur || this.main, i = this.find(id, c); if (i < 0) return; c.legs[i] = resolveLeg(Object.assign({}, c.legs[i], { lane, label }), this); this.touch(); }
+  replaceMode(id, mode, label) { const c = this.cur || this.main, i = this.find(id, c); if (i < 0) return; c.legs[i] = resolveLeg(Object.assign({}, c.legs[i], { mode, label, lane: null }), this); this.touch(); }
+  setDays(id, days) { const c = this.cur || this.main, i = this.find(id, c); if (i < 0) return; c.legs[i] = resolveLeg(Object.assign({}, c.legs[i], { days }), this); this.touch(); }
   removeLeg(id) { const c = this.cur || this.main, i = this.find(id, c); if (i > c.i || (i === c.i && !c.started)) { c.legs.splice(i, 1); this.touch(); } }
-  replaceFrom(id, legs) { const c = this.cur || this.main, i = this.find(id, c); if (i < 0) return; c.legs.splice(i, c.legs.length - i, ...legs.map(resolveLeg)); this.touch(); }
-  insertBefore(id, leg) { const c = this.cur || this.main, i = this.find(id, c); if (i < 0) return; c.legs.splice(i, 0, resolveLeg(leg)); this.touch(); }
+  replaceFrom(id, legs) { const c = this.cur || this.main, i = this.find(id, c); if (i < 0) return; c.legs.splice(i, c.legs.length - i, ...legs.map(l => resolveLeg(l, this))); this.touch(); }
+  insertBefore(id, leg) { const c = this.cur || this.main, i = this.find(id, c); if (i < 0) return; c.legs.splice(i, 0, resolveLeg(leg, this)); this.touch(); }
   insertAfterCurrentDelay(days, why) { const c = this.cur || this.main, l = c.legs[c.i]; l.days += days; this.note(`${why}: +${days} day${days > 1 ? 's' : ''}.`, 'warn'); this.touch(); }
   legNode(id) { const c = this.cur || this.main, i = this.find(id, c); const l = c.legs[i]; return l.kind === 'move' ? l.from : l.node; }
   addCost(perTeu, why) { this.cost += perTeu; this.items.push({ why, v: perTeu }); if (!this.dry) this.note(`${why}: +${fmt$(perTeu)}/TEU`, 'warn'); }
@@ -2206,9 +2616,9 @@ class Mission {
     const c = this.cur || this.main;
     const rest = c.legs.slice(c.i).map(l => Object.assign({}, l));
     const here = c.legs[c.i], node = here.kind === 'dwell' ? here.node : here.from;
-    rest.unshift(resolveLeg(dw('roll', node, label, delay)));
+    rest.unshift(resolveLeg(dw('roll', node, label, delay), this));
     c.share -= share;
-    this.cohorts.push({ name: 'Rolled', share, legs: rest, i: 0, t: 0, started: false, done: false, quality: c.quality, deliveredDay: null });
+    this.cohorts.push(this.cohort('Rolled', share, rest, c.quality, c.termDays));
     this.note(`${Math.round(share * 100)}% of volume rolled to the next sailing (+${delay} days).`, 'warn');
     this.touch();
   }
@@ -2218,21 +2628,32 @@ class Mission {
   // ---- projections ----
   remaining(c) { if (c.done) return 0; let d = c.legs[c.i].days - c.t; for (let i = c.i + 1; i < c.legs.length; i++) d += c.legs[i].days; return d; }
   eta(c) { return c.done ? c.deliveredDay : this.day + this.remaining(c); }
+  // Demurrage: terminal days past the free time, per TEU
+  demFor(before, add) { const F = MODEL.freeDays; return (Math.max(0, before + add - F) - Math.max(0, before - F)) * MODEL.demurragePerDay; }
   projected() {
-    let cost = this.cost, co2 = this.co2, eta = 0, sl = 0;
+    let cost = this.cost, co2 = this.co2, ets = this.ets, carry = this.carry, dem = this.dem, eta = 0, sl = 0, late = 0, conf = 0;
     for (const c of this.cohorts) {
       if (!c.done) {
-        const l = c.legs[c.i], f = 1 - c.t / l.days;
-        cost += l.cost * c.share * f; co2 += l.co2 * c.share * f;
-        for (let i = c.i + 1; i < c.legs.length; i++) { cost += c.legs[i].cost * c.share; co2 += c.legs[i].co2 * c.share; }
+        let term = c.termDays;
+        for (let i = c.i; i < c.legs.length; i++) {
+          const l = c.legs[i], f = i === c.i ? 1 - c.t / l.days : 1;
+          cost += l.cost * c.share * f; co2 += l.co2 * c.share * f; ets += l.ets * c.share * f;
+          if (l.term) { dem += this.demFor(term, l.days * f) * c.share; term += l.days * f; }
+          if (l.mode === 'sea' && !(i === c.i && c.started)) conf += l.days * MODEL.seaDelaySd;
+        }
+        carry += this.carryPerDay * this.remaining(c) * c.share;
       }
       const e = this.eta(c); eta = Math.max(eta, e);
       let q = c.quality;
       if (this.def.reefer && !c.done) { const over = this.ageAtRipen(c) - this.def.reefer.greenLife; if (over > 0) q *= Math.max(0, 1 - 0.04 * over); }
-      sl += c.share * q * (e <= this.deadline + 1e-6 ? 1 : 0);
+      const lateDays = Math.max(0, e - this.deadline);
+      sl += c.share * q * Math.max(0, 1 - lateDays * (this.def.lostPerDay || 0.1));
+      late += (this.def.latePerTeuDay || 0) * lateDays * c.share;
     }
     sl = Math.max(0, sl - this.reeferLoss);
-    return { cost, co2, eta, sl: sl * 100 };
+    const parts = { logistics: cost, fees: dem, duty: this.dutyPerTeu, carry, ets, late };
+    const landed = cost + dem + this.dutyPerTeu + carry + ets + late;
+    return { cost, co2, eta, sl: sl * 100, landed, parts, conf };
   }
   // Projected fruit age when ripening starts; -1e9 once ripening has begun (quality already applied)
   ageAtRipen(c) {
@@ -2255,6 +2676,8 @@ class Mission {
     this.fired.add(ev.id);
     this.cur = c;
     if (ev.auto) { ev.apply(this); this.cur = null; this.decisions.push({ title: ev.title, choice: null }); if (!this.dry) UI.eventInfo(ev, this); return false; }
+    if (ev.prepare) ev.prepare(this);
+    this.cur = null;
     this.blocked = { ev, c };
     if (!this.dry) UI.decide(ev, this);
     return true;
@@ -2271,6 +2694,15 @@ class Mission {
   enter(c, leg) {
     c.started = true;
     if (leg.ediStart) this.milestone(leg.ediStart, leg);
+    // schedule reliability: real voyages rarely match the plan
+    if (leg.mode === 'sea' && !this.dry && !leg.varied) {
+      leg.varied = true;
+      const g = (this.rand() + this.rand() + this.rand() - 1.5) * 2;
+      const factor = clamp(1 + MODEL.seaDelayMean + g * MODEL.seaDelaySd, 0.95, 1.25);
+      const delta = leg.days * (factor - 1);
+      leg.days *= factor;
+      if (Math.abs(delta) >= 0.4 && c === this.main) this.note(`Schedule reliability: vessel running ${Math.abs(delta).toFixed(1)} days ${delta > 0 ? 'late' : 'early'} against plan.`, delta > 0 ? 'warn' : '');
+    }
     if (this.def.reefer && leg.ripen) {
       const over = this.day - this.def.reefer.greenLife;
       if (over > 0) { c.quality *= Math.max(0, 1 - 0.04 * over); this.note(`Fruit reached ripening ${over.toFixed(1)} days past green life. Quality ${Math.round(c.quality * 100)}%.`, 'bad'); }
@@ -2281,6 +2713,7 @@ class Mission {
     if (leg.ms) leg.ms.forEach(t => this.milestone(null, leg, t));
     if (leg.ediEnd) this.milestone(leg.ediEnd, leg);
     if (leg.final) this.milestone(null, leg, 'Delivered, proof of delivery captured');
+    if (leg.onExit) leg.onExit(this, c);
   }
   milestone(code, leg, text) {
     const names = { I: 'Gate in at terminal', AE: 'Loaded on vessel', VD: 'Vessel departed', VA: 'Vessel arrived', UV: 'Unloaded from vessel', OA: 'Gate out from terminal' };
@@ -2292,6 +2725,13 @@ class Mission {
     const f = d / leg.days;
     this.cost += leg.cost * c.share * f;
     this.co2 += leg.co2 * c.share * f;
+    this.ets += leg.ets * c.share * f;
+    this.carry += this.carryPerDay * d * c.share;
+    if (leg.term) {
+      const fee = this.demFor(c.termDays, d);
+      if (fee > 0 && c.termDays <= MODEL.freeDays && c === this.main) this.note(`Free time used up at ${NODES[leg.node].short}. Demurrage now ${fmt$(MODEL.demurragePerDay)}/TEU per day.`, 'warn');
+      this.dem += fee * c.share; c.termDays += d;
+    }
   }
   step(dt) {
     if (this.done || this.blocked || dt <= 0) return;
@@ -2339,7 +2779,7 @@ class Mission {
   finish() {
     this.done = true;
     const p = this.projected();
-    this.result = { lead: Math.max(...this.cohorts.map(c => c.deliveredDay)), cost: p.cost, co2: p.co2, sl: p.sl };
+    this.result = { lead: Math.max(...this.cohorts.map(c => c.deliveredDay)), landed: p.landed, parts: p.parts, co2: p.co2, sl: p.sl };
     this.result.score = scoreOf(this.result, this.def.targets);
     this.touch();
     if (!this.dry) UI.debrief(this);
@@ -2347,25 +2787,34 @@ class Mission {
   static preview(def, plan) {
     const m = new Mission(def, plan, 1, true);
     const p = m.projected();
-    return { days: p.eta, cost: p.cost, co2: p.co2 };
+    return { days: p.eta, landed: p.landed, co2: p.co2, parts: p.parts };
   }
 }
 
 function scoreOf(r, t) {
   const parts = {
     lead: r.lead <= t.lead ? 25 : 25 * Math.max(0, 1 - (r.lead / t.lead - 1) * 2.5),
-    cost: r.cost <= t.cost ? 25 : 25 * Math.max(0, 1 - (r.cost / t.cost - 1) * 2),
+    cost: r.landed <= t.landed ? 25 : 25 * Math.max(0, 1 - (r.landed / t.landed - 1) * 2),
     co2: r.co2 <= t.co2 ? 25 : 25 * Math.max(0, 1 - (r.co2 / t.co2 - 1) * 1.2),
     sl: r.sl >= t.sl ? 25 : 25 * Math.max(0, 1 - ((t.sl - r.sl) / t.sl) * 3),
   };
   const total = Math.round(parts.lead + parts.cost + parts.co2 + parts.sl);
   return { parts, total, grade: total >= 90 ? 'A' : total >= 75 ? 'B' : total >= 60 ? 'C' : 'D' };
 }
+
+const COST_PARTS = [
+  ['logistics', 'Freight, handling, fees', '#3f8fd8'],
+  ['fees', 'Demurrage', '#e0a020'],
+  ['duty', 'Import duty', '#9a6bff'],
+  ['carry', 'Inventory carrying', '#22a88a'],
+  ['ets', 'Carbon (EU ETS)', '#7d8a96'],
+  ['late', 'Late penalties', '#d8324a'],
+];
 /* ================= UI ================= */
 NODES.open_sea = { name: 'Open ocean', short: 'At sea', kind: 'choke', dio: 'strait', info: 'ship', hidden: 1 };
 
 const App = { view: 'globe', stage: null, nodeId: null, mission: null, speed: 1, paused: false, dis: new Set(), seenTips: new Set(), lastVer: -1 };
-const left = $('#left'), right = $('#right'), card = $('#card'), toast = $('#toast'), modal = $('#modal'), mbox = $('#mbox');
+const left = $('#left'), right = $('#right'), leftB = $('#leftBody'), rightB = $('#rightBody'), card = $('#card'), toast = $('#toast'), modal = $('#modal'), mbox = $('#mbox');
 
 const UI = {
   /* ---------- info card ---------- */
@@ -2396,7 +2845,8 @@ const UI = {
   /* ---------- views ---------- */
   ctxFor(id) {
     const m = App.mission;
-    return { closed: Globe.isClosed(id) || (id === 'savannah' && App.dis.has('strike')), storm: App.dis.has('storm') || !!(m && m.flags.storm), reefer: !!(m && m.def.reefer), mission: !!m };
+    const gateDown = (id === 'rotterdam' && App.dis.has('cyber')) || ((id === 'yantian' || id === 'shanghai') && Globe.isClosed('yantian'));
+    return { gateDown, closed: !gateDown && (Globe.isClosed(id) || (id === 'savannah' && App.dis.has('strike'))), storm: App.dis.has('storm') || !!(m && m.flags.storm), reefer: !!(m && m.def.reefer), mission: !!m };
   },
   openNode(id, opts = {}) {
     const n = NODES[id];
@@ -2405,6 +2855,7 @@ const UI = {
       Labels.clearScope('dio');
       const st = Dio.get(id, UI.ctxFor(id));
       App.stage = st; App.nodeId = id; App.view = 'diorama';
+      camera.near = 0.5; camera.far = 20000; camera.updateProjectionMatrix();
       document.body.dataset.view = 'diorama';
       st.hots.forEach(h => Labels.add('dio', h.obj, esc(h.label), { off: h.off, onClick: () => UI.info(h.key), maxDist: 900 }));
       const here = UI.missionHere(id, opts.sea);
@@ -2428,6 +2879,7 @@ const UI = {
     UI.fade(() => {
       Labels.clearScope('dio');
       App.view = 'globe'; App.stage = null;
+      camera.near = 0.05; camera.far = 4000; camera.updateProjectionMatrix();
       document.body.dataset.view = 'globe';
       UI.globeControls();
       UI.layoutCam();
@@ -2471,14 +2923,14 @@ const UI = {
     if (!m) {
       const groups = {};
       Object.entries(NODES).forEach(([id, n]) => { if (!n.hidden) (groups[n.kind] = groups[n.kind] || []).push(id); });
-      left.innerHTML = `<div class="grp"><h2 class="sec">Disruptions</h2>${DISRUPTIONS.map(d => `<div class="dis"><span>${esc(d.l)}<small>${esc(d.d)}</small></span><label class="toggle"><input type="checkbox" data-d="${d.id}" ${App.dis.has(d.id) ? 'checked' : ''} aria-label="${esc(d.l)}"><span class="sw"></span></label></div>`).join('')}</div>
+      leftB.innerHTML = `<div class="grp"><h2 class="sec">Disruptions</h2>${DISRUPTIONS.map(d => `<div class="dis"><span>${esc(d.l)}<small>${esc(d.d)}</small></span><label class="toggle"><input type="checkbox" data-d="${d.id}" ${App.dis.has(d.id) ? 'checked' : ''} aria-label="${esc(d.l)}"><span class="sw"></span></label></div>`).join('')}</div>
         ${Object.keys(KIND).filter(k => groups[k]).map(k => `<div class="grp"><h2 class="sec">${esc(KIND[k].label)}s</h2>${groups[k].map(id => `<button class="node-row" data-n="${id}"><i style="background:${KIND[k].color}"></i><span>${esc(NODES[id].short)}<br><small>${esc(NODES[id].name)}</small></span></button>`).join('')}</div>`).join('')}`;
-      left.querySelectorAll('[data-d]').forEach(i => i.onchange = () => UI.toggleDis(i.dataset.d, i.checked));
-      left.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { UI.openNode(b.dataset.n); UI.closeTabs(); });
-      $('#mtabLeft').textContent = 'Network';
+      leftB.querySelectorAll('[data-d]').forEach(i => i.onchange = () => UI.toggleDis(i.dataset.d, i.checked));
+      leftB.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { UI.openNode(b.dataset.n); UI.closeTabs(); });
+      $('#mtabLeft').textContent = 'Network'; $('#leftTabLabel').textContent = 'Network';
       return;
     }
-    $('#mtabLeft').textContent = 'Plan';
+    $('#mtabLeft').textContent = 'Plan'; $('#leftTabLabel').textContent = 'Plan';
     const d = m.def, inco = d.incoterm || m.plan.inco;
     const legsHtml = c => c.legs.map((l, i) => {
       const cls = c.done || i < c.i ? 'done' : i === c.i ? 'now' : '';
@@ -2486,15 +2938,15 @@ const UI = {
       const view = l.kind === 'dwell' ? `<button class="lbtn" data-node="${l.node}">Enter</button>` : l.mode === 'sea' ? `<button class="lbtn" data-sea="1">Ride along</button>` : '';
       return `<li class="${cls}"><b>${esc(legTitle(l))}</b><small>${meta}</small> ${view}</li>`;
     }).join('');
-    left.innerHTML = `<div class="grp"><h2 class="sec">Mission ${d.n}</h2><b style="font-size:15px">${esc(d.title)}</b><div style="color:var(--muted);font-size:12px">${esc(d.sub)}</div>
+    leftB.innerHTML = `<div class="grp"><h2 class="sec">Mission ${d.n}</h2><b style="font-size:15px">${esc(d.title)}</b><div style="color:var(--muted);font-size:12px">${esc(d.sub)}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><span class="chip">${d.teu} TEU</span><span class="chip">${esc(d.cargo)}</span>${m.plan.hs || d.hs ? `<span class="chip mono">HS ${esc(m.plan.hs || d.hs)}</span>` : ''}</div></div>
       ${inco ? `<div class="grp"><h2 class="sec">Incoterm: ${inco} ${esc(d.incoPlace || '')} · you are the ${/seller/.test(d.you) ? 'seller' : 'buyer'}</h2>${UI.incoBar(inco)}</div>` : ''}
       ${m.cohorts.map(c => `<div class="grp"><h2 class="sec">${m.cohorts.length > 1 ? esc(c.name) + ' · ' + Math.round(c.share * 100) + '% of volume' : 'Route'}</h2><ol class="legs">${legsHtml(c)}</ol></div>`).join('')}
       <button class="btn ghost" id="abort" style="width:100%">Abandon mission</button>`;
-    left.querySelectorAll('[data-node]').forEach(b => b.onclick = () => UI.openNode(b.dataset.node));
-    left.querySelectorAll('[data-sea]').forEach(b => b.onclick = () => UI.openNode('open_sea', { sea: 1 }));
+    leftB.querySelectorAll('[data-node]').forEach(b => b.onclick = () => UI.openNode(b.dataset.node));
+    leftB.querySelectorAll('[data-sea]').forEach(b => b.onclick = () => UI.openNode('open_sea', { sea: 1 }));
     $('#abort').onclick = () => UI.endMission();
-    const now = left.querySelector('.legs li.now'); if (now && document.body.dataset.tab !== 'left') now.scrollIntoView({ block: 'nearest' });
+    const now = leftB.querySelector('.legs li.now'); if (now && document.body.dataset.tab !== 'left') now.scrollIntoView({ block: 'nearest' });
   },
   incoBar(code) {
     const t = INCOTERMS[code];
@@ -2510,7 +2962,7 @@ const UI = {
       const [suez, capeR] = cmp(['shanghai_lk', 'lk_rotterdam_suez'], ['shanghai_lk', 'lk_rotterdam_cape']);
       const [west, east] = cmp(['yantian_lalb'], ['yantian_panama', 'panama_savannah']);
       const row = (l, km) => `<div class="rt"><span>${l}</span><span>${Math.round(km).toLocaleString()} km</span><span>${(km / MODEL.speedKmDay.sea).toFixed(1)} d</span><span>${(km * 10 * 12 / 1e6).toFixed(2)} t</span></div>`;
-      right.innerHTML = `<h2 class="sec">How to play</h2><p style="margin:0 0 8px">Drag to spin the globe, scroll to zoom. Click a marker to drop into that node. Click a ship to ride along. Toggle disruptions on the left and watch traffic react.</p>
+      rightB.innerHTML = `<h2 class="sec">How to play</h2><p style="margin:0 0 8px">Drag to spin the globe, scroll to zoom. Click a marker to drop into that node. Click a ship to ride along. Toggle disruptions on the left and watch traffic react.</p>
         <button class="btn primary" style="width:100%" onclick="UI.missions()">Start a mission</button>
         <div class="block"><h2 class="sec">Route lengths in this model</h2><div class="track">
         <div style="font-weight:650;margin-bottom:4px">Shanghai to Rotterdam</div>${row('via Suez', suez)}${row('via Cape', capeR)}
@@ -2523,14 +2975,15 @@ const UI = {
     const p = m.projected(), t = m.def.targets;
     const kpi = (v, l, tg, bad, key) => `<div class="kpi ${bad ? 'bad' : 'good'}" role="button" tabindex="0" data-k="${key}" style="cursor:pointer"><div class="v">${v}</div><div class="l">${l}</div><div class="t">target ${tg}</div></div>`;
     const cur = m.main.legs[m.main.i];
-    const dutyLine = m.dutyPerTeu ? `<div class="row"><span>Import duty</span><span>${fmt$(m.dutyPerTeu)}/TEU · ${m.plan.inco === 'DDP' ? 'seller pays' : 'you pay'}</span></div>` : '';
-    right.innerHTML = `<h2 class="sec">KPIs <span style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--faint)">· projected at delivery</span></h2>
+    const dutyLine = `<div class="row"><span>Import duty</span><span>${m.dutyPerTeu ? fmt$(m.dutyPerTeu) + '/TEU' + (m.plan.inco === 'DDP' ? ' · seller pays' : '') : m.def.dutyRate === 0 ? '$0' : 'not modelled'}</span></div>${m.def.dutyNote ? `<div style="font-size:11px;color:var(--faint);margin-bottom:4px">${esc(m.def.dutyNote)}</div>` : ''}`;
+    rightB.innerHTML = `<h2 class="sec">KPIs <span style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--faint)">· projected at delivery</span></h2>
       <div class="kpis">
-        ${kpi(`${p.eta.toFixed(1)}<small style="font-size:11px"> d</small>`, 'Lead time (ETA)', `≤ ${t.lead} d`, p.eta > t.lead, 'leadtime')}
-        ${kpi(fmt$(p.cost), 'Cost per TEU', `≤ ${fmt$(t.cost)}`, p.cost > t.cost, 'costteu')}
+        ${kpi(`${p.eta.toFixed(1)}<small style="font-size:11px"> d${p.conf > 0.2 ? ' ±' + p.conf.toFixed(1) : ''}</small>`, 'Lead time (ETA)', `≤ ${t.lead} d`, p.eta > t.lead, 'reliability')}
+        ${kpi(fmt$(p.landed), 'Landed cost per TEU', `≤ ${fmt$(t.landed)}`, p.landed > t.landed, 'landed')}
         ${kpi(`${p.co2.toFixed(2)}<small style="font-size:11px"> t</small>`, 'CO2e per TEU', `≤ ${t.co2} t`, p.co2 > t.co2, 'co2')}
         ${kpi(`${p.sl.toFixed(0)}%`, 'Service level', `≥ ${t.sl}%`, p.sl < t.sl, 'servicelevel')}
       </div>
+      <div class="block"><h2 class="sec">Landed cost per TEU</h2>${UI.costBar(p.parts, p.landed)}</div>
       <div class="block"><h2 class="sec">Container tracker</h2><div class="track">
         <div class="row"><span>Container</span><span>${esc(m.boxId)}</span></div>
         <div class="row"><span>Bill of lading</span><span>${esc(m.bol)}</span></div>
@@ -2542,8 +2995,13 @@ const UI = {
       </div></div>
       ${m.def.reefer ? `<div class="block"><h2 class="sec">Cold chain · set point ${m.def.reefer.set} °C</h2><canvas id="coldChart" aria-label="Reefer temperature trace"></canvas><div style="font-size:11px;color:var(--faint)">Green life budget: ${m.def.reefer.greenLife} days to ripening rooms</div></div>` : ''}
       <div class="block"><h2 class="sec">Event log</h2><ul id="log">${m.log.slice(0, 30).map(e => `<li class="${e.cls || ''}"><span class="mono">D${e.day.toFixed(1)}</span><span>${esc(e.text)}</span></li>`).join('')}</ul></div>`;
-    right.querySelectorAll('.kpi').forEach(k => { k.onclick = () => UI.info(k.dataset.k); k.onkeydown = e => { if (e.key === 'Enter') UI.info(k.dataset.k); }; });
-    UI.drawCold();
+    rightB.querySelectorAll('.kpi').forEach(k => { k.onclick = () => UI.info(k.dataset.k); k.onkeydown = e => { if (e.key === 'Enter') UI.info(k.dataset.k); }; });
+    UI.drawCold(); UI.strip();
+  },
+  costBar(parts, total) {
+    const segs = COST_PARTS.filter(([k]) => parts[k] > 0.5);
+    return `<div class="cbar" role="img" aria-label="Landed cost breakdown">${segs.map(([k, l, c]) => `<i style="flex:${parts[k]};background:${c}" title="${l}: ${fmt$(parts[k])}"></i>`).join('')}</div>
+      <div class="cleg">${segs.map(([k, l, c]) => `<span><i style="background:${c}"></i>${l}<b>${fmt$(parts[k])}</b></span>`).join('')}<span class="tot">Total<b>${fmt$(total)}</b></span></div>`;
   },
   drawCold() {
     const c = $('#coldChart'), m = App.mission; if (!c || !m) return;
@@ -2567,7 +3025,7 @@ const UI = {
     Globe.setDisruption(id, on);
     const d = DISRUPTIONS.find(x => x.id === id);
     App.netLog = App.netLog || [];
-    const effect = { suez: 'Asia to Europe traffic now sails around the Cape.', panama: 'Ships queue at both canal entrances.', lalb: 'Arrivals wait at anchor off San Pedro Bay.', strike: 'Savannah stops working ships; boxes pile up offshore.', storm: 'Transpacific ships slow down in the North Pacific.' }[id];
+    const effect = { suez: 'Asia to Europe traffic now sails around the Cape.', panama: 'Ships queue at both canal entrances.', lalb: 'Arrivals wait at anchor off San Pedro Bay.', strike: 'Savannah stops working ships; boxes pile up offshore.', storm: 'Transpacific ships slow down in the North Pacific.', cyber: 'Rotterdam terminal systems are down: gates closed, trucks queue, cranes idle.', empties: 'Exporters in South China cannot get empty boxes; bookings roll.' }[id];
     App.netLog.unshift({ t: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), text: `${d.l} ${on ? 'ON' : 'off'}. ${on ? effect : 'Traffic returns to normal.'}`, cls: on ? 'warn' : '' });
     UI.renderRight();
     if (on && d.node) UI.toast(d.l, `${esc(effect)}`, [{ l: 'See it up close', f: () => UI.openNode(d.node) }, { l: 'Fly there', f: () => UI.flyTo(d.node) }]);
@@ -2598,9 +3056,9 @@ const UI = {
       const t = def.targets;
       UI.modal(`<span class="chip">Mission ${def.n} · ${esc(def.tags.join(' · '))}</span><h2 id="mTitle">${esc(def.title)}</h2><p>${esc(def.brief)}</p>
         <div class="facts"><div class="fact"><b>${def.teu} TEU</b><small>${esc(def.cargo)}</small></div><div class="fact"><b>${def.hs ? 'HS ' + def.hs : 'You classify'}</b><small>Commodity code</small></div><div class="fact"><b>${def.incoterm ? def.incoterm + ' ' + esc(def.incoPlace) : 'You choose'}</b><small>Incoterm</small></div><div class="fact"><b style="font-size:13px">${esc(def.you)}</b><small>Your role</small></div></div>
-        <h4 style="margin:12px 0 4px">Targets</h4><div class="facts"><div class="fact"><b>≤ ${t.lead} d</b><small>Lead time</small></div><div class="fact"><b>≤ ${fmt$(t.cost)}</b><small>Cost per TEU</small></div><div class="fact"><b>≤ ${t.co2} t</b><small>CO2e per TEU</small></div><div class="fact"><b>≥ ${t.sl}%</b><small>Service level</small></div></div>
+        <h4 style="margin:12px 0 4px">Targets</h4><div class="facts"><div class="fact"><b>≤ ${t.lead} d</b><small>Lead time</small></div><div class="fact"><b>≤ ${fmt$(t.landed)}</b><small>Landed cost per TEU</small></div><div class="fact"><b>≤ ${t.co2} t</b><small>CO2e per TEU</small></div><div class="fact"><b>≥ ${t.sl}%</b><small>Service level</small></div></div>
         <div class="plan">${def.plan.map(q => `<h4>${esc(q.q)}${q.quiz ? ' <span class="chip">quiz</span>' : ''}</h4><div class="opts" role="group" aria-label="${esc(q.q)}">${q.opts.map(o => `<button class="opt" data-k="${q.k}" data-v="${o.v}" aria-pressed="${plan[q.k] === o.v}"><b>${esc(o.l)}</b><small>${esc(o.d)}</small></button>`).join('')}</div>`).join('')}</div>
-        ${pv ? `<h4 style="margin:12px 0 4px">Plan preview <span style="font-weight:400;color:var(--muted)">(before any disruption)</span></h4><div class="facts"><div class="fact"><b>${pv.days.toFixed(1)} d</b><small>Lead time</small></div><div class="fact"><b>${fmt$(pv.cost)}</b><small>Cost per TEU</small></div><div class="fact"><b>${pv.co2.toFixed(2)} t</b><small>CO2e per TEU</small></div></div>` : ''}
+        ${pv ? `<h4 style="margin:12px 0 4px">Plan preview <span style="font-weight:400;color:var(--muted)">(before any disruption)</span></h4><div class="facts"><div class="fact"><b>${pv.days.toFixed(1)} d</b><small>Lead time</small></div><div class="fact"><b>${fmt$(pv.landed)}</b><small>Landed cost per TEU</small></div><div class="fact"><b>${pv.co2.toFixed(2)} t</b><small>CO2e per TEU</small></div></div>${UI.costBar(pv.parts, pv.landed)}` : ''}
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" id="mBack">All missions</button><button class="btn primary" id="mGo" ${ready ? '' : 'disabled'}>${ready ? 'Launch mission' : 'Answer every question to launch'}</button></div>`);
       mbox.querySelectorAll('.opt').forEach(b => b.onclick = () => { const q = def.plan.find(x => x.k === b.dataset.k); const o = q.opts.find(x => String(x.v) === b.dataset.v); plan[q.k] = o.v; const y = mbox.scrollTop; render(); mbox.scrollTop = y; });
       $('#mBack').onclick = () => UI.missions();
@@ -2638,7 +3096,7 @@ const UI = {
     if (ev.closes) Globe.setDisruption(ev.closes, true);
     if (App.view === 'globe') { Globe.updateMovers(m); const p = Globe.moverPos(m.cohorts.indexOf(m.blocked.c)); if (p && p.lengthSq() > 1) CamTween.toGlobe(p, 22, 1.2); }
     const it = INFO[ev.info];
-    UI.modal(`<span class="chip" style="background:var(--fault);color:#fff">Day ${m.day.toFixed(1)} · decision needed</span><h2 id="mTitle">${esc(ev.title)}</h2><p>${esc(ev.body)}</p>
+    UI.modal(`<span class="chip" style="background:var(--fault);color:#fff">Day ${m.day.toFixed(1)} · decision needed</span><h2 id="mTitle">${esc(ev.title)}</h2><p>${esc(ev.bodyFn ? ev.bodyFn(m) : ev.body)}</p>
       <div class="opts">${ev.choices.map((c, i) => `<button class="opt" data-i="${i}"><b>${esc(c.l)}</b><div class="fx">${esc(c.fx)}</div></button>`).join('')}</div>
       ${it ? `<details class="bg"><summary>Background: ${esc(it.t)}</summary><p>${esc(it.b)}</p></details>` : ''}`);
     mbox.querySelector('.x').style.display = 'none';
@@ -2672,8 +3130,9 @@ const UI = {
     if (!best[m.def.id] || best[m.def.id].total < s.total) { best[m.def.id] = { total: s.total, grade: s.grade }; store.set('best', best); }
     const f = (ok, v, l, tg) => `<div class="fact ${ok ? 'pass' : 'fail'}"><b>${v}</b><small>${l} · target ${tg}</small></div>`;
     UI.modal(`<span class="chip">Mission ${m.def.n} complete</span><div style="display:flex;align-items:center;gap:18px;margin:6px 0"><div class="grade">${s.grade}</div><div><h2 id="mTitle" style="margin:0">${esc(m.def.title)}</h2><div style="color:var(--muted)">${s.total} / 100 points</div></div></div>
-      <div class="score">${f(r.lead <= t.lead, r.lead.toFixed(1) + ' d', 'Lead time', '≤ ' + t.lead + ' d')}${f(r.cost <= t.cost, fmt$(r.cost), 'Cost per TEU', '≤ ' + fmt$(t.cost))}${f(r.co2 <= t.co2, r.co2.toFixed(2) + ' t', 'CO2e per TEU', '≤ ' + t.co2 + ' t')}${f(r.sl >= t.sl, r.sl.toFixed(0) + '%', 'Service level', '≥ ' + t.sl + '%')}</div>
+      <div class="score">${f(r.lead <= t.lead, r.lead.toFixed(1) + ' d', 'Lead time', '≤ ' + t.lead + ' d')}${f(r.landed <= t.landed, fmt$(r.landed), 'Landed cost per TEU', '≤ ' + fmt$(t.landed))}${f(r.co2 <= t.co2, r.co2.toFixed(2) + ' t', 'CO2e per TEU', '≤ ' + t.co2 + ' t')}${f(r.sl >= t.sl, r.sl.toFixed(0) + '%', 'Service level', '≥ ' + t.sl + '%')}</div>
       ${m.decisions.length ? `<h4 style="margin:10px 0 4px">What happened</h4><ul style="margin:0 0 8px;padding-left:18px">${m.decisions.map(d => `<li>${esc(d.title)}${d.choice ? `: <b>${esc(d.choice)}</b>` : ''}</li>`).join('')}</ul>` : ''}
+      ${UI.costBar(r.parts, r.landed)}
       ${m.items.length ? `<h4 style="margin:10px 0 4px">Extra costs</h4><ul style="margin:0 0 8px;padding-left:18px">${m.items.map(i => `<li>${esc(i.why)}: ${fmt$(i.v)}/TEU</li>`).join('')}</ul>` : ''}
       <h4 style="margin:10px 0 4px">Lessons</h4><ul style="margin:0 0 8px;padding-left:18px">${m.def.lessons.map(l => `<li>${esc(l)}</li>`).join('')}</ul>
       <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:12px"><button class="btn" id="dExplore">Explore freely</button><button class="btn" id="dAll">All missions</button><button class="btn primary" id="dAgain">Replay with other choices</button></div>`);
@@ -2701,7 +3160,7 @@ const UI = {
         const sp = MODEL.speedKmDay, c = MODEL.costPerTeuKm, e = MODEL.co2gPerTkm;
         body = `<p>Numbers in ChainVerse are illustrative model outputs for teaching, not market quotes. Real rates move week to week.</p>
           <div class="incosteps">${['sea', 'rail', 'truck', 'air'].map(k => `<div style="grid-template-columns:90px 1fr"><b style="background:var(--accent);color:var(--accent-ink)">${modeName(k)}</b><span>${sp[k].toLocaleString()} km/day · $${c[k]}/TEU-km · ${e[k]} g CO2e per tonne-km</span></div>`).join('')}</div>
-          <ul style="padding-left:18px"><li>Sea speed is 16 knots (slow steaming). Distances come from the lane waypoints on the globe.</li><li>Each TEU is modelled at 10 tonnes of cargo.</li><li>Last mile: van ${fmt$(MODEL.lastMile.van.cost)}/TEU and ${MODEL.lastMile.van.co2} t; drone ${fmt$(MODEL.lastMile.drone.cost)}/TEU and ${MODEL.lastMile.drone.co2} t.</li><li>Dwell nodes add terminal handling, customs and warehouse costs per TEU.</li><li>Service level counts volume delivered by the deadline in sellable condition.</li><li>Emission factors sit in the range of published defaults; real reporting follows the GLEC Framework and ISO 14083.</li></ul>`;
+          <ul style="padding-left:18px"><li>Sea speed is 16 knots unless you pick Eco (14) or Express (20). Fuel and CO2 per km scale with speed squared. Voyages vary around plan (mean +3%, spread 6%) to mimic schedule reliability.</li><li>Landed cost per TEU = freight and handling + demurrage + import duty + inventory carrying cost (${MODEL.carryRatePerYear * 100}% of cargo value a year) + EU ETS carbon cost ($${MODEL.etsUsdPerT}/t on half of voyage emissions into the EU) + late penalties.</li><li>Terminals give ${MODEL.freeDays} free days; demurrage is ${fmt$(MODEL.demurragePerDay)}/TEU per day after that.</li><li>Distances come from the lane waypoints on the globe.</li><li>Each TEU is modelled at 10 tonnes of cargo.</li><li>Last mile: van ${fmt$(MODEL.lastMile.van.cost)}/TEU and ${MODEL.lastMile.van.co2} t; drone ${fmt$(MODEL.lastMile.drone.cost)}/TEU and ${MODEL.lastMile.drone.co2} t.</li><li>Dwell nodes add terminal handling, customs and warehouse costs per TEU.</li><li>Service level: each day late loses 5 to 15% of that volume's sales, depending on the mission; spoiled fruit counts as lost.</li><li>Emission factors sit in the range of published defaults; real reporting follows the GLEC Framework and ISO 14083.</li></ul>`;
       }
       UI.modal(`<span class="chip">Learn</span><h2 id="mTitle">Global trade, explained</h2><div class="tabs" role="tablist">${[['gloss', 'Glossary'], ['inco', 'Incoterms explorer'], ['model', 'How the model works']].map(([k, l]) => `<button class="btn ${k === tb ? 'primary' : ''}" data-tab="${k}" role="tab" aria-selected="${k === tb}">${l}</button>`).join('')}</div>${body}`);
       mbox.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => draw(b.dataset.tab));
@@ -2726,6 +3185,26 @@ const UI = {
     $('#playLabel').textContent = App.paused ? 'Play' : 'Pause';
     $('#playIcon').innerHTML = App.paused ? '<path d="M4 2.5v11l9-5.5z"/>' : '<path d="M4 2.5h3v11H4zM9 2.5h3v11H9z"/>';
   },
+  setCollapsed(side, on) {
+    if (innerWidth <= 820) { UI.closeTabs(); return; }
+    document.body.classList.toggle(side === 'left' ? 'lc' : 'rc', on);
+    store.set('ui', { lc: document.body.classList.contains('lc'), rc: document.body.classList.contains('rc') });
+    UI.layoutCam();
+  },
+  focus(on = !document.body.classList.contains('focus')) {
+    document.body.classList.toggle('focus', on);
+    $('#focusBtn').setAttribute('aria-pressed', String(on));
+    $('#focusLabel').textContent = on ? 'Panels' : 'Focus';
+    if (on) toast.classList.remove('on');
+    UI.layoutCam(); UI.strip();
+  },
+  strip() {
+    const m = App.mission, el = $('#kpiStrip');
+    if (!m || !document.body.classList.contains('focus')) return;
+    const p = m.projected(), t = m.def.targets;
+    const cell = (l, v, bad) => `<span><small>${l}</small><b class="${bad ? 'bad' : 'good'}">${v}</b></span>`;
+    el.innerHTML = cell('ETA', p.eta.toFixed(1) + ' d', p.eta > t.lead) + cell('Landed', fmt$(p.landed), p.landed > t.landed) + cell('CO2e', p.co2.toFixed(2) + ' t', p.co2 > t.co2) + cell('Service', p.sl.toFixed(0) + '%', p.sl < t.sl);
+  },
   closeTabs() { if (innerWidth <= 820) { document.body.dataset.tab = 'none'; document.querySelectorAll('.mtabs button').forEach(b => b.setAttribute('aria-pressed', 'false')); } },
 };
 /* ================= BOOT: input, loop ================= */
@@ -2737,6 +3216,10 @@ UI.renderLeft(); UI.renderRight();
 UI.layoutCam();
 
 $('#backBtn').onclick = () => UI.back();
+$('#focusBtn').onclick = () => UI.focus();
+document.querySelectorAll('.pmin').forEach(b => b.onclick = () => UI.setCollapsed(b.dataset.side, true));
+document.querySelectorAll('.edgetab').forEach(b => b.onclick = () => UI.setCollapsed(b.dataset.side, false));
+{ const u = store.get('ui', {}); if (innerWidth > 820) { document.body.classList.toggle('lc', !!u.lc); document.body.classList.toggle('rc', !!u.rc); } UI.layoutCam(); }
 $('#btnMissions').onclick = () => UI.missions();
 $('#btnLearn').onclick = () => UI.learn();
 $('#playBtn').onclick = () => { App.paused = !App.paused; UI.syncPlay(); };
@@ -2751,9 +3234,11 @@ document.querySelectorAll('.mtabs button').forEach(b => b.onclick = () => {
 });
 modal.addEventListener('click', e => { if (e.target === modal && !(App.mission && App.mission.blocked)) UI.closeModal(); });
 addEventListener('keydown', e => {
+  if ((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey && !e.altKey && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) && !modal.classList.contains('on')) { UI.focus(); return; }
   if (e.key !== 'Escape') return;
   if (modal.classList.contains('on')) { if (!(App.mission && App.mission.blocked)) UI.closeModal(); }
   else if (card.classList.contains('on')) card.classList.remove('on');
+  else if (document.body.classList.contains('focus')) UI.focus(false);
   else UI.back();
 });
 
@@ -2812,11 +3297,13 @@ function frame() {
   CamTween.step(dt);
   controls.update();
   if (App.view === 'globe') {
+    renderer.toneMappingExposure = 1;
     Globe.update(dt, t, simDays || (App.paused ? 0 : dt * DAYS_PER_SEC * App.speed * 0.4));
     if (m) Globe.updateMovers(m);
     Labels.update('globe');
     renderer.render(Globe.scene, camera);
   } else {
+    renderer.toneMappingExposure = App.stage.exposure;
     App.stage.update(dt * (App.paused ? 0 : Math.min(2, App.speed)), t);
     Labels.update('dio');
     renderer.render(App.stage.scene, camera);
