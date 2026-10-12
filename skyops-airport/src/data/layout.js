@@ -84,6 +84,20 @@ SK.L = (function () {
   L.remote = { x: -160, z: -78 };
   L.tower = { x: 150, z: -70, h: 62 };
 
+  // Arrivals (pass 2): sterile corridor at mezzanine height, east-pier building, pickup curb
+  L.arr = {
+    x0: 190, x1: 290, z0: -10, z1: 50, h: 10,
+    corridorZ: -41.4, corridorY: 5.2, corridorX: 172, bridgeZ: 20,
+    escTop: { x: 192, z: 20 }, escBottom: { x: 205, z: 20 },
+    imm: { x: 232, manual: { z0: 14, z1: 48, n: 10, queue: { x0: 210, x1: 228, z0: 14.5, z1: 48 } }, egate: { z0: -8, z1: 12, n: 8, queue: { x0: 210, x1: 228, z0: -8, z1: 11.5 } } },
+    claim: { x: 250, carousels: [2, 22, 42], rx: 6, rz: 2.4 },
+    services: { x: 243, z: -6.5 },
+    customs: { wallX: 265, green: { z0: 8, z1: 16 }, red: { z0: 25, z1: 33, desk: { x: 268, z: 29 } }, bench: { x: 269, z: 4 } },
+    hall: { x0: 272, x1: 290, barrierX: 276 },
+    doors: [4, 20, 36],
+    curbX: 294, roadX: 302, roadZ0: -40, roadZ1: 90,
+  };
+
   // Gate geometry derived from the gate list
   L.gateDoor = (g) => ({ x: g.x + 9, z: L.term.z0 });
   L.podium = (g) => ({ x: g.x + 9, z: -36.6 });
@@ -149,6 +163,19 @@ SK.L = (function () {
   spine.sort((a, b) => N[a].x - N[b].x);
   for (let i = 0; i < spine.length - 1; i++) edge(spine[i], spine[i + 1]);
 
+  // arrivals ground-floor graph (separate from departures: arriving passengers never mix with departing ones)
+  const AR = L.arr;
+  node('aEsc', AR.escBottom.x + 1, AR.escBottom.z);
+  node('aImmM', 209, 31); node('aImmE', 209, 2); edge('aEsc', 'aImmM'); edge('aEsc', 'aImmE');
+  node('aClaim', 240, 20); node('aClaimN', 240, -2); node('aClaimS', 240, 44);
+  edge('aClaim', 'aClaimN'); edge('aClaim', 'aClaimS');
+  AR.claim.carousels.forEach((z, i) => { node('aCar' + i, 240.5, z); edge('aCar' + i, 'aClaim'); edge('aCar' + i, i === 0 ? 'aClaimN' : i === 2 ? 'aClaimS' : 'aClaim'); });
+  node('aServ', AR.services.x, AR.services.z + 2.2); edge('aServ', 'aClaimN');
+  node('aCustIn', 261, 20); edge('aCustIn', 'aClaim'); edge('aCustIn', 'aCar1');
+  node('aGreen', 263, 12); node('aRed', 263, 29); edge('aGreen', 'aCustIn'); edge('aRed', 'aCustIn');
+  node('aGreenOut', 273, 12); node('aRedOut', 273, 29); edge('aGreen', 'aGreenOut'); edge('aRed', 'aRedOut');
+  node('aHall', 280, 20); edge('aHall', 'aGreenOut'); edge('aHall', 'aRedOut');
+  AR.doors.forEach((z, i) => { node('aDoor' + i, AR.x1, z); node('aCurb' + i, AR.curbX, z); edge('aDoor' + i, 'aHall'); edge('aDoor' + i, 'aCurb' + i); });
   L.nodes = N;
 
   // Dijkstra on a ~100-node graph; cached per pair

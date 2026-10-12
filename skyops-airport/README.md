@@ -1,6 +1,9 @@
 # SkyOps: International Departures
 
-A browser-based 3D simulation of a fictional international airport, SKY International. Pass 1 is the core engine plus a fully working International Departures slice: curb and rail link, check-in, security with K9, passport control, walk-through duty free, food court, lounges, gates with jet bridges and a bus gate, the baggage hall, the apron and runway 27.
+A browser-based 3D simulation of a fictional international airport, SKY International.
+
+- **Pass 1, Departures:** curb and rail link, check-in, security with K9, passport control, walk-through duty free, food court, lounges, gates with jet bridges and a bus gate, the baggage hall, the apron and runway 27.
+- **Pass 2, Arrivals:** deplaning from every inbound aircraft, a sterile arrivals corridor, arrivals immigration (booths and e-gates), baggage claim with three carousels and baggage services, green/red customs channels, the arrivals hall and the pickup curb.
 
 Open `index.html` in a browser. No install, no build step for viewers.
 
@@ -26,6 +29,7 @@ Open `index.html` in a browser. No install, no build step for viewers.
 | Boarding | Pre-boarding, groups 1 to 4, final call, gate close at STD-15, missed passengers |
 | Bags | Belt, CT level 1/3 screening, carousel, cart departure at STD-28, short-shipped bags counted as mishandled |
 | Aircraft | Approach, landing, taxi-in, marshalling, bridge docking, turnaround, pushback, de-icing in snow, take-off; single-runway lock; late inbound aircraft cause reactionary delays |
+| Arrivals | Each inbound aircraft deplanes 70 to 92% of seats; bags towed to the inbound hall and fed to a carousel; first and last bag times from on-blocks; 1.5% delayed bags filed as PIRs; 4% red channel with duty, 3% green-channel stops |
 | KPIs | Waits graded against IATA ADRM optimum ranges, security throughput, on-time (off-blocks within 15 min), mishandled bags per 1,000, missed-flight rate, retail and F&B sales, staffing cost, satisfaction |
 
 ## Develop

@@ -122,12 +122,13 @@ SK.terminal = (function () {
   fidsCanvas.width = 1024; fidsCanvas.height = 576;
   const fidsTex = new THREE.CanvasTexture(fidsCanvas);
   fidsTex.encoding = THREE.sRGBEncoding;
-  const fidsMat = new THREE.MeshBasicMaterial({ map: fidsTex, toneMapped: false, side: THREE.DoubleSide });
+  const fidsMat = new THREE.MeshBasicMaterial({ map: fidsTex, toneMapped: false });
   [[-10, 49, 0], [40, 49, 0], [0, -9.8, 0], [-60, -26.5, Math.PI], [60, -26.5, Math.PI]].forEach(([x, z, ry]) => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(7.1, 4), fidsMat);
     m.position.set(x, 5.2, z); m.rotation.y = ry;
     root.add(m);
     B.box(0.15, 3.4, 0.15, M.darkSteel, x, 7.2, z);
+    B.box(7.3, 4.2, 0.1, M.black, x, 3.1, z - (ry ? -0.08 : 0.08));
     E.pick.add(m, 'fids');
   });
   T.updateFids = function (flights, now) {

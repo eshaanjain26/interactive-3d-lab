@@ -103,10 +103,10 @@ SK.sky = (function () {
     const dusk = SK.clamp(1 - Math.abs(elev) * 4, 0, 1) * (dayT > -0.2 && dayT < 1.2 ? 1 : 0);
     S.night = 1 - day;
     const overcast = w.cloud;
-    sun.intensity = (0.1 + 1.55 * day) * (1 - overcast * 0.75);
+    sun.intensity = (0.1 + 1.0 * day) * (1 - overcast * 0.75);
     sun.color.setHSL(0.09 + 0.04 * day, 0.7 - 0.5 * day, 0.6 + 0.3 * day);
     if (S.night > 0.8) sun.color.set(0x9db4ff);
-    hemi.intensity = 0.18 + 0.5 * day + (S.flash > 0 ? S.flash * 2.5 : 0);
+    hemi.intensity = 0.18 + 0.32 * day + (S.flash > 0 ? S.flash * 2.5 : 0);
 
     tmpC.copy(cNight).lerp(cDay, day);
     if (dusk > 0) tmpC.lerp(cDusk, dusk * 0.55);
@@ -116,7 +116,7 @@ SK.sky = (function () {
     fog.color.copy(tmpC);
     fog.near = w.fogNear; fog.far = w.fogFar * (0.75 + 0.25 * day);
     starMat.opacity = SK.clamp((S.night - 0.6) * 2.5, 0, 1) * (1 - overcast);
-    E.renderer.toneMappingExposure = 0.9 + 0.1 * day;
+    E.renderer.toneMappingExposure = 0.9 - 0.08 * day;
     glows.forEach(([m, d, n]) => (m.emissiveIntensity = SK.lerp(d, n, S.night)));
     E.bloom.strength = 0.25 + 0.55 * S.night;
 

@@ -33,6 +33,7 @@ src/
   world/terminal.js     building shell, check-in, security, passport, airside, gates
   world/airfield.js     apron, stands, jet bridges, taxiways, runway, lights, tower, future-zone massing
   world/aircraft.js     aircraft factory and the flight movement state machine
+  world/arrivals.js     pass 2: arrivals corridor, immigration, claim, customs, hall, pickup, inbound bags
   sim/crowd.js          instanced human + dog renderer
   sim/agents.js         agent movement, passenger lifecycle, staff behaviours
   sim/bags.js           baggage handling system and follow-a-bag tracking
@@ -84,7 +85,9 @@ scene
 | Apron + stands | z -40..-110 | 1 (turnaround visuals) |
 | Taxiway / runway 09/27 | z -150 / -220, x -460..460 | 1 (movements) |
 | ATC tower | x 150, z -70 | 1 |
-| Arrivals, baggage claim, customs | east pier | 2 |
+| Arrivals corridor | z -41.4 at y 5.2, x -97..172, then to the east pier | 2 |
+| Arrivals immigration, claim, customs, hall | x 190..290, z -10..50 | 2 |
+| Pickup curb + road | x 292..307 | 2 |
 | Cargo terminal, fuel farm, hangar, fire station, EOC | airfield edges | 3 |
 
 ## Time model

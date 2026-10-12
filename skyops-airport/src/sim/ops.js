@@ -183,7 +183,7 @@ SK.ops = (function () {
     const cabinReady = f.blockIn + SK.minutes(18);
     const boardAt = Math.max(f.etd - SK.minutes(f.boardBefore), cabinReady);
     const ready = f.bus || SK.airfield.bridgeReady(f.gate);
-    if (!f.boarding && !f.doorsClosed && t >= boardAt && ready) {
+    if (!f.boarding && !f.doorsClosed && t >= boardAt && ready && !f.arrivalsPending) {
       f.boarding = true; f.groupCalled = 0; f.boardStart = t; f.lastCall = t;
       SK.bus.emit('ops', { t, kind: 'go', msg: f.num + ' to ' + f.city + ' now boarding at ' + f.gate + ': pre-boarding' });
     }
@@ -254,6 +254,11 @@ SK.ops = (function () {
     k.missRate = +missRate.toFixed(1);
     sat -= Math.min(15, missRate * 3);
     sat -= Math.min(10, k.mishandledRate * 0.5);
+    if (SK.arrivals) {
+      SK.arrivals.kpi(k);
+      sat -= Math.max(0, k.waitArrImm - 10) * 0.8;
+      if (k.firstBag != null) sat -= Math.max(0, k.firstBag - 20) * 0.5;
+    }
     k.satisfaction = Math.round(SK.clamp(sat, 0, 100));
     if (!O.lastHist || t - O.lastHist >= 600) {
       O.lastHist = t;
@@ -301,6 +306,7 @@ SK.ops = (function () {
     SK.aircraft.update(dtGame, t);
     SK.agents.update(dtGame);
     SK.bags.update(dtGame);
+    if (SK.arrivals) SK.arrivals.update(dtGame);
     SK.airfield.update(dtGame);
     updateBus(dtGame);
     updateTugs();
@@ -311,6 +317,7 @@ SK.ops = (function () {
   };
   O.visual = function (dtGame, dtReal) {
     SK.airfield.visual(dtReal);
+    if (SK.arrivals) SK.arrivals.visual(dtReal);
     SK.terminal.update(dtGame);
     fidsTimer -= dtReal;
     if (fidsTimer <= 0) {

@@ -15,6 +15,9 @@ SK.cam = (function () {
     { name: 'CAM 07 · Gate A3', pos: [10, 6, -27], at: [32, 1, -36] },
     { name: 'CAM 08 · Baggage hall', pos: [139, 8, 35], at: [118, 1, 8] },
     { name: 'CAM 09 · Apron', pos: [-40, 18, -30], at: [10, 2, -70] },
+    { name: 'CAM 10 · Arrivals immigration', pos: [196, 7, -6], at: [222, 1, 20] },
+    { name: 'CAM 11 · Baggage claim', pos: [262, 7, -6], at: [248, 1, 22] },
+    { name: 'CAM 12 · Customs and arrivals hall', pos: [288, 7, 48], at: [270, 1, 18] },
   ];
 
   // spherical helpers relative to a target

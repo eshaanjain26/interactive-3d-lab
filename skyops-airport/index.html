@@ -523,6 +523,20 @@ SK.L = (function () {
   L.remote = { x: -160, z: -78 };
   L.tower = { x: 150, z: -70, h: 62 };
 
+  // Arrivals (pass 2): sterile corridor at mezzanine height, east-pier building, pickup curb
+  L.arr = {
+    x0: 190, x1: 290, z0: -10, z1: 50, h: 10,
+    corridorZ: -41.4, corridorY: 5.2, corridorX: 172, bridgeZ: 20,
+    escTop: { x: 192, z: 20 }, escBottom: { x: 205, z: 20 },
+    imm: { x: 232, manual: { z0: 14, z1: 48, n: 10, queue: { x0: 210, x1: 228, z0: 14.5, z1: 48 } }, egate: { z0: -8, z1: 12, n: 8, queue: { x0: 210, x1: 228, z0: -8, z1: 11.5 } } },
+    claim: { x: 250, carousels: [2, 22, 42], rx: 6, rz: 2.4 },
+    services: { x: 243, z: -6.5 },
+    customs: { wallX: 265, green: { z0: 8, z1: 16 }, red: { z0: 25, z1: 33, desk: { x: 268, z: 29 } }, bench: { x: 269, z: 4 } },
+    hall: { x0: 272, x1: 290, barrierX: 276 },
+    doors: [4, 20, 36],
+    curbX: 294, roadX: 302, roadZ0: -40, roadZ1: 90,
+  };
+
   // Gate geometry derived from the gate list
   L.gateDoor = (g) => ({ x: g.x + 9, z: L.term.z0 });
   L.podium = (g) => ({ x: g.x + 9, z: -36.6 });
@@ -588,6 +602,19 @@ SK.L = (function () {
   spine.sort((a, b) => N[a].x - N[b].x);
   for (let i = 0; i < spine.length - 1; i++) edge(spine[i], spine[i + 1]);
 
+  // arrivals ground-floor graph (separate from departures: arriving passengers never mix with departing ones)
+  const AR = L.arr;
+  node('aEsc', AR.escBottom.x + 1, AR.escBottom.z);
+  node('aImmM', 209, 31); node('aImmE', 209, 2); edge('aEsc', 'aImmM'); edge('aEsc', 'aImmE');
+  node('aClaim', 240, 20); node('aClaimN', 240, -2); node('aClaimS', 240, 44);
+  edge('aClaim', 'aClaimN'); edge('aClaim', 'aClaimS');
+  AR.claim.carousels.forEach((z, i) => { node('aCar' + i, 240.5, z); edge('aCar' + i, 'aClaim'); edge('aCar' + i, i === 0 ? 'aClaimN' : i === 2 ? 'aClaimS' : 'aClaim'); });
+  node('aServ', AR.services.x, AR.services.z + 2.2); edge('aServ', 'aClaimN');
+  node('aCustIn', 261, 20); edge('aCustIn', 'aClaim'); edge('aCustIn', 'aCar1');
+  node('aGreen', 263, 12); node('aRed', 263, 29); edge('aGreen', 'aCustIn'); edge('aRed', 'aCustIn');
+  node('aGreenOut', 273, 12); node('aRedOut', 273, 29); edge('aGreen', 'aGreenOut'); edge('aRed', 'aRedOut');
+  node('aHall', 280, 20); edge('aHall', 'aGreenOut'); edge('aHall', 'aRedOut');
+  AR.doors.forEach((z, i) => { node('aDoor' + i, AR.x1, z); node('aCurb' + i, AR.curbX, z); edge('aDoor' + i, 'aHall'); edge('aDoor' + i, 'aCurb' + i); });
   L.nodes = N;
 
   // Dijkstra on a ~100-node graph; cached per pair
@@ -709,6 +736,7 @@ SK.flightStatus = function (f, now) {
 // ===== data/content.js =====
 // SkyOps learn content: zones, entries (SOP, rules, data, roles, explainer), glossary, quiz. Pure data.
 // Figures are typical published ranges, labelled with their source. Airport, airlines and flights are fictional.
+SK.BUILT_PASS = 2;   // zones with pass <= this are live; later passes are massing only
 (function () {
   const L = SK.L;
   const g = (id) => L.gates.find((x) => x.id === id);
@@ -729,12 +757,14 @@ SK.flightStatus = function (f, now) {
     { id: 'apron', name: 'Apron and stands', group: 'airside', pass: 1, x: 10, z: -70, d: 150, b: [-180, 120, -110, -40] },
     { id: 'runway', name: 'Runway 09/27', group: 'airside', pass: 1, x: 120, z: -200, d: 420, b: [-460, 460, -245, -140] },
     { id: 'tower', name: 'ATC tower', group: 'ops', pass: 1, x: 150, z: -70, d: 70, y: 40, b: [140, 160, -80, -60] },
-    { id: 'arrivals', name: 'Arrivals hall', group: 'landside', pass: 2, x: 230, z: 20, d: 90, b: [190, 270, -10, 50] },
-    { id: 'claim', name: 'Baggage claim', group: 'landside', pass: 2, x: 230, z: 20, d: 70, b: [190, 270, -10, 50] },
-    { id: 'customs', name: 'Customs', group: 'security', pass: 2, x: 230, z: 0, d: 60, b: [190, 270, -20, 10] },
+    { id: 'arrivals', name: 'Arrivals hall', group: 'landside', pass: 2, x: 281, z: 20, d: 60, b: [272, 306, -10, 50] },
+    { id: 'arrimm', name: 'Arrivals immigration', group: 'security', pass: 2, x: 222, z: 20, d: 62, b: [190, 236, -10, 50] },
+    { id: 'claim', name: 'Baggage claim', group: 'landside', pass: 2, x: 250, z: 22, d: 62, b: [236, 264, -10, 50] },
+    { id: 'customs', name: 'Customs', group: 'security', pass: 2, x: 268, z: 18, d: 40, b: [264, 272, -10, 50] },
+    { id: 'corridor', name: 'Arrivals corridor', group: 'airside', pass: 2, x: 120, z: -41, d: 120, y: 5, b: [-100, 190, -43, 22] },
     { id: 'cargo', name: 'Cargo terminal', group: 'ops', pass: 3, x: 330, z: -70, d: 120, b: [280, 380, -110, -30] },
     { id: 'hangar', name: 'Maintenance hangar', group: 'ops', pass: 3, x: -300, z: -80, d: 120, b: [-350, -250, -120, -40] },
-    { id: 'fuel', name: 'Fuel farm', group: 'ops', pass: 3, x: 300, z: 60, d: 90, b: [270, 330, 30, 90] },
+    { id: 'fuel', name: 'Fuel farm', group: 'ops', pass: 3, x: 360, z: 70, d: 90, b: [330, 390, 40, 100] },
     { id: 'fire', name: 'Fire station (ARFF)', group: 'ops', pass: 3, x: 40, z: -176, d: 70, b: [20, 60, -186, -166] },
     { id: 'eoc', name: 'Operations centre (SOC/EOC)', group: 'ops', pass: 3, x: 150, z: -40, d: 50, b: [140, 162, -48, -32] },
   ];
@@ -892,10 +922,10 @@ SK.flightStatus = function (f, now) {
     data: [{ k: 'Radar rotation', v: 'Terminal surveillance radars sweep every 4 to 5 seconds' }],
     roles: ['r_atc'], keywords: 'atc tower air traffic control radar',
   });
-  ['arrivals', 'claim', 'customs', 'cargo', 'hangar', 'fuel', 'fire', 'eoc'].forEach((id) => {
+  ['cargo', 'hangar', 'fuel', 'fire', 'eoc'].forEach((id) => {
     const z = SK.ZONES.find((q) => q.id === id);
     add(id, {
-      kind: 'zone', name: z.name, zone: id, at: { x: z.x, z: z.z }, future: z.pass,
+      kind: 'zone', name: z.name, zone: id, at: { x: z.x, z: z.z }, future: z.pass > SK.BUILT_PASS ? z.pass : 0,
       summary: z.name + ' is placed on the map as massing and is scheduled for pass ' + z.pass + '. It will get the same depth as Departures: live agents, SOPs, rules, data and an explainer.',
       keywords: id,
     });
@@ -1053,6 +1083,80 @@ SK.flightStatus = function (f, now) {
   add('car', { name: 'Private car', zone: 'curb', at: { x: 0, z: 68 }, summary: 'Private drop-offs should stop only long enough to unload.', keywords: 'car vehicle' });
   add('cordon', { name: 'Cordon', zone: 'security', at: { x: 0, z: 40 }, summary: 'Police tape and staff hold people away from a suspect item or an incident until it is resolved.', keywords: 'cordon tape evacuation' });
 
+
+  // ================= ARRIVALS (pass 2) =================
+  const AR = L.arr;
+  add('corridor', {
+    kind: 'zone', name: 'Arrivals corridor', zone: 'corridor', at: { x: 120, z: -41.4, y: 5.2 },
+    summary: 'Arriving passengers leave the aircraft through the jet bridge and turn into a glass corridor one level above the apron. It keeps them apart from departing passengers, who have already been screened, until arrivals immigration.',
+    sop: ['Deplane through the bridge; crew and gate staff direct passengers to "Arrivals".', 'Walk the sterile corridor to the arrivals building.', 'Escalator down to arrivals immigration.'],
+    regs: [{ src: 'ICAO Annex 17', text: 'Arriving passengers who have not been screened to the departure standard must not mix with screened departing passengers.' }, { src: 'ICAO Annex 9', text: 'Facilitation standards for the arrival border process.' }],
+    data: [{ k: 'Typical deplaning rate', v: 'About 15 to 25 passengers per minute per door' }],
+    roles: ['r_pax'], keywords: 'arrivals corridor deplane sterile segregation',
+    explainer: [
+      { x: -25, z: -44, y: 3, d: 30, text: 'Passengers leave the aircraft through the jet bridge.' },
+      { x: 0, z: -41.4, y: 5.2, d: 40, text: 'A glass corridor above the apron keeps arriving passengers away from screened departures.' },
+      { x: 172, z: -10, y: 5.2, d: 70, text: 'The corridor runs past the baggage hall and tower to the arrivals building.' },
+      { x: 198, z: 20, y: 3, d: 26, text: 'An escalator brings them down to immigration.' },
+    ],
+  });
+  add('arrimm', {
+    kind: 'zone', name: 'Arrivals immigration', zone: 'arrimm', at: { x: 222, z: 20 },
+    summary: 'Every arriving international passenger is admitted by a border officer or an e-gate before collecting bags. This is usually the longest wait on the arrivals side, and it decides how long bags sit on the carousel.',
+    sop: ['Choose a queue: e-gates for eligible ePassports, booths for everyone else.', 'Officer or gate reads the passport chip and matches the face.', 'Visa, watch-list and Advance Passenger Information checks.', 'Questions on purpose of visit and length of stay where required.', 'Admitted, refused, or referred to a secondary office.'],
+    regs: [{ src: 'ICAO Annex 9', text: 'States should use API and risk assessment so most passengers clear quickly and officers focus on the few who need attention.' }, { src: 'ICAO Doc 9303', text: 'ePassport chip and facial image used by e-gates.' }, { src: 'US CBP', text: 'In the US, Customs and Border Protection runs immigration and customs together; Global Entry kiosks serve trusted travellers.' }],
+    data: [{ k: 'IATA ADRM optimum wait', v: '5 to 10 min' }, { k: 'Booths / e-gates here', v: '10 / 8' }],
+    roles: ['r_immigration', 'r_pax'], keywords: 'arrivals immigration border control passport entry egate',
+    explainer: [
+      { x: 219, z: 38, d: 26, text: 'Booth queue: officers check documents, visas and purpose of visit.' },
+      { x: 219, z: 5, d: 26, text: 'e-gates admit eligible ePassport holders in seconds.' },
+      { x: 232, z: 37, d: 16, text: 'Referrals go to a secondary office; everyone else walks on to baggage claim.' },
+    ],
+  });
+  add('claim', {
+    kind: 'zone', name: 'Baggage claim', zone: 'claim', at: { x: 250, z: 22 },
+    summary: 'Bags come off the aircraft, ride a cart to the inbound baggage hall and are loaded onto the carousel shown on the screens. Passengers usually reach the carousel just as the first bags arrive, when immigration and unloading run in step.',
+    sop: ['Ramp agents unload the hold and tow carts to the inbound hall.', 'Handlers put bags on the carousel feed belt; priority-tagged bags go first.', 'Screens show the carousel for each flight.', 'Passengers collect their bag and check the tag.', 'A missing bag goes to the baggage services desk, which files a Property Irregularity Report.'],
+    regs: [{ src: 'IATA Resolution 753', text: 'Bags are tracked at arrival when they are delivered back to the passenger.' }, { src: 'Montreal Convention 1999', text: 'Airlines are liable for lost, delayed or damaged checked baggage up to a limit set in Special Drawing Rights.' }],
+    data: [{ k: 'Common service target', v: 'First bag within 15 to 20 min, last bag within 30 to 40 min of on-blocks' }, { k: 'Carousels here', v: '3' }],
+    roles: ['r_ramp', 'r_bservices', 'r_pax'], keywords: 'baggage claim reclaim carousel belt bags collect',
+    explainer: [
+      { x: 250, z: -12, d: 30, text: 'Carts arrive at the inbound baggage hall behind the claim area.' },
+      { x: 250, z: 22, d: 24, text: 'Handlers feed bags onto the carousel for that flight.' },
+      { x: 243, z: -6.5, d: 16, text: 'No bag? Baggage services files a report and traces it worldwide.' },
+    ],
+  });
+  add('customs', {
+    kind: 'zone', name: 'Customs', zone: 'customs', at: { x: 268, z: 18 },
+    summary: 'Customs controls what comes into the country: goods over the duty-free allowance, cash, food, plants, weapons and drugs. Passengers choose green (nothing to declare) or red (goods to declare); officers stop a share of green-channel passengers on risk and at random.',
+    sop: ['Green channel if within allowances; red channel to declare.', 'Red channel: declare goods, pay duty and tax, receive a receipt.', 'Green channel: officers select passengers on risk indicators and at random.', 'Selected bags are X-rayed or opened in front of the passenger.', 'Seizures and penalties for undeclared goods.'],
+    regs: [{ src: 'WCO Revised Kyoto Convention, Specific Annex J', text: 'Recommends the dual-channel (green/red) system for travellers.' }, { src: 'EU Directive 2007/74/EC', text: 'Travellers arriving by air from outside the EU may bring goods worth up to EUR 430 free of VAT and excise.' }, { src: 'US CBP', text: 'Returning US residents usually have an $800 duty-free personal exemption.' }, { src: 'Cash controls', text: 'Cash of EUR 10,000 or more entering the EU, or more than $10,000 entering the US, must be declared.' }],
+    data: [{ k: 'Channels here', v: 'Green (nothing to declare), red (goods to declare)' }],
+    roles: ['r_customs'], keywords: 'customs green channel red channel declare duty',
+    explainer: [
+      { x: 266, z: 12, d: 18, text: 'Green channel: nothing to declare.' },
+      { x: 268, z: 29, d: 16, text: 'Red channel: declare goods and pay duty.' },
+      { x: 269, z: 4, d: 14, text: 'Officers stop some green-channel passengers and search their bags.' },
+    ],
+  });
+  add('arrivals', {
+    kind: 'zone', name: 'Arrivals hall', zone: 'arrivals', at: { x: 281, z: 20 },
+    summary: 'Past customs, passengers walk into the public arrivals hall where friends, family and drivers wait behind the barrier. Currency exchange, SIM cards and car hire sit here, and the doors lead to the pickup curb.',
+    sop: ['Exit customs into the landside hall; re-entry is not allowed.', 'Meet greeters at the barrier.', 'Buy a SIM, change money or collect a hire car.', 'Leave by taxi, ride share, private car, bus or rail.'],
+    data: [{ k: 'Exits', v: '3 doors to the pickup curb' }],
+    roles: ['r_driver', 'r_pax'], keywords: 'arrivals hall meet greet pickup taxi',
+  });
+  add('arr_booth', { name: 'Arrivals passport booth', zone: 'arrimm', at: { x: 232, z: 38 }, summary: 'An officer admits the traveller: document and chip check, face match, visa and watch lists, and questions where needed.', sop: ['Scan passport and check the chip.', 'Compare face, check visa and lists.', 'Ask purpose and length of stay.', 'Admit, refuse or refer.'], regs: [{ src: 'ICAO Annex 9', text: 'Border inspection standards on arrival.' }], data: [{ k: 'Service time', v: 'About 45 to 90 seconds per traveller' }], roles: ['r_immigration'], keywords: 'immigration booth arrivals officer' });
+  add('arr_egate', { name: 'Arrivals e-gate', zone: 'arrimm', at: { x: 232, z: 5 }, summary: 'Eligible ePassport holders clear themselves: chip read, live face match, then the exit door opens.', sop: ['Passport on the reader.', 'Look at the camera.', 'Exit door opens, or an officer helps.'], regs: [{ src: 'ICAO Doc 9303', text: 'Chip and facial image standards.' }], roles: ['r_immigration'], keywords: 'egate arrivals automated border' });
+  add('carousel', { name: 'Baggage carousel', zone: 'claim', at: { x: 250, z: 22 }, summary: 'A sloped, continuously moving belt that holds a flight\'s bags until passengers collect them. A feed belt from the inbound baggage hall drops bags onto it.', sop: ['Feed starts when the first cart arrives.', 'Bags circulate until collected.', 'Unclaimed bags are taken to baggage services at the end of the flight.'], data: [{ k: 'Common service target', v: 'First bag within 15 to 20 min of on-blocks' }], roles: ['r_ramp'], keywords: 'carousel belt reclaim' });
+  add('bservices', { name: 'Baggage services (lost and found)', zone: 'claim', at: { x: 243, z: -6.5 }, summary: 'Where passengers report missing or damaged bags. The agent files a Property Irregularity Report (PIR) and the bag is traced through WorldTracer, the industry tracing system.', sop: ['Check the bag tag stub against the system.', 'File a PIR with a description and delivery address.', 'Give the passenger a file reference.', 'Track the bag; deliver it when found.'], regs: [{ src: 'Montreal Convention 1999', text: 'Airline liability for delayed, lost or damaged baggage, and claim time limits.' }], roles: ['r_bservices'], keywords: 'lost found baggage services pir worldtracer delayed bag' });
+  add('green_channel', { name: 'Green channel', zone: 'customs', at: { x: 266, z: 12 }, summary: 'Nothing to declare. Passengers walk through, but officers watch and stop some for checks.', sop: ['Walk through if within allowances.', 'Stop if an officer asks.'], regs: [{ src: 'WCO Revised Kyoto Convention', text: 'Dual-channel system.' }], roles: ['r_customs'], keywords: 'green channel nothing to declare' });
+  add('red_channel', { name: 'Red channel', zone: 'customs', at: { x: 268, z: 29 }, summary: 'Goods to declare: anything over the allowance, commercial goods, large amounts of cash, restricted food or plants.', sop: ['Declare goods.', 'Officer assesses duty and tax.', 'Pay and keep the receipt.'], regs: [{ src: 'EU Directive 2007/74/EC / US CBP', text: 'Traveller allowances: EUR 430 by air into the EU; $800 for returning US residents.' }], roles: ['r_customs'], keywords: 'red channel declare duty' });
+  add('meetgreet', { name: 'Meet and greet barrier', zone: 'arrivals', at: { x: 276, z: 20 }, summary: 'Greeters wait behind the barrier so the exit stream from customs stays clear.', sop: ['Greeters wait outside the exit lane.', 'Drivers hold name boards.'], keywords: 'meet greet barrier family drivers' });
+  add('kiosks_arr', { name: 'Currency, SIM and car hire', zone: 'arrivals', at: { x: 283, z: -6 }, summary: 'First stops for many visitors: local currency, a mobile SIM and the car hire desks. Like duty free, they pay concession fees that fund the airport.', keywords: 'currency exchange sim card car rental hire atm' });
+  add('pickup', { name: 'Pickup curb', zone: 'arrivals', at: { x: 296, z: 20 }, summary: 'Cars, taxis and ride shares collect arriving passengers. Short dwell limits keep the curb moving.', sop: ['Wait inside until your ride arrives.', 'Load and leave.'], roles: ['r_driver'], keywords: 'pickup curb taxi ride share' });
+  add('arrfids', { name: 'Arrivals board', zone: 'arrivals', at: { x: 244, z: 22 }, summary: 'Shows each arrival\'s origin, landing time, on-blocks time and its carousel number.', keywords: 'arrivals board screen carousel number' });
+
   // ================= ROLES =================
   const role = (id, name, zone, summary, sop, extra) => add(id, Object.assign({ kind: 'role', name, zone, summary, sop, at: C[zone].at }, extra || {}));
   role('r_pax', 'Passenger', 'checkin', 'Each figure here stands for ' + SK.PAX_PER_FIGURE + ' passengers on the same flight. Click one to follow its journey from the curb to the aircraft.', ['Arrive at the curb or station.', 'Check in and drop bags.', 'Clear security and passport control.', 'Shop, eat or relax, then go to the gate.', 'Board by group.']);
@@ -1074,6 +1178,9 @@ SK.flightStatus = function (f, now) {
   role('r_bhs', 'BHS operator', 'bhs', 'Monitors the baggage system, clears jams and reviews bag images flagged by the scanners.', ['Watch the control screens.', 'Clear jams fast.', 'Review flagged images.']);
   role('r_atc', 'Air traffic controller', 'tower', 'Separates aircraft on the ground and in the air.', ['Issue clearances.', 'Sequence the runway.', 'Hand over to the next sector.']);
   role('r_paramedic', 'Paramedic', 'gates', 'Airport medical responders reach any gate within minutes and carry a defibrillator, oxygen and a stretcher.', ['Assess the patient.', 'Treat and stabilise.', 'Transfer to hospital or clear the passenger to fly.']);
+  role('r_customs', 'Customs officer', 'customs', 'Controls goods entering the country, collects duty and tax, and stops smuggling of drugs, cash, weapons and protected species.', ['Watch the channels and select passengers on risk.', 'Search bags with the passenger present.', 'Assess duty in the red channel.', 'Seize prohibited goods.']);
+  role('r_bservices', 'Baggage services agent', 'claim', 'Handles missing, delayed and damaged bags: files the PIR, traces the bag and arranges delivery.', ['Match tag stub to record.', 'File the PIR.', 'Trace and deliver.']);
+  role('r_greeter', 'Greeter', 'arrivals', 'Friends, family and drivers meeting arriving passengers in the public hall.', ['Wait behind the barrier.']);
   role('r_driver', 'Driver', 'curb', 'Taxi, shuttle and bus drivers who bring passengers to the curb.', ['Stop only in the assigned bay.', 'Unload and move on.']);
 
   SK.CONTENT = C;
@@ -1131,6 +1238,13 @@ SK.flightStatus = function (f, now) {
     ['Stand', 'A marked aircraft parking position.'],
     ['STD', 'Scheduled time of departure.'],
     ['STEB', 'Security tamper-evident bag for liquids bought airside.'],
+    ['PIR', 'Property Irregularity Report. Filed at baggage services when a bag is missing or damaged.'],
+    ['WorldTracer', 'The shared airline system used to trace mishandled bags.'],
+    ['Green channel', 'Customs exit for passengers with nothing to declare.'],
+    ['Red channel', 'Customs exit for passengers with goods to declare.'],
+    ['Reclaim', 'Baggage claim; the carousels where passengers collect hold bags.'],
+    ['Deplaning', 'Passengers leaving the aircraft after arrival.'],
+    ['On-blocks', 'The moment an arriving aircraft stops on its stand; bag delivery times are measured from here.'],
     ['Sterile area', 'The screened zone between security and the aircraft.'],
     ['Taxiway', 'Paved path aircraft use to move between runway and apron.'],
     ['Tug', 'Vehicle that pushes aircraft or tows baggage carts.'],
@@ -1162,6 +1276,10 @@ SK.flightStatus = function (f, now) {
     { q: 'IATA ADRM optimum wait at security is…', o: ['0 to 2 min', '5 to 10 min', '20 to 30 min', '45 min'], a: 1, why: 'ADRM gives 5 to 10 minutes as the optimum range.', ref: 'security' },
     { q: 'Why does a body scanner with ATR show a generic outline?', o: ['To save power', 'To protect privacy', 'Because it cannot see the body', 'To speed the belt'], a: 1, why: 'Automated target recognition flags areas on an outline; no image of the person is shown.', ref: 'bodyscanner' },
     { q: 'What is reactionary delay?', o: ['Delay caused by passenger complaints', 'Delay passed on from an earlier late flight of the same aircraft or crew', 'ATC delay', 'Delay from a bird strike'], a: 1, why: 'A late inbound aircraft delays the outbound flight, and the delay can cascade all day.', ref: 'apron' },
+    { q: 'Why do arriving passengers use a separate corridor from departing passengers?', o: ['To shorten the walk', 'Departing passengers are screened; unscreened arrivals must not mix with them', 'For duty free sales', 'Fire regulations'], a: 1, why: 'ICAO Annex 17 segregation keeps the screened departure area clean.', ref: 'corridor' },
+    { q: 'What does a passenger do if their bag does not arrive?', o: ['Wait until tomorrow', 'File a Property Irregularity Report at baggage services', 'Call the police', 'Go back airside'], a: 1, why: 'The PIR starts the trace in WorldTracer and the airline delivers the bag.', ref: 'bservices' },
+    { q: 'In the dual-channel customs system, the red channel is for…', o: ['Crew only', 'Goods to declare', 'Diplomats', 'Transfer passengers'], a: 1, why: 'Green means nothing to declare; red means goods to declare (WCO Revised Kyoto Convention).', ref: 'customs' },
+    { q: 'Bag delivery times are usually measured from…', o: ['Landing', 'On-blocks', 'Passport control', 'Gate close'], a: 1, why: 'Service targets for first and last bag count from on-blocks.', ref: 'claim' },
   ];
 })();
 
@@ -1756,10 +1874,10 @@ SK.sky = (function () {
     const dusk = SK.clamp(1 - Math.abs(elev) * 4, 0, 1) * (dayT > -0.2 && dayT < 1.2 ? 1 : 0);
     S.night = 1 - day;
     const overcast = w.cloud;
-    sun.intensity = (0.1 + 1.55 * day) * (1 - overcast * 0.75);
+    sun.intensity = (0.1 + 1.0 * day) * (1 - overcast * 0.75);
     sun.color.setHSL(0.09 + 0.04 * day, 0.7 - 0.5 * day, 0.6 + 0.3 * day);
     if (S.night > 0.8) sun.color.set(0x9db4ff);
-    hemi.intensity = 0.18 + 0.5 * day + (S.flash > 0 ? S.flash * 2.5 : 0);
+    hemi.intensity = 0.18 + 0.32 * day + (S.flash > 0 ? S.flash * 2.5 : 0);
 
     tmpC.copy(cNight).lerp(cDay, day);
     if (dusk > 0) tmpC.lerp(cDusk, dusk * 0.55);
@@ -1769,7 +1887,7 @@ SK.sky = (function () {
     fog.color.copy(tmpC);
     fog.near = w.fogNear; fog.far = w.fogFar * (0.75 + 0.25 * day);
     starMat.opacity = SK.clamp((S.night - 0.6) * 2.5, 0, 1) * (1 - overcast);
-    E.renderer.toneMappingExposure = 0.9 + 0.1 * day;
+    E.renderer.toneMappingExposure = 0.9 - 0.08 * day;
     glows.forEach(([m, d, n]) => (m.emissiveIntensity = SK.lerp(d, n, S.night)));
     E.bloom.strength = 0.25 + 0.55 * S.night;
 
@@ -1824,6 +1942,9 @@ SK.cam = (function () {
     { name: 'CAM 07 · Gate A3', pos: [10, 6, -27], at: [32, 1, -36] },
     { name: 'CAM 08 · Baggage hall', pos: [139, 8, 35], at: [118, 1, 8] },
     { name: 'CAM 09 · Apron', pos: [-40, 18, -30], at: [10, 2, -70] },
+    { name: 'CAM 10 · Arrivals immigration', pos: [196, 7, -6], at: [222, 1, 20] },
+    { name: 'CAM 11 · Baggage claim', pos: [262, 7, -6], at: [248, 1, 22] },
+    { name: 'CAM 12 · Customs and arrivals hall', pos: [288, 7, 48], at: [270, 1, 18] },
   ];
 
   // spherical helpers relative to a target
@@ -2345,12 +2466,13 @@ SK.terminal = (function () {
   fidsCanvas.width = 1024; fidsCanvas.height = 576;
   const fidsTex = new THREE.CanvasTexture(fidsCanvas);
   fidsTex.encoding = THREE.sRGBEncoding;
-  const fidsMat = new THREE.MeshBasicMaterial({ map: fidsTex, toneMapped: false, side: THREE.DoubleSide });
+  const fidsMat = new THREE.MeshBasicMaterial({ map: fidsTex, toneMapped: false });
   [[-10, 49, 0], [40, 49, 0], [0, -9.8, 0], [-60, -26.5, Math.PI], [60, -26.5, Math.PI]].forEach(([x, z, ry]) => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(7.1, 4), fidsMat);
     m.position.set(x, 5.2, z); m.rotation.y = ry;
     root.add(m);
     B.box(0.15, 3.4, 0.15, M.darkSteel, x, 7.2, z);
+    B.box(7.3, 4.2, 0.1, M.black, x, 3.1, z - (ry ? -0.08 : 0.08));
     E.pick.add(m, 'fids');
   });
   T.updateFids = function (flights, now) {
@@ -2867,9 +2989,6 @@ SK.airfield = (function () {
     s.position.set((x0 + x1) / 2, h + 3, z1 + 0.1); root.add(s);
     K.hit(x1 - x0, h, z1 - z0, (x0 + x1) / 2, 0, (z0 + z1) / 2, root, id);
   }
-  // east pier: arrivals + reclaim + customs (one building, ground floor)
-  future('arrivals', 190, 270, -10, 50, 12, M.wall, 'Arrivals · Baggage claim · Customs', 2);
-  B.box(90, 0.6, 8, M.roof, 145, 6, 20);    // link bridge from the main terminal
   future('cargo', 280, 380, -110, -30, 16, M.wallDark, 'Cargo terminal', 3);
   future('eoc', 140, 162, -48, -32, 6, M.wallDark, 'SOC / EOC', 3);
   future('fire', 20, 60, -186, -166, 8, M.red, 'ARFF fire station', 3);
@@ -2879,10 +2998,10 @@ SK.airfield = (function () {
   arch.rotation.x = Math.PI / 2; arch.scale.set(1.25, 1, 0.25); arch.position.set(-300, 18, -80);
   root.add(arch);
   // fuel farm tanks
-  for (let i = 0; i < 4; i++) B.cyl(9, 12, M.white, 283 + (i % 2) * 24, 0, 45 + Math.floor(i / 2) * 26, 24);
-  K.hit(60, 12, 60, 300, 0, 60, root, 'fuel');
+  for (let i = 0; i < 4; i++) B.cyl(9, 12, M.white, 348 + (i % 2) * 24, 0, 57 + Math.floor(i / 2) * 26, 24);
+  K.hit(60, 12, 60, 360, 0, 70, root, 'fuel');
   const fs = K.sign(['Fuel farm', 'Pass 3 · coming next'], 10, 2.4, { bg: '#2f3a48', font: 'bold 64px system-ui, sans-serif', accent: '#f2b134' });
-  fs.position.set(300, 16, 92); root.add(fs);
+  fs.position.set(360, 16, 102); root.add(fs);
 
   B.build(root);
 
@@ -3929,6 +4048,8 @@ SK.agents = (function () {
       if (a.visibleFn) a.hidden = !a.visibleFn();
     }
   };
+  // shared helpers for other sim modules (arrivals, crisis responders)
+  Object.assign(AG, { make, setPath, go, walkTo, use, station, waitSim, until, ARRIVE, log, jit, takeSeat, sit, freeSeat, WALK });
   AG.rendered = function () {
     const lay = SK.layers || {};
     return AG.list.filter((a) => !a.hidden && (a.kind === 'pax' ? lay.pax !== false : lay.staff !== false) && (!SK.filterFn || SK.filterFn(a)));
@@ -4381,7 +4502,7 @@ SK.ops = (function () {
     const cabinReady = f.blockIn + SK.minutes(18);
     const boardAt = Math.max(f.etd - SK.minutes(f.boardBefore), cabinReady);
     const ready = f.bus || SK.airfield.bridgeReady(f.gate);
-    if (!f.boarding && !f.doorsClosed && t >= boardAt && ready) {
+    if (!f.boarding && !f.doorsClosed && t >= boardAt && ready && !f.arrivalsPending) {
       f.boarding = true; f.groupCalled = 0; f.boardStart = t; f.lastCall = t;
       SK.bus.emit('ops', { t, kind: 'go', msg: f.num + ' to ' + f.city + ' now boarding at ' + f.gate + ': pre-boarding' });
     }
@@ -4452,6 +4573,11 @@ SK.ops = (function () {
     k.missRate = +missRate.toFixed(1);
     sat -= Math.min(15, missRate * 3);
     sat -= Math.min(10, k.mishandledRate * 0.5);
+    if (SK.arrivals) {
+      SK.arrivals.kpi(k);
+      sat -= Math.max(0, k.waitArrImm - 10) * 0.8;
+      if (k.firstBag != null) sat -= Math.max(0, k.firstBag - 20) * 0.5;
+    }
     k.satisfaction = Math.round(SK.clamp(sat, 0, 100));
     if (!O.lastHist || t - O.lastHist >= 600) {
       O.lastHist = t;
@@ -4499,6 +4625,7 @@ SK.ops = (function () {
     SK.aircraft.update(dtGame, t);
     SK.agents.update(dtGame);
     SK.bags.update(dtGame);
+    if (SK.arrivals) SK.arrivals.update(dtGame);
     SK.airfield.update(dtGame);
     updateBus(dtGame);
     updateTugs();
@@ -4509,6 +4636,7 @@ SK.ops = (function () {
   };
   O.visual = function (dtGame, dtReal) {
     SK.airfield.visual(dtReal);
+    if (SK.arrivals) SK.arrivals.visual(dtReal);
     SK.terminal.update(dtGame);
     fidsTimer -= dtReal;
     if (fidsTimer <= 0) {
@@ -4531,6 +4659,518 @@ SK.ops = (function () {
     return O.flights.filter((f) => !f.departed && f.std > t - SK.minutes(90)).slice(0, n || 12);
   };
   return O;
+})();
+
+// ===== world/arrivals.js =====
+// SkyOps arrivals (pass 2): sterile corridor, arrivals immigration, baggage claim, customs, arrivals hall, pickup curb.
+// Every inbound aircraft that blocks in deplanes its passengers and sends its bags to a carousel.
+SK.arrivals = (function () {
+  const K = SK.kit, M = K.mat, L = SK.L, E = SK.engine, AG = SK.agents, AR = L.arr, N = L.nodes;
+  const P = SK.PAX_PER_FIGURE;
+  const now = () => SK.sim.now;
+  const A = { list: [], stats: { arrived: 0, pir: 0, stops: 0, red: 0, duty: 0, delayedBags: 0, bagsDelivered: 0 }, recent: [] };
+  const root = new THREE.Group(); root.name = 'arrivals';
+  E.scene.add(root);
+  const B = new K.Batch();
+  const spread = (a, b, n) => Array.from({ length: n }, (_, i) => a + ((i + 0.5) * (b - a)) / n);
+  const Y = AR.corridorY, CZ = AR.corridorZ, CX = AR.corridorX;
+
+  // ---------- sterile arrivals corridor (glass tube one level above the apron) ----------
+  const westX = L.gateDoor(L.gates.find((g) => g.bus)).x - 3;
+  const legs = [[westX, CZ, CX, CZ], [CX, CZ, CX, AR.escTop.z], [CX, AR.escTop.z, AR.x0, AR.escTop.z]];
+  legs.forEach(([x0, z0, x1, z1]) => {
+    const len = Math.hypot(x1 - x0, z1 - z0) + 2.6, ang = -Math.atan2(z1 - z0, x1 - x0);
+    const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+    B.add(K.geo.box(len, 0.3, 2.8), M.darkSteel, K.matrix(mx, Y - 0.15, mz, ang));
+    B.add(K.geo.box(len, 0.25, 3.0), M.steel, K.matrix(mx, Y + 2.7, mz, ang));
+    [-1.4, 1.4].forEach((o) => B.add(K.geo.box(len, 2.6, 0.08), M.glass, K.matrix(mx, Y + 1.3, mz, ang).multiply(new THREE.Matrix4().makeTranslation(0, 0, o))));
+    const n = Math.floor(len / 16);
+    for (let i = 0; i <= n; i++) {
+      const u = i / Math.max(1, n), x = x0 + (x1 - x0) * u, z = z0 + (z1 - z0) * u;
+      if (Math.abs(z - CZ) < 0.1 && x < L.term.x1 + 4) continue;     // the terminal wall carries it here
+      B.box(0.5, Y - 0.3, 0.5, M.steel, x, 0, z);
+    }
+  });
+  K.hit(CX - westX, 3, 3, (CX + westX) / 2, Y, CZ, root, 'corridor');
+  K.hit(3, 3, AR.escTop.z - CZ, CX, Y, (AR.escTop.z + CZ) / 2, root, 'corridor');
+  // connector from each bridge rotunda up to the corridor
+  L.gates.forEach((g) => {
+    const d = L.gateDoor(g);
+    B.box(2.2, 0.25, 2.6, M.darkSteel, d.x, Y - 0.4, CZ - 1.6);
+  });
+
+  // ---------- arrivals building ----------
+  const w = AR.x1 - AR.x0, dd = AR.z1 - AR.z0, cx = (AR.x0 + AR.x1) / 2, cz = (AR.z0 + AR.z1) / 2;
+  K.ground(w, dd, M.floor, cx, 0.03, cz, root);
+  B.box(w + 2, 0.3, dd + 2, M.concrete, cx, -0.3, cz);
+  function wall(x0, z0, x1, z1, h, gaps, mat) {
+    const len = Math.hypot(x1 - x0, z1 - z0), ang = Math.atan2(z1 - z0, x1 - x0);
+    let cur = 0;
+    const segs = [];
+    (gaps || []).forEach(([a, b]) => { if (a > cur) segs.push([cur, a]); cur = b; });
+    if (cur < len) segs.push([cur, len]);
+    segs.forEach(([a, b]) => {
+      const m = (a + b) / 2;
+      B.add(K.geo.box(b - a, h, 0.14), mat || M.glass, K.matrix(x0 + Math.cos(ang) * m, h / 2, z0 + Math.sin(ang) * m, -ang));
+      if (!mat) for (let s = a; s <= b + 0.01; s += 4) B.box(0.18, h, 0.3, M.steel, x0 + Math.cos(ang) * s, 0, z0 + Math.sin(ang) * s);
+    });
+  }
+  wall(AR.x0, AR.z0, AR.x0, AR.z1, AR.h, [[AR.escTop.z - AR.z0 - 2, AR.escTop.z - AR.z0 + 2]]);
+  wall(AR.x0, AR.z1, AR.x1, AR.z1, AR.h);
+  wall(AR.x1, AR.z0, AR.x1, AR.z1, AR.h, AR.doors.map((z) => [z - AR.z0 - 2.4, z - AR.z0 + 2.4]));
+  wall(AR.x0, AR.z0, AR.x1, AR.z0, AR.h, [[244 - AR.x0, 256 - AR.x0]]);
+  // mezzanine landing + escalator down
+  B.box(6, 0.3, 4, M.darkSteel, AR.x0 + 2, Y - 0.3, AR.escTop.z);
+  const escLen = Math.hypot(AR.escBottom.x - AR.escTop.x, Y);
+  const esc = new THREE.Mesh(new THREE.BoxGeometry(escLen, 0.5, 1.6), M.darkSteel);
+  esc.position.set((AR.escTop.x + AR.escBottom.x) / 2, Y / 2, AR.escTop.z);
+  esc.rotation.z = -Math.atan2(Y, AR.escBottom.x - AR.escTop.x);
+  esc.castShadow = true; root.add(esc);
+  [-0.9, 0.9].forEach((o) => { const r = esc.clone(); r.scale.set(1, 1.8, 0.08); r.material = M.glass; r.position.z += o; r.position.y += 0.6; root.add(r); });
+  const rf = new THREE.Group(); rf.name = 'arrivalsRoof';
+  const rb = new K.Batch();
+  rb.box(w + 4, 0.6, dd + 4, M.roof, cx, AR.h + 0.3, cz);
+  rb.build(rf);
+  rf.visible = false; root.add(rf);
+  A.roof = rf;
+  const LB = new K.Batch();
+  for (let z = AR.z0 + 5; z < AR.z1; z += 9) for (let x = AR.x0 + 8; x < AR.x1; x += 16) LB.box(6, 0.05, 0.18, M.lightStrip, x, 8.6, z);
+  LB.build(root, { castShadow: false, receiveShadow: false });
+
+  // ---------- arrivals immigration ----------
+  const I = AR.imm;
+  const manualZ = spread(I.manual.z0, I.manual.z1, I.manual.n), egateZ = spread(I.egate.z0, I.egate.z1, I.egate.n);
+  manualZ.forEach((z, i) => {
+    B.box(2.2, 1.25, 2.2, M.wallDark, I.x, 0, z);
+    B.box(2.2, 1.0, 2.2, M.glass, I.x, 1.25, z);
+    B.box(2.3, 0.15, 2.3, M.wallDark, I.x, 2.25, z);
+    const s = K.sign(String(i + 1), 0.6, 0.6, { bg: '#16324f', font: 'bold 160px system-ui, sans-serif' });
+    s.position.set(I.x - 1.16, 2.8, z); s.rotation.y = -Math.PI / 2; root.add(s);
+  });
+  const egDoors = [];
+  egateZ.forEach((z) => {
+    B.box(2.6, 1.1, 0.3, M.kiosk, I.x, 0, z - 0.75);
+    B.box(2.6, 1.1, 0.3, M.kiosk, I.x, 0, z + 0.75);
+    B.box(0.3, 0.35, 0.3, M.screen, I.x - 1, 1.1, z - 0.75);
+    const d = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.0, 1.2), M.glassDark);
+    d.position.set(I.x + 1.3, 0.6, z); root.add(d);
+    egDoors.push({ d, open: 0 });
+  });
+  const immSign = K.sign(['ARRIVALS · IMMIGRATION', 'All passports  ·  ePassports: e-gates'], 14, 1.8, { bg: '#16324f', font: 'bold 60px system-ui, sans-serif', accent: '#f2b134' });
+  immSign.position.set(209, 5, 20); immSign.rotation.y = -Math.PI / 2; root.add(immSign);
+  K.hit(3, 2.4, I.manual.z1 - I.manual.z0, I.x, 0, (I.manual.z0 + I.manual.z1) / 2, root, 'arr_booth');
+  K.hit(3, 1.4, I.egate.z1 - I.egate.z0, I.x, 0, (I.egate.z0 + I.egate.z1) / 2, root, 'arr_egate');
+  K.hit(46, 0.06, dd, 213, 0, cz, root, 'arrimm');
+  const qM = SK.serpentine(I.manual.queue, { headX: 'x1', headZ: 'z0' }), qE = SK.serpentine(I.egate.queue, { headX: 'x1', headZ: 'z1' });
+
+  // ---------- baggage claim ----------
+  const C = AR.claim;
+  const ovalShape = (rx, rz) => { const s = new THREE.Shape(); s.absellipse(0, 0, rx, rz, 0, Math.PI * 2, false, 0); return s; };
+  const ringShape = ovalShape(C.rx + 0.7, C.rz + 0.7);
+  ringShape.holes.push(ovalShape(C.rx - 0.7, C.rz - 0.7));
+  const ringGeo = new THREE.ExtrudeGeometry(ringShape, { depth: 0.45, bevelEnabled: false, curveSegments: 40 });
+  ringGeo.rotateX(Math.PI / 2);
+  C.carousels.forEach((z, i) => {
+    const ring = new THREE.Mesh(ringGeo, M.belt);
+    ring.position.set(C.x, 0.5, z); ring.receiveShadow = true; ring.castShadow = true;
+    root.add(ring);
+    const island = new THREE.Mesh(new THREE.ExtrudeGeometry(ovalShape(C.rx - 0.75, C.rz - 0.75), { depth: 0.9, bevelEnabled: false }), M.steel);
+    island.geometry.rotateX(-Math.PI / 2); island.position.set(C.x, 0, z); root.add(island);
+    B.box(1.2, 0.3, 0.8, M.black, C.x, 0.9, z);   // feed chute from the inbound hall below
+    const s = K.sign(String(i + 1), 1, 1, { bg: '#f2b134', fg: '#14202e', font: 'bold 200px system-ui, sans-serif' });
+    s.position.set(C.x - C.rx - 1.5, 3.4, z); s.rotation.y = -Math.PI / 2; root.add(s);
+    B.cyl(0.08, 3.1, M.darkSteel, C.x - C.rx - 1.5, 0, z, 6);
+    K.hit(C.rx * 2 + 1.6, 1.2, C.rz * 2 + 1.6, C.x, 0, z, root, 'carousel');
+  });
+  K.hit(28, 0.06, dd, 250, 0, cz, root, 'claim');
+  // inbound baggage hall behind the north wall
+  B.box(28, 5, 12, M.wallDark, 250, 0, AR.z0 - 6.2);
+  B.box(6, 3.6, 0.2, M.yellow, 250, 0, AR.z0 - 12.3);
+  // baggage services desk + oversize belt
+  B.box(4, 1.05, 1, M.desk, AR.services.x, 0, AR.services.z);
+  B.box(0.5, 0.35, 0.05, M.screen, AR.services.x - 1, 1.1, AR.services.z - 0.5);
+  B.box(3, 0.8, 1.2, M.belt, 258, 0, -7.5);
+  const bs = K.sign(['BAGGAGE SERVICES', 'Lost, delayed, damaged'], 5, 1.1, { bg: '#2f3a48', font: 'bold 64px system-ui, sans-serif' });
+  bs.position.set(AR.services.x, 2.8, AR.services.z - 0.7); root.add(bs);
+  K.hit(4.4, 1.4, 1.6, AR.services.x, 0, AR.services.z, root, 'bservices');
+  // arrivals board (canvas), facing passengers coming from immigration
+  const fc = document.createElement('canvas'); fc.width = 1024; fc.height = 576;
+  const ftex = new THREE.CanvasTexture(fc); ftex.encoding = THREE.sRGBEncoding;
+  const fids = new THREE.Mesh(new THREE.PlaneGeometry(7.1, 4), new THREE.MeshBasicMaterial({ map: ftex, toneMapped: false }));
+  fids.position.set(238.2, 5, 22); fids.rotation.y = -Math.PI / 2; root.add(fids);
+  B.box(0.12, 4.2, 7.3, M.black, 238.3, 2.9, 22);
+  E.pick.add(fids, 'arrfids');
+
+  // ---------- customs ----------
+  const CU = AR.customs;
+  wall(CU.wallX, AR.z0, CU.wallX, AR.z1, 3, [[CU.green.z0 - AR.z0, CU.green.z1 - AR.z0], [CU.red.z0 - AR.z0, CU.red.z1 - AR.z0]], M.wall);
+  [[CU.green, '#1b7f4b', 'NOTHING TO DECLARE'], [CU.red, '#b3262d', 'GOODS TO DECLARE']].forEach(([ch, col, txt]) => {
+    const s = K.sign(txt, 6.5, 1.1, { bg: col, font: 'bold 90px system-ui, sans-serif' });
+    s.position.set(CU.wallX - 0.2, 3.8, (ch.z0 + ch.z1) / 2); s.rotation.y = -Math.PI / 2; root.add(s);
+    K.ground(7, ch.z1 - ch.z0, new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 }), CU.wallX + 3.5, 0.05, (ch.z0 + ch.z1) / 2, root);
+  });
+  B.box(1.6, 1.05, 3, M.desk, CU.red.desk.x + 1, 0, CU.red.desk.z);
+  B.box(2.6, 0.9, 1.2, M.steel, CU.bench.x, 0, CU.bench.z);
+  K.hit(8, 1.4, CU.green.z1 - CU.green.z0, CU.wallX + 3.5, 0, (CU.green.z0 + CU.green.z1) / 2, root, 'green_channel');
+  K.hit(8, 1.4, CU.red.z1 - CU.red.z0, CU.wallX + 3.5, 0, (CU.red.z0 + CU.red.z1) / 2, root, 'red_channel');
+  K.hit(8, 0.06, dd, CU.wallX + 3.5, 0, cz, root, 'customs');
+
+  // ---------- arrivals hall ----------
+  const H = AR.hall;
+  for (let z = AR.z0 + 1; z < AR.z1 - 1; z += 2) {
+    if (Math.abs(z - 12) < 3 || Math.abs(z - 29) < 3) continue;
+    B.cyl(0.05, 1, M.steel, H.barrierX, 0, z, 6);
+  }
+  B.box(0.06, 0.06, AR.z1 - AR.z0 - 2, M.steel, H.barrierX, 0.95, cz);
+  [['CURRENCY', '#1f5fbf'], ['SIM CARDS', '#7a2e5c'], ['CAR HIRE', '#2f8f5b']].forEach(([t, c], i) => {
+    const x = 279 + i * 4;
+    B.box(3.2, 1.1, 1.2, new THREE.MeshStandardMaterial({ color: c, roughness: 0.5 }), x, 0, AR.z0 + 1.6);
+    const s = K.sign(t, 3, 0.7, { bg: c, font: 'bold 110px system-ui, sans-serif' });
+    s.position.set(x, 2.6, AR.z0 + 1.0); root.add(s);
+  });
+  K.hit(13, 2.6, 2, 283, 0, AR.z0 + 1.6, root, 'kiosks_arr');
+  K.hit(1, 1.2, dd, H.barrierX, 0, cz, root, 'meetgreet');
+  K.hit(H.x1 - H.x0, 0.06, dd, (H.x0 + H.x1) / 2, 0, cz, root, 'arrivals');
+  const hs = K.sign(['WELCOME TO SKY', 'Taxis · Ride share · Car hire · Rail'], 12, 1.8, { bg: '#16324f', font: 'bold 64px system-ui, sans-serif', accent: '#f2b134' });
+  hs.position.set(AR.x1 - 0.3, 6, 20); hs.rotation.y = -Math.PI / 2; root.add(hs);
+
+  // ---------- pickup curb + road ----------
+  K.ground(4, AR.z1 - AR.z0 + 30, M.sidewalk, AR.curbX, 0.12, cz, root).position.y = 0.12;
+  K.ground(10, AR.roadZ1 - AR.roadZ0, M.asphalt, AR.roadX, 0.01, (AR.roadZ0 + AR.roadZ1) / 2, root);
+  for (let z = AR.roadZ0 + 4; z < AR.roadZ1; z += 9) B.box(0.2, 0.02, 4, M.marking, AR.roadX, 0.02, z);
+  K.paint('PICKUP', 9, 2.2, '#f2f2ee', root, AR.roadX - 2.4, 20, -Math.PI / 2);
+  K.hit(4, 0.3, dd, AR.curbX, 0, cz, root, 'pickup');
+
+  B.build(root);
+
+  // ---------- staff ----------
+  manualZ.forEach((z, i) => AG.post('r_immigration', I.x + 0.3, z, -Math.PI / 2, () => st.manual.servers[i].open || !st.manual.idle(st.manual.servers[i]), 'work'));
+  AG.post('r_immigration', I.x + 2.4, I.egate.z1 + 1, -Math.PI / 2, null, 'idle');
+  AG.post('r_bservices', AR.services.x, AR.services.z - 1.0, 0, null, 'work');
+  AG.post('r_customs', CU.red.desk.x + 1.9, CU.red.desk.z, -Math.PI / 2, null, 'work');
+  AG.post('r_customs', CU.bench.x + 1.6, CU.bench.z, -Math.PI / 2, null, 'idle');
+  AG.post('r_customs', CU.wallX + 5, (CU.green.z0 + CU.green.z1) / 2 - 3.2, -Math.PI / 2, null, 'idle');
+  for (let i = 0; i < 3; i++) AG.post('r_ramp', 248 + i * 2, AR.z0 - 1.2, Math.PI, () => A.list.some((r) => r.feeding), 'work');
+
+  // ---------- stations ----------
+  const sv = (m, sd) => Math.max(10, SK.rng.normal(m, sd));
+  const st = {
+    manual: AG.station('arrManual', { servers: manualZ.map((z, i) => ({ x: I.x - 2.1, z, label: 'Booth ' + (i + 1) })), queue: qM }, { service: () => sv(P * 60, 20), meanCycle: P * 60 }),
+    egate: AG.station('arrEgate', { servers: egateZ.map((z, i) => ({ x: I.x, z, label: 'e-gate ' + (i + 1) })), queue: qE }, { service: () => sv(P * 18, 5), meanCycle: P * 18, onStage: (a, k, s) => { egDoors[s.id].open = 1.6; } }),
+    serv: AG.station('arrServ', { servers: [{ x: AR.services.x, z: AR.services.z + 1.3, label: 'Baggage services' }], queue: { slots: [0, 1, 2, 3, 4].map((k) => ({ x: AR.services.x - 1.5 - k * 0.8, z: AR.services.z + 2.4 })) } }, { service: () => sv(420, 120), meanCycle: 420, overflow: { dx: -0.8, dz: 0 } }),
+    red: AG.station('arrRed', { servers: [{ x: CU.red.desk.x - 0.4, z: CU.red.desk.z, label: 'Red channel' }], queue: { slots: [0, 1, 2, 3].map((k) => ({ x: CU.red.desk.x - 1.8 - k * 0.8, z: CU.red.desk.z })) } }, { service: () => sv(300, 90), meanCycle: 300, overflow: { dx: -0.8, dz: 0 } }),
+  };
+  A.st = st;
+  st.manual.setOpen(6);
+  // simple auto staffing for arrivals booths, same rule as departures
+  function autoStaff() {
+    const per = (8 * 60) / st.manual.meanCycle;
+    st.manual.setOpen(SK.clamp(Math.ceil(st.manual.queue.length / Math.max(1, per)), 3, 10));
+  }
+
+  // ---------- arrival bags on the carousels ----------
+  const MAXB = 900;
+  const bagMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.62, 0.36, 0.42), new THREE.MeshStandardMaterial({ roughness: 0.6 }), MAXB);
+  bagMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  bagMesh.setColorAt(0, new THREE.Color());
+  bagMesh.count = 0; bagMesh.castShadow = true; bagMesh.frustumCulled = false;
+  root.add(bagMesh);
+  const bagMap = [];
+  E.pick.add(bagMesh, (hit) => { const b = bagMap[hit.instanceId]; return b ? { entry: 'carousel', abag: b } : null; });
+  const BCOL = [0x1e1e1e, 0x2f4f7f, 0x7f2f2f, 0x5f5f5f, 0x2f6f5f, 0xc7a64a, 0x6b3f8f, 0xd9d4c7];
+  const ovalPos = (i, th, off) => ({ x: C.x + (C.rx + (off || 0)) * Math.cos(th), z: C.carousels[i] + (C.rz + (off || 0)) * Math.sin(th) });
+
+  // ---------- inbound carts ----------
+  function makeCart() {
+    const g = new THREE.Group();
+    K.box(1.6, 1, 2.4, M.yellow, 0, 0.3, 2.8, g);
+    K.box(1.4, 0.9, 0.9, M.glassDark, 0, 1.3, 2.3, g);
+    [-0.3, -3.6].forEach((z) => { K.box(1.8, 0.2, 2.8, M.darkSteel, 0, 0.45, z, g); K.box(1.6, 0.9, 2.4, new THREE.MeshStandardMaterial({ color: 0x5a4a3a }), 0, 0.65, z, g); });
+    root.add(g); E.pick.add(g, 'claim');
+    return g;
+  }
+  function cartPath(from) {
+    const pts = [[from.x, from.z], [from.x + 6, -46], [176, -46], [200, -40], [250, -34], [250, AR.z0 - 13.5]];
+    const c = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal');
+    return { c, len: c.getLength() };
+  }
+
+  // ---------- pickup cars ----------
+  const cars = [];
+  const waiting = [];
+  function car() {
+    const g = new THREE.Group();
+    const col = SK.rng.chance(0.35) ? 0xf1c232 : SK.rng.pick([0xd9dde2, 0x1f2329, 0x7b8691, 0xa62b2b, 0x274b8a]);
+    K.box(1.9, 0.8, 4.4, new THREE.MeshStandardMaterial({ color: col, roughness: 0.35, metalness: 0.5 }), 0, 0.35, 0, g);
+    K.box(1.7, 0.65, 2.4, M.glassDark, 0, 1.15, 0.2, g);
+    root.add(g); E.pick.add(g, 'pickup');
+    return g;
+  }
+
+  // ---------- inbound flights ----------
+  const carouselLoad = [0, 0, 0];
+  SK.bus.on('blockIn', (p) => {
+    const f = p.f;
+    const kind = f.wide ? 'wide' : 'narrow';
+    const seats = SK.AIRCRAFT_TYPES[kind].seats;
+    const figures = Math.max(6, Math.round((seats * SK.rng.range(0.7, 0.92)) / P));
+    const origin = SK.rng.pick(SK.DESTS[kind]);
+    const ci = carouselLoad.indexOf(Math.min(...carouselLoad));
+    carouselLoad[ci]++;
+    const rec = {
+      f, plane: p, figures, spawned: 0, origin: origin[1], num: f.airline.code + ' ' + (parseInt(f.num.split(' ')[1], 10) + 1),
+      carousel: ci, blockIn: now(), nextSpawn: now() + SK.minutes(3), bags: [], bagQueue: 0, firstBag: null, lastBag: null, pax: [],
+      cart: null, cartState: 'wait', feeding: false, done: false,
+    };
+    f.arrivalsPending = true;
+    A.list.push(rec);
+    SK.bus.emit('ops', { t: now(), kind: 'info', msg: rec.num + ' from ' + rec.origin + ' on blocks at ' + (f.bus ? 'R1' : f.gate) + ': ' + figures * P + ' arriving passengers, bags to carousel ' + (ci + 1) });
+  });
+
+  function spawnArrival(rec) {
+    const f = rec.f;
+    const g = L.gates.find((x) => x.id === f.gate);
+    const r = SK.rng;
+    const u = r.next();
+    const cls = f.wide ? (u < 0.03 ? 'F' : u < 0.15 ? 'J' : 'Y') : u < 0.09 ? 'J' : 'Y';
+    let start, path;
+    if (f.bus) {
+      const d = L.gateDoor(g);
+      start = { x: d.x + r.range(-1, 1), z: L.term.z0 - 1.5, y: 0 };
+      path = [{ x: d.x, z: CZ, y: Y }];
+    } else {
+      const bp = SK.airfield.bridgePath(f.gate);
+      start = { x: bp[3].x, z: bp[3].z, y: bp[3].y };
+      path = [{ x: bp[2].x, z: bp[2].z, y: 3 }, { x: bp[2].x, z: CZ - 1.6, y: Y - 0.4 }, { x: bp[2].x, z: CZ, y: Y }];
+    }
+    path.push({ x: CX, z: CZ, y: Y }, { x: CX, z: AR.escTop.z, y: Y }, { x: AR.escTop.x, z: AR.escTop.z, y: Y }, { x: AR.escBottom.x, z: AR.escBottom.z, y: 0 });
+    path.forEach((p) => { p.x += AG.jit({ id: rec.spawned + 7 }, p.z) * 0.5; });
+    const a = AG.make({ kind: 'pax', role: 'r_pax', arriving: true, arr: rec, cls, x: start.x, y: start.y, z: start.z, log: [], flight: null,
+      egate: r.chance(0.55), bags: r.chance(0.72) ? 1 : 0, cabinBag: r.chance(0.65), red: r.chance(0.04) });
+    a.carry = a.cabinBag;
+    a.script = arrScript(a, path);
+    rec.pax.push(a);
+    if (a.bags) {
+      const delayed = r.chance(0.015);
+      rec.bags.push({ owner: a, state: delayed ? 'delayed' : 'hold', color: r.pick(BCOL), th: 0, rec });
+      if (delayed) A.stats.delayedBags++;
+    }
+    rec.spawned++;
+    A.stats.arrived++;
+    AG.log(a, 'Deplaned ' + rec.num + ' from ' + rec.origin + ' at ' + (f.bus ? 'R1 (bus to the terminal)' : f.gate));
+  }
+
+  function* arrScript(a, path) {
+    const rec = a.arr;
+    AG.setPath(a, path);
+    yield AG.ARRIVE;
+    AG.log(a, 'Through the arrivals corridor');
+    a.node = 'aEsc';
+    // immigration
+    const s = a.egate ? st.egate : st.manual;
+    yield* AG.use(a, s, a.egate ? 'aImmE' : 'aImmM', a.egate ? 'Arrivals e-gate' : 'Arrivals passport booth');
+    yield* AG.walkTo(a, { x: I.x + 4, z: a.z });
+    a.node = a.z < 10 ? 'aClaimN' : a.z > 30 ? 'aClaimS' : 'aClaim';
+    AG.log(a, 'Admitted to the country');
+    // baggage claim
+    const bag = rec.bags.find((b) => b.owner === a);
+    if (bag) {
+      yield* AG.go(a, 'aCar' + rec.carousel);
+      const th = SK.rng.range(-0.6, 0.6) + Math.PI;     // west side of the oval, facing the belt
+      const spot = ovalPos(rec.carousel, th, 1.5);
+      yield* AG.walkTo(a, spot);
+      a.heading = Math.atan2(C.x - spot.x, C.carousels[rec.carousel] - spot.z);
+      a.waitTh = th;
+      AG.log(a, 'Waiting at carousel ' + (rec.carousel + 1));
+      yield AG.until(() => bag.state === 'taken' || (bag.state === 'delayed' && rec.lastBag && now() - rec.lastBag > SK.minutes(4)));
+      if (bag.state === 'taken') {
+        a.carry = true; a.look.case = bag.color;
+        AG.log(a, 'Collected bag after ' + Math.round((now() - rec.blockIn) / 60) + ' min from on-blocks');
+      } else {
+        AG.log(a, 'Bag did not arrive');
+        yield* AG.use(a, st.serv, 'aServ', 'Baggage services');
+        A.stats.pir++;
+        AG.log(a, 'Filed a Property Irregularity Report; bag will be traced and delivered');
+        SK.bus.emit('ops', { t: now(), kind: 'warn', msg: 'Delayed bag on ' + rec.num + ': PIR filed at baggage services' });
+      }
+      a.node = 'aCar' + rec.carousel;
+    } else AG.log(a, 'No hold bag, straight to customs');
+    // customs
+    yield* AG.go(a, 'aCustIn');
+    if (a.red) {
+      yield* AG.go(a, 'aRed');
+      yield* AG.use(a, st.red, null, 'Red channel');
+      const duty = Math.round(SK.rng.range(25, 320)) * P;
+      A.stats.red++; A.stats.duty += duty;
+      AG.log(a, 'Declared goods; paid $' + duty + ' duty and tax');
+      a.node = 'aRed';
+      yield* AG.go(a, 'aRedOut');
+    } else {
+      yield* AG.go(a, 'aGreen');
+      if (SK.rng.chance(SK.arrivals.stopRate)) {
+        A.stats.stops++;
+        yield* AG.walkTo(a, { x: CU.bench.x - 1.2, z: CU.bench.z + AG.jit(a, 2) * 0.6 });
+        a.anim = 'idle';
+        AG.log(a, 'Stopped in the green channel: bags X-rayed and opened');
+        yield AG.waitSim(SK.rng.range(180, 420));
+        a.node = 'aGreen';
+      }
+      yield* AG.go(a, 'aGreenOut');
+    }
+    // arrivals hall and pickup
+    yield* AG.go(a, 'aHall');
+    const g = greeters.find((x) => !x.follow && !x.dead && SK.rng.chance(0.5));
+    if (g) { g.follow = a; AG.log(a, 'Met by family at the barrier'); }
+    const door = SK.rng.int(0, AR.doors.length - 1);
+    yield* AG.go(a, 'aCurb' + door);
+    yield* AG.walkTo(a, { x: AR.curbX + SK.rng.range(-0.8, 0.8), z: AR.doors[door] + SK.rng.range(-6, 6) });
+    a.anim = 'idle'; a.heading = Math.PI / 2;
+    AG.log(a, 'Waiting at the pickup curb');
+    waiting.push(a);
+    yield AG.until(() => a.picked);
+    AG.log(a, 'Left by car');
+    if (g) AG.kill(g);
+    AG.kill(a);
+  }
+
+  // greeters waiting behind the barrier
+  const greeters = [];
+  function topUpGreeters() {
+    for (let i = greeters.length - 1; i >= 0; i--) if (greeters[i].dead || greeters[i].follow) greeters.splice(i, 1);
+    while (greeters.length < 12) {
+      const g = AG.post('r_greeter', AR.hall.barrierX + SK.rng.range(1.5, 6), SK.rng.range(AR.z0 + 4, AR.z1 - 4), -Math.PI / 2, null, 'idle');
+      g.kind = 'staff';
+      greeters.push(g);
+    }
+  }
+  topUpGreeters();
+  A.stopRate = 0.03;
+
+  // ---------- update ----------
+  const mx = new THREE.Matrix4(), col = new THREE.Color();
+  let staffT = 0, greetT = 0, carT = 0;
+  A.update = function (dt) {
+    if (dt <= 0) return;
+    const t = now();
+    staffT -= dt; if (staffT <= 0 && SK.ops.autoStaff) { autoStaff(); staffT = 4; }
+    greetT -= dt; if (greetT <= 0) { topUpGreeters(); greetT = 6; }
+    for (let i = A.list.length - 1; i >= 0; i--) {
+      const rec = A.list[i];
+      const f = rec.f;
+      // deplaning: one figure every ~10 sim s once the bridge is on the door (bus: after the ride in)
+      const ready = f.bus ? t >= rec.blockIn + SK.minutes(7) : SK.airfield.bridgeReady(f.gate);
+      while (ready && rec.spawned < rec.figures && t >= rec.nextSpawn) { spawnArrival(rec); rec.nextSpawn += f.bus ? 4 : 10; }
+      if (rec.spawned >= rec.figures && f.arrivalsPending && t >= rec.nextSpawn + SK.minutes(3)) f.arrivalsPending = false;
+      // bags: unload, tow to the inbound hall, feed the carousel
+      if (rec.cartState === 'wait' && t >= rec.blockIn + SK.minutes(5)) {
+        const from = f.bus ? { x: L.remote.x + 4, z: L.remote.z - 8 } : SK.aircraft.holdPos(rec.plane);
+        rec.cart = makeCart(); rec.path = cartPath(from); rec.s = 0; rec.cartState = 'tow';
+      }
+      if (rec.cartState === 'tow') {
+        rec.s = Math.min(rec.path.len, rec.s + 7 * dt);
+        const u = rec.s / rec.path.len, pt = rec.path.c.getPointAt(u), tg = rec.path.c.getTangentAt(u);
+        rec.cart.position.set(pt.x, 0, pt.z); rec.cart.rotation.y = Math.atan2(tg.x, tg.z);
+        if (rec.s >= rec.path.len) { rec.cartState = 'feed'; rec.feeding = true; rec.feedT = 0; }
+      }
+      if (rec.cartState === 'feed') {
+        rec.feedT -= dt;
+        const next = rec.bags.find((b) => b.state === 'hold');
+        const entry = Math.PI / 2;
+        const clear = !rec.bags.some((b) => b.state === 'belt' && Math.abs(Math.atan2(Math.sin(b.th - entry), Math.cos(b.th - entry))) < 0.3);
+        if (next && rec.feedT <= 0 && clear) {
+          next.state = 'belt'; next.th = entry; rec.feedT = 1.2;
+          if (!rec.firstBag) { rec.firstBag = t; SK.bus.emit('ops', { t, kind: 'info', msg: 'First bag on carousel ' + (rec.carousel + 1) + ' for ' + rec.num + ', ' + Math.round((t - rec.blockIn) / 60) + ' min after on-blocks' }); }
+        }
+        if (!next && rec.spawned >= rec.figures) {
+          rec.lastBag = rec.lastBag || t; rec.feeding = false; rec.cartState = 'done';
+          root.remove(rec.cart); E.pick.remove(rec.cart);
+          A.recent.push({ first: (rec.firstBag || t) - rec.blockIn, last: t - rec.blockIn });
+          if (A.recent.length > 8) A.recent.shift();
+        }
+      }
+      rec.bags.forEach((b) => {
+        if (b.state !== 'belt') return;
+        b.th += dt * 0.32;
+        const o = b.owner;
+        // owner standing at the belt grabs the bag as it passes
+        if (o.waitTh != null && !o.dead && Math.abs(Math.atan2(Math.sin(b.th - o.waitTh), Math.cos(b.th - o.waitTh))) < 0.12 && o.arrived) { b.state = 'taken'; A.stats.bagsDelivered++; }
+      });
+      const live = rec.pax.some((a) => !a.dead) || rec.spawned < rec.figures || rec.cartState !== 'done';
+      if (!live) { carouselLoad[rec.carousel]--; A.list.splice(i, 1); }
+    }
+    // e-gate doors
+    egDoors.forEach((g) => { if (g.open > 0) g.open -= dt; g.d.scale.z += ((g.open > 0 ? 0.06 : 1) - g.d.scale.z) * Math.min(1, dt * 8); });
+    // pickup cars
+    carT -= dt;
+    const unassigned = waiting.filter((a) => !a.car && !a.dead);
+    if (carT <= 0 && unassigned.length) {
+      const target = unassigned[0];
+      const g = car();
+      const c = { g, z: AR.roadZ1, stopZ: target.z, state: 'in', riders: [target], wait: 0 };
+      unassigned.slice(1).forEach((o) => { if (c.riders.length < 2 && Math.abs(o.z - target.z) < 5) c.riders.push(o); });
+      c.riders.forEach((r) => (r.car = c));
+      cars.push(c);
+      carT = 1.5;
+    }
+    for (let i = cars.length - 1; i >= 0; i--) {
+      const c = cars[i];
+      if (c.state === 'in') { c.z -= Math.max(2, Math.min(14, (c.z - c.stopZ) * 1.2)) * dt; if (c.z - c.stopZ < 0.2) { c.state = 'stop'; c.wait = 2.5; } }
+      else if (c.state === 'stop') { c.wait -= dt; if (c.wait <= 0) { c.riders.forEach((r) => { r.picked = true; r.hidden = true; }); c.state = 'out'; } }
+      else { c.z -= 12 * dt; if (c.z < AR.roadZ0) { root.remove(c.g); E.pick.remove(c.g); cars.splice(i, 1); continue; } }
+      c.g.position.set(AR.roadX - 2.4, 0, c.z); c.g.rotation.y = Math.PI;
+    }
+    for (let i = waiting.length - 1; i >= 0; i--) if (waiting[i].dead || waiting[i].picked) waiting.splice(i, 1);
+  };
+
+  // draw carousel bags + arrivals board
+  let boardT = 0;
+  A.visual = function (dtReal) {
+    let n = 0;
+    if (!SK.layers || SK.layers.bags !== false) {
+      for (const rec of A.list) for (const b of rec.bags) {
+        if (b.state !== 'belt' || n >= MAXB) continue;
+        const p = ovalPos(rec.carousel, b.th, 0);
+        mx.makeRotationY(-b.th); mx.setPosition(p.x, 1.15, p.z);
+        bagMesh.setMatrixAt(n, mx); col.setHex(b.color); bagMesh.setColorAt(n, col); bagMap[n] = b; n++;
+      }
+    }
+    bagMesh.count = n; bagMesh.instanceMatrix.needsUpdate = true;
+    if (bagMesh.instanceColor) bagMesh.instanceColor.needsUpdate = true;
+    boardT -= dtReal;
+    if (boardT > 0) return;
+    boardT = 1;
+    const c = fc.getContext('2d');
+    c.fillStyle = '#0c1522'; c.fillRect(0, 0, 1024, 576);
+    c.fillStyle = '#62d48f'; c.font = 'bold 40px system-ui, sans-serif'; c.textBaseline = 'middle';
+    c.fillText('ARRIVALS', 30, 38);
+    c.fillStyle = '#9fb3c8'; c.font = 'bold 30px system-ui, sans-serif'; c.fillText(SK.fmtTime(now()), 870, 38);
+    c.font = 'bold 22px system-ui, sans-serif'; c.fillStyle = '#7f93a8';
+    ['ON BLOCKS', 'FLIGHT', 'FROM', 'BELT', 'STATUS'].forEach((h, i) => c.fillText(h, [30, 190, 360, 660, 760][i], 86));
+    A.list.slice(-9).reverse().forEach((r, k) => {
+      const y = 128 + k * 50;
+      c.fillStyle = k % 2 ? '#101c2b' : '#0c1522'; c.fillRect(0, y - 24, 1024, 50);
+      c.fillStyle = '#ffffff'; c.font = 'bold 30px ui-monospace, monospace';
+      c.fillText(SK.fmtTime(r.blockIn), 30, y); c.fillText(r.num, 190, y);
+      c.font = 'bold 30px system-ui, sans-serif'; c.fillText(r.origin, 360, y); c.fillText(String(r.carousel + 1), 675, y);
+      const s = r.cartState === 'done' ? 'Bags delivered' : r.firstBag ? 'Bags on belt' : 'On blocks';
+      c.fillStyle = r.firstBag ? '#62d48f' : '#f2d38a'; c.fillText(s, 760, y);
+    });
+    ftex.needsUpdate = true;
+  };
+
+  A.kpi = function (k) {
+    const t = now();
+    k.waitArrImm = Math.round(Math.max(st.manual.predictedWait(), st.manual.observedWait(t, 1200)) / 60);
+    const r = A.recent;
+    k.firstBag = r.length ? Math.round(r.reduce((s, x) => s + x.first, 0) / r.length / 60) : null;
+    k.lastBag = r.length ? Math.round(r.reduce((s, x) => s + x.last, 0) / r.length / 60) : null;
+    k.arrived = A.stats.arrived * P;
+    k.pir = A.stats.pir * P;
+    k.customsStops = A.stats.stops * P;
+    k.duty = A.stats.duty;
+  };
+  A.root = root;
+  return A;
 })();
 
 // ===== sim/crisis.js =====
@@ -4835,8 +5475,8 @@ SK.overlays = (function () {
   const host = document.getElementById('labels');
   const labels = SK.ZONES.map((z) => {
     const el = document.createElement('button');
-    el.className = 'lbl' + (z.pass > 1 ? ' locked' : '');
-    el.textContent = z.name + (z.pass > 1 ? ' · pass ' + z.pass : '');
+    el.className = 'lbl' + (z.pass > SK.BUILT_PASS ? ' locked' : '');
+    el.textContent = z.name + (z.pass > SK.BUILT_PASS ? ' · pass ' + z.pass : '');
     el.setAttribute('tabindex', '-1');
     el.addEventListener('click', () => SK.ui.goZone(z.id));
     host.appendChild(el);
@@ -4853,7 +5493,7 @@ SK.overlays = (function () {
         v.copy(l.p).project(cam);
         const near = cam.position.distanceTo(l.p);
         // hide labels that are behind the camera, off screen, or would clutter a close view
-        vis = v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05 && near < l.z.d * 9 && (dist > 60 || near < 90) && !(l.z.id === 'claim' || l.z.id === 'customs');
+        vis = v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05 && near < l.z.d * 9 && (dist > 60 || near < 90) && l.z.id !== 'corridor';
         if (vis) { l.el.style.left = ((v.x + 1) / 2) * w + 'px'; l.el.style.top = ((1 - v.y) / 2) * h + 'px'; }
       }
       l.el.style.display = vis ? '' : 'none';
@@ -4876,15 +5516,17 @@ SK.overlays = (function () {
     rect(L.runway.x0, L.runway.x1, L.runway.z - 22, L.runway.z + 22, '#3a3f45');
     rect(L.runway.x0 + 20, L.runway.x1 - 20, L.taxiwayZ - 10, L.taxiwayZ + 10, '#8a9097');
     rect(-165, 165, 64, 90, '#4a4f55');
+    rect(L.arr.roadX - 5, L.arr.roadX + 5, L.arr.roadZ0, L.arr.roadZ1, '#4a4f55');
+    rect(L.arr.x0, L.arr.x1, L.arr.z0, L.arr.z1, dark ? '#c9cdd2' : '#eceae4');
     rect(L.term.x0, L.term.x1, L.term.z0, L.term.z1, dark ? '#c9cdd2' : '#eceae4');
     SK.ZONES.forEach((z) => {
       const [x0, x1, z0, z1] = z.b;
-      c.globalAlpha = z.pass > 1 ? 0.35 : 0.5;
+      c.globalAlpha = z.pass > SK.BUILT_PASS ? 0.35 : 0.5;
       rect(x0, x1, z0, z1, GROUP_COLORS[z.group]);
       c.globalAlpha = 1;
     });
     c.fillStyle = '#ffffff'; c.font = 'bold 15px system-ui, sans-serif'; c.textAlign = 'center';
-    [['Check-in', 0, 44], ['Security', -10, 16], ['Gates', 0, -33], ['Runway 27', 0, L.runway.z + 5], ['BHS', 121, 10], ['Garage', 0, 116], ['Rail', -130, 42]].forEach(([t, x, z]) => { const [a, b] = toMap(x, z); c.fillText(t, a, b); });
+    [['Check-in', 0, 44], ['Security', -10, 16], ['Gates', 0, -33], ['Runway 27', 0, L.runway.z + 5], ['BHS', 121, 10], ['Garage', 0, 116], ['Rail', -130, 42], ['Arrivals', 240, 22]].forEach(([t, x, z]) => { const [a, b] = toMap(x, z); c.fillText(t, a, b); });
   }
   drawBg();
   SK.bus.on('settings', drawBg);
@@ -4990,6 +5632,7 @@ SK.overlays = (function () {
     heat.visible = l.heat;
     flowGroup.visible = l.flow;
     SK.terminal.roof.visible = l.roof;
+    if (SK.arrivals) SK.arrivals.roof.visible = l.roof;
     SK.landside.vehicles.forEach((v) => (v.g.visible = l.vehicles));
   };
   let tHeat = 0, tMini = 0;
@@ -5020,6 +5663,8 @@ SK.ui = (function () {
     { id: 'waitSecurity', label: 'Security wait', fmt: (v) => v + ' min', grade: (v) => (v <= 10 ? 'ok' : v <= 20 ? 'warn' : 'bad'), entry: 'security' },
     { id: 'waitCheckin', label: 'Check-in wait', fmt: (v) => v + ' min', grade: (v) => (v <= 20 ? 'ok' : v <= 35 ? 'warn' : 'bad'), entry: 'checkin' },
     { id: 'waitPassport', label: 'Passport wait', fmt: (v) => v + ' min', grade: (v) => (v <= 10 ? 'ok' : v <= 20 ? 'warn' : 'bad'), entry: 'passport' },
+    { id: 'waitArrImm', label: 'Arrivals immigration', fmt: (v) => v + ' min', grade: (v) => (v <= 10 ? 'ok' : v <= 20 ? 'warn' : 'bad'), entry: 'arrimm' },
+    { id: 'firstBag', label: 'First bag', fmt: (v) => (v == null ? '–' : v + ' min'), grade: (v) => (v == null ? '' : v <= 20 ? 'ok' : v <= 30 ? 'warn' : 'bad'), entry: 'claim' },
     { id: 'otp', label: 'On-time', fmt: (v) => v + '%', grade: (v) => (v >= 80 ? 'ok' : v >= 65 ? 'warn' : 'bad'), entry: 'gates' },
     { id: 'mishandledRate', label: 'Bags mishandled', fmt: (v) => v + ' /1k', grade: (v) => (v <= 7 ? 'ok' : v <= 14 ? 'warn' : 'bad'), entry: 'bhs' },
     { id: 'satisfaction', label: 'Satisfaction', fmt: (v) => v, grade: (v) => (v >= 75 ? 'ok' : v >= 60 ? 'warn' : 'bad'), entry: null },
@@ -5037,7 +5682,7 @@ SK.ui = (function () {
     const k = OPS.kpi;
     KPI.forEach((d) => {
       const el = $('k_' + d.id);
-      if (!el || k[d.id] == null) return;
+      if (!el || k[d.id] === undefined) return;
       el.textContent = d.fmt(k[d.id], k);
       el.className = d.grade(k[d.id]);
     });
@@ -5052,7 +5697,7 @@ SK.ui = (function () {
     left.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === leftTab)));
     if (leftTab === 'zones') {
       leftBody.innerHTML = Object.keys(GROUP_NAMES).map((g) => `<div class="eyebrow group-h">${GROUP_NAMES[g]}</div>` +
-        SK.ZONES.filter((z) => z.group === g).map((z, i) => `<button class="zone${z.pass > 1 ? ' locked' : ''}" data-z="${z.id}"><span class="dot" style="background:${SK.overlays.groupColors[g]}"></span>${esc(z.name)}<span class="k">${z.pass > 1 ? 'Pass ' + z.pass : ''}</span></button>`).join('')).join('');
+        SK.ZONES.filter((z) => z.group === g).map((z, i) => `<button class="zone${z.pass > SK.BUILT_PASS ? ' locked' : ''}" data-z="${z.id}"><span class="dot" style="background:${SK.overlays.groupColors[g]}"></span>${esc(z.name)}<span class="k">${z.pass > SK.BUILT_PASS ? 'Pass ' + z.pass : ''}</span></button>`).join('')).join('');
       leftBody.querySelectorAll('.zone').forEach((b) => b.addEventListener('click', () => { U.goZone(b.dataset.z); if (innerWidth < 900) left.classList.remove('on'); }));
     } else if (leftTab === 'layers') {
       const L = [['pax', 'Passengers'], ['staff', 'Staff'], ['vehicles', 'Road vehicles'], ['bags', 'Bags'], ['labels', 'Zone labels'], ['heat', 'Crowd heat map'], ['flow', 'Flow lines'], ['roof', 'Terminal roof']];
@@ -5068,9 +5713,9 @@ SK.ui = (function () {
     SK.filterGroup = g;
     if (g === 'all') SK.filterFn = null;
     else {
-      const rects = SK.ZONES.filter((z) => z.group === g && z.pass === 1).map((z) => z.b);
+      const rects = SK.ZONES.filter((z) => z.group === g && z.pass <= SK.BUILT_PASS).map((z) => z.b);
       SK.filterFn = (a) => rects.some((b) => a.x >= b[0] && a.x <= b[1] && a.z >= b[2] && a.z <= b[3]);
-      const zs = SK.ZONES.filter((z) => z.group === g && z.pass === 1);
+      const zs = SK.ZONES.filter((z) => z.group === g && z.pass <= SK.BUILT_PASS);
       if (zs.length) {
         const cx = zs.reduce((s, z) => s + z.x, 0) / zs.length, cz = zs.reduce((s, z) => s + z.z, 0) / zs.length;
         SK.cam.flyTo({ x: cx, z: cz }, { dist: g === 'airside' || g === 'ops' ? 200 : 110 });
@@ -5103,12 +5748,12 @@ SK.ui = (function () {
   // ---------- info panel ----------
   const info = $('info');
   let cur = null, curTab = 'overview';
-  const stationFor = { desk_economy: ['economy'], desk_priority: ['priority'], bagdrop: ['bagdrop'], special_desk: ['special'], kiosk: ['kiosk'], docpodium: ['doc', 'ftDoc'], lane: ['lanes', 'ftLane'], xray: ['lanes'], bodyscanner: ['lanes'], security: ['doc', 'lanes', 'ftLane'], checkin: ['economy', 'priority', 'bagdrop', 'kiosk', 'special'], passport: ['manual', 'egate'], booth: ['manual'], egate: ['egate'], cafe: ['cafe'], food: ['cafe'], lounge: ['lounge'], dutyfree: ['till0', 'till1'] };
+  const stationFor = { desk_economy: ['economy'], desk_priority: ['priority'], bagdrop: ['bagdrop'], special_desk: ['special'], kiosk: ['kiosk'], docpodium: ['doc', 'ftDoc'], lane: ['lanes', 'ftLane'], xray: ['lanes'], bodyscanner: ['lanes'], security: ['doc', 'lanes', 'ftLane'], checkin: ['economy', 'priority', 'bagdrop', 'kiosk', 'special'], passport: ['manual', 'egate'], booth: ['manual'], egate: ['egate'], cafe: ['cafe'], food: ['cafe'], lounge: ['lounge'], dutyfree: ['till0', 'till1'], arrimm: ['arrManual', 'arrEgate'], arr_booth: ['arrManual'], arr_egate: ['arrEgate'], bservices: ['arrServ'], customs: ['arrRed'], red_channel: ['arrRed'] };
   U.open = function (id, ctx) {
     const e = C[id];
     if (!e) return;
     cur = { e, ctx: ctx || {} };
-    const hasLive = !!(cur.ctx.agent || cur.ctx.bag || cur.ctx.flight || stationFor[id] || id === 'gates' || id === 'gatepodium' || id === 'bhs');
+    const hasLive = !!(cur.ctx.agent || cur.ctx.bag || cur.ctx.abag || cur.ctx.flight || stationFor[id] || ['gates', 'gatepodium', 'bhs', 'claim', 'carousel', 'arrivals'].includes(id));
     curTab = hasLive ? 'live' : 'overview';
     info.classList.add('on');
     $('infoKind').textContent = e.future ? 'Coming in pass ' + e.future : e.kind === 'role' ? 'Role' : e.kind === 'zone' ? 'Zone' : 'Equipment and process';
@@ -5119,7 +5764,7 @@ SK.ui = (function () {
   $('infoClose').addEventListener('click', U.close);
   function tabsFor(e, ctx) {
     const t = [];
-    if (ctx.agent || ctx.bag || ctx.flight || stationFor[e.id] || e.id === 'gates' || e.id === 'gatepodium' || e.id === 'bhs') t.push(['live', 'Live']);
+    if (ctx.agent || ctx.bag || ctx.abag || ctx.flight || stationFor[e.id] || ['gates', 'gatepodium', 'bhs', 'claim', 'carousel', 'arrivals'].includes(e.id)) t.push(['live', 'Live']);
     t.push(['overview', 'Overview']);
     if (e.sop.length) t.push(['sop', 'SOP']);
     if (e.regs.length) t.push(['rules', 'Rules']);
@@ -5131,7 +5776,7 @@ SK.ui = (function () {
     if (!cur) return;
     const { e, ctx } = cur;
     let title = e.name;
-    if (ctx.agent && ctx.agent.kind === 'pax') title = 'Passenger party · ' + ctx.agent.flight.num;
+    if (ctx.agent && ctx.agent.kind === 'pax') title = 'Passenger party · ' + (ctx.agent.arriving ? ctx.agent.arr.num + ' from ' + ctx.agent.arr.origin : ctx.agent.flight.num);
     if (ctx.bag) title = 'Bag ' + ctx.bag.tag;
     if (ctx.flight && !ctx.agent && !ctx.bag) title = ctx.flight.num + ' to ' + ctx.flight.city;
     $('infoTitle').textContent = title;
@@ -5162,6 +5807,10 @@ SK.ui = (function () {
     const t = SK.sim.now;
     if (ctx.agent) {
       const a = ctx.agent;
+      if (a.kind === 'pax' && a.arriving) {
+        const r = a.arr;
+        return `<div class="live"><b>${esc(r.num)}</b> from ${esc(r.origin)} · on blocks ${SK.fmtTime(r.blockIn)} · bags on carousel ${r.carousel + 1}<br>${a.bags ? 'one hold bag' : 'cabin bags only'}${a.egate ? ' · ePassport' : ''}</div><div class="eyebrow">Journey</div><ul class="timeline">${(a.log || []).slice().reverse().map((l) => `<li><span>${SK.fmtTime(l.t)}</span>${esc(l.text)}</li>`).join('')}</ul>`;
+      }
       if (a.kind === 'pax') {
         const f = a.flight;
         return `<div class="live"><b>${esc(f.num)}</b> to ${esc(f.city)} · gate ${f.gate} · ${esc(f.statusText || '')}<br>${a.cls === 'F' ? 'First' : a.cls === 'J' ? 'Business' : 'Economy'} · ${a.bags ? 'checked bag ' + esc((a.tags || []).join(', ') || 'not yet tagged') : 'no hold bag'}${a.prm ? ' · wheelchair assistance' : ''}${a.egate ? ' · ePassport' : ''} · boarding group ${a.group === 0 ? 'pre-board' : a.group}</div>
@@ -5175,7 +5824,13 @@ SK.ui = (function () {
       const b = ctx.bag;
       return `<div class="live">Tag <b>${esc(b.tag)}</b> · ${esc(b.f.num)} to ${esc(b.f.city)} · now: ${esc(b.state)}</div><div class="eyebrow">Tracking events</div><ul class="timeline">${b.log.slice().reverse().map((l) => `<li><span>${SK.fmtTime(l.t)}</span>${esc(l.text)}</li>`).join('')}</ul>`;
     }
+    if (ctx.abag) { const b = ctx.abag; return `<div class="live">Bag for a passenger on <b>${esc(b.rec.num)}</b> from ${esc(b.rec.origin)} · carousel ${b.rec.carousel + 1}</div><p>Its owner is ${b.owner.dead ? 'gone' : 'on the way or waiting at the belt'}.</p>`; }
     if (ctx.flight) return flightLive(ctx.flight, ctx.plane);
+    if (['claim', 'carousel', 'arrivals'].includes(e.id) && SK.arrivals) {
+      const k = OPS.kpi, list = SK.arrivals.list;
+      return `<div class="data"><div>Arriving passengers today</div><div>${(k.arrived || 0).toLocaleString()}</div><div>Avg first bag</div><div>${k.firstBag == null ? '–' : k.firstBag + ' min'}</div><div>Avg last bag</div><div>${k.lastBag == null ? '–' : k.lastBag + ' min'}</div><div>Delayed bag reports (PIR)</div><div>${k.pir}</div><div>Customs green-channel stops</div><div>${k.customsStops}</div><div>Duty collected</div><div>$${(k.duty || 0).toLocaleString()}</div></div>
+        <div class="eyebrow" style="margin-top:10px">Flights in reclaim</div><table class="fl"><tr><th>Flight</th><th>From</th><th>Belt</th><th>On blocks</th><th>First bag</th></tr>${list.map((r) => `<tr><td>${esc(r.num)}</td><td>${esc(r.origin)}</td><td>${r.carousel + 1}</td><td>${SK.fmtTime(r.blockIn)}</td><td>${r.firstBag ? Math.round((r.firstBag - r.blockIn) / 60) + ' min' : '–'}</td></tr>`).join('')}</table>`;
+    }
     if (e.id === 'gates' || e.id === 'gatepodium') {
       const list = OPS.flightsAhead(8).filter((f) => !f.offBlock);
       return `<div class="eyebrow">Next departures</div><table class="fl"><tr><th>STD</th><th>Flight</th><th>Gate</th><th>Status</th><th>Boarded</th></tr>${list.map((f) => `<tr><td>${SK.fmtTime(f.std)}</td><td>${esc(f.num)}</td><td>${f.gate}</td><td>${pill(f)}</td><td>${f.boarded * P}/${f.figures * P}</td></tr>`).join('')}</table>`;
@@ -5247,7 +5902,7 @@ SK.ui = (function () {
     clearFollow();
     a.highlight = true;
     SK.cam.follow(() => (a.dead || a.hidden && a.kind !== 'pax' ? null : { x: a.x, y: a.y, z: a.z }), 'agent');
-    showChip(a.kind === 'pax' ? 'Following a passenger party to ' + a.flight.city + ' (' + a.flight.num + ')' : 'Following ' + (C[a.role] ? C[a.role].name : 'staff'));
+    showChip(a.kind === 'pax' ? (a.arriving ? 'Following an arriving party from ' + a.arr.origin + ' (' + a.arr.num + ')' : 'Following a passenger party to ' + a.flight.city + ' (' + a.flight.num + ')') : 'Following ' + (C[a.role] ? C[a.role].name : 'staff'));
     U.open(a.role, { agent: a });
   };
   U.followBag = function (b) {
@@ -5263,7 +5918,7 @@ SK.ui = (function () {
     showChip('Following ' + p.f.num + ' to ' + p.f.city);
   };
   U.followRandom = function () {
-    const pool = AG.list.filter((a) => a.kind === 'pax' && !a.hidden && a.log && a.log.length < 4 && a.z > 29);
+    const pool = AG.list.filter((a) => a.kind === 'pax' && !a.arriving && !a.hidden && a.log && a.log.length < 4 && a.z > 29 && a.x < 110);
     const a = pool.length ? SK.rng.pick(pool) : AG.list.find((x) => x.kind === 'pax' && !x.hidden);
     if (a) U.followAgent(a);
   };

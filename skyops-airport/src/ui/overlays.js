@@ -10,8 +10,8 @@ SK.overlays = (function () {
   const host = document.getElementById('labels');
   const labels = SK.ZONES.map((z) => {
     const el = document.createElement('button');
-    el.className = 'lbl' + (z.pass > 1 ? ' locked' : '');
-    el.textContent = z.name + (z.pass > 1 ? ' · pass ' + z.pass : '');
+    el.className = 'lbl' + (z.pass > SK.BUILT_PASS ? ' locked' : '');
+    el.textContent = z.name + (z.pass > SK.BUILT_PASS ? ' · pass ' + z.pass : '');
     el.setAttribute('tabindex', '-1');
     el.addEventListener('click', () => SK.ui.goZone(z.id));
     host.appendChild(el);
@@ -28,7 +28,7 @@ SK.overlays = (function () {
         v.copy(l.p).project(cam);
         const near = cam.position.distanceTo(l.p);
         // hide labels that are behind the camera, off screen, or would clutter a close view
-        vis = v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05 && near < l.z.d * 9 && (dist > 60 || near < 90) && !(l.z.id === 'claim' || l.z.id === 'customs');
+        vis = v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05 && near < l.z.d * 9 && (dist > 60 || near < 90) && l.z.id !== 'corridor';
         if (vis) { l.el.style.left = ((v.x + 1) / 2) * w + 'px'; l.el.style.top = ((1 - v.y) / 2) * h + 'px'; }
       }
       l.el.style.display = vis ? '' : 'none';
@@ -51,15 +51,17 @@ SK.overlays = (function () {
     rect(L.runway.x0, L.runway.x1, L.runway.z - 22, L.runway.z + 22, '#3a3f45');
     rect(L.runway.x0 + 20, L.runway.x1 - 20, L.taxiwayZ - 10, L.taxiwayZ + 10, '#8a9097');
     rect(-165, 165, 64, 90, '#4a4f55');
+    rect(L.arr.roadX - 5, L.arr.roadX + 5, L.arr.roadZ0, L.arr.roadZ1, '#4a4f55');
+    rect(L.arr.x0, L.arr.x1, L.arr.z0, L.arr.z1, dark ? '#c9cdd2' : '#eceae4');
     rect(L.term.x0, L.term.x1, L.term.z0, L.term.z1, dark ? '#c9cdd2' : '#eceae4');
     SK.ZONES.forEach((z) => {
       const [x0, x1, z0, z1] = z.b;
-      c.globalAlpha = z.pass > 1 ? 0.35 : 0.5;
+      c.globalAlpha = z.pass > SK.BUILT_PASS ? 0.35 : 0.5;
       rect(x0, x1, z0, z1, GROUP_COLORS[z.group]);
       c.globalAlpha = 1;
     });
     c.fillStyle = '#ffffff'; c.font = 'bold 15px system-ui, sans-serif'; c.textAlign = 'center';
-    [['Check-in', 0, 44], ['Security', -10, 16], ['Gates', 0, -33], ['Runway 27', 0, L.runway.z + 5], ['BHS', 121, 10], ['Garage', 0, 116], ['Rail', -130, 42]].forEach(([t, x, z]) => { const [a, b] = toMap(x, z); c.fillText(t, a, b); });
+    [['Check-in', 0, 44], ['Security', -10, 16], ['Gates', 0, -33], ['Runway 27', 0, L.runway.z + 5], ['BHS', 121, 10], ['Garage', 0, 116], ['Rail', -130, 42], ['Arrivals', 240, 22]].forEach(([t, x, z]) => { const [a, b] = toMap(x, z); c.fillText(t, a, b); });
   }
   drawBg();
   SK.bus.on('settings', drawBg);
@@ -165,6 +167,7 @@ SK.overlays = (function () {
     heat.visible = l.heat;
     flowGroup.visible = l.flow;
     SK.terminal.roof.visible = l.roof;
+    if (SK.arrivals) SK.arrivals.roof.visible = l.roof;
     SK.landside.vehicles.forEach((v) => (v.g.visible = l.vehicles));
   };
   let tHeat = 0, tMini = 0;

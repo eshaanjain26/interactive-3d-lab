@@ -200,9 +200,6 @@ SK.airfield = (function () {
     s.position.set((x0 + x1) / 2, h + 3, z1 + 0.1); root.add(s);
     K.hit(x1 - x0, h, z1 - z0, (x0 + x1) / 2, 0, (z0 + z1) / 2, root, id);
   }
-  // east pier: arrivals + reclaim + customs (one building, ground floor)
-  future('arrivals', 190, 270, -10, 50, 12, M.wall, 'Arrivals · Baggage claim · Customs', 2);
-  B.box(90, 0.6, 8, M.roof, 145, 6, 20);    // link bridge from the main terminal
   future('cargo', 280, 380, -110, -30, 16, M.wallDark, 'Cargo terminal', 3);
   future('eoc', 140, 162, -48, -32, 6, M.wallDark, 'SOC / EOC', 3);
   future('fire', 20, 60, -186, -166, 8, M.red, 'ARFF fire station', 3);
@@ -212,10 +209,10 @@ SK.airfield = (function () {
   arch.rotation.x = Math.PI / 2; arch.scale.set(1.25, 1, 0.25); arch.position.set(-300, 18, -80);
   root.add(arch);
   // fuel farm tanks
-  for (let i = 0; i < 4; i++) B.cyl(9, 12, M.white, 283 + (i % 2) * 24, 0, 45 + Math.floor(i / 2) * 26, 24);
-  K.hit(60, 12, 60, 300, 0, 60, root, 'fuel');
+  for (let i = 0; i < 4; i++) B.cyl(9, 12, M.white, 348 + (i % 2) * 24, 0, 57 + Math.floor(i / 2) * 26, 24);
+  K.hit(60, 12, 60, 360, 0, 70, root, 'fuel');
   const fs = K.sign(['Fuel farm', 'Pass 3 · coming next'], 10, 2.4, { bg: '#2f3a48', font: 'bold 64px system-ui, sans-serif', accent: '#f2b134' });
-  fs.position.set(300, 16, 92); root.add(fs);
+  fs.position.set(360, 16, 102); root.add(fs);
 
   B.build(root);
 

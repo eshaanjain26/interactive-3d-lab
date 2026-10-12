@@ -13,6 +13,8 @@ SK.ui = (function () {
     { id: 'waitSecurity', label: 'Security wait', fmt: (v) => v + ' min', grade: (v) => (v <= 10 ? 'ok' : v <= 20 ? 'warn' : 'bad'), entry: 'security' },
     { id: 'waitCheckin', label: 'Check-in wait', fmt: (v) => v + ' min', grade: (v) => (v <= 20 ? 'ok' : v <= 35 ? 'warn' : 'bad'), entry: 'checkin' },
     { id: 'waitPassport', label: 'Passport wait', fmt: (v) => v + ' min', grade: (v) => (v <= 10 ? 'ok' : v <= 20 ? 'warn' : 'bad'), entry: 'passport' },
+    { id: 'waitArrImm', label: 'Arrivals immigration', fmt: (v) => v + ' min', grade: (v) => (v <= 10 ? 'ok' : v <= 20 ? 'warn' : 'bad'), entry: 'arrimm' },
+    { id: 'firstBag', label: 'First bag', fmt: (v) => (v == null ? '–' : v + ' min'), grade: (v) => (v == null ? '' : v <= 20 ? 'ok' : v <= 30 ? 'warn' : 'bad'), entry: 'claim' },
     { id: 'otp', label: 'On-time', fmt: (v) => v + '%', grade: (v) => (v >= 80 ? 'ok' : v >= 65 ? 'warn' : 'bad'), entry: 'gates' },
     { id: 'mishandledRate', label: 'Bags mishandled', fmt: (v) => v + ' /1k', grade: (v) => (v <= 7 ? 'ok' : v <= 14 ? 'warn' : 'bad'), entry: 'bhs' },
     { id: 'satisfaction', label: 'Satisfaction', fmt: (v) => v, grade: (v) => (v >= 75 ? 'ok' : v >= 60 ? 'warn' : 'bad'), entry: null },
@@ -30,7 +32,7 @@ SK.ui = (function () {
     const k = OPS.kpi;
     KPI.forEach((d) => {
       const el = $('k_' + d.id);
-      if (!el || k[d.id] == null) return;
+      if (!el || k[d.id] === undefined) return;
       el.textContent = d.fmt(k[d.id], k);
       el.className = d.grade(k[d.id]);
     });
@@ -45,7 +47,7 @@ SK.ui = (function () {
     left.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === leftTab)));
     if (leftTab === 'zones') {
       leftBody.innerHTML = Object.keys(GROUP_NAMES).map((g) => `<div class="eyebrow group-h">${GROUP_NAMES[g]}</div>` +
-        SK.ZONES.filter((z) => z.group === g).map((z, i) => `<button class="zone${z.pass > 1 ? ' locked' : ''}" data-z="${z.id}"><span class="dot" style="background:${SK.overlays.groupColors[g]}"></span>${esc(z.name)}<span class="k">${z.pass > 1 ? 'Pass ' + z.pass : ''}</span></button>`).join('')).join('');
+        SK.ZONES.filter((z) => z.group === g).map((z, i) => `<button class="zone${z.pass > SK.BUILT_PASS ? ' locked' : ''}" data-z="${z.id}"><span class="dot" style="background:${SK.overlays.groupColors[g]}"></span>${esc(z.name)}<span class="k">${z.pass > SK.BUILT_PASS ? 'Pass ' + z.pass : ''}</span></button>`).join('')).join('');
       leftBody.querySelectorAll('.zone').forEach((b) => b.addEventListener('click', () => { U.goZone(b.dataset.z); if (innerWidth < 900) left.classList.remove('on'); }));
     } else if (leftTab === 'layers') {
       const L = [['pax', 'Passengers'], ['staff', 'Staff'], ['vehicles', 'Road vehicles'], ['bags', 'Bags'], ['labels', 'Zone labels'], ['heat', 'Crowd heat map'], ['flow', 'Flow lines'], ['roof', 'Terminal roof']];
@@ -61,9 +63,9 @@ SK.ui = (function () {
     SK.filterGroup = g;
     if (g === 'all') SK.filterFn = null;
     else {
-      const rects = SK.ZONES.filter((z) => z.group === g && z.pass === 1).map((z) => z.b);
+      const rects = SK.ZONES.filter((z) => z.group === g && z.pass <= SK.BUILT_PASS).map((z) => z.b);
       SK.filterFn = (a) => rects.some((b) => a.x >= b[0] && a.x <= b[1] && a.z >= b[2] && a.z <= b[3]);
-      const zs = SK.ZONES.filter((z) => z.group === g && z.pass === 1);
+      const zs = SK.ZONES.filter((z) => z.group === g && z.pass <= SK.BUILT_PASS);
       if (zs.length) {
         const cx = zs.reduce((s, z) => s + z.x, 0) / zs.length, cz = zs.reduce((s, z) => s + z.z, 0) / zs.length;
         SK.cam.flyTo({ x: cx, z: cz }, { dist: g === 'airside' || g === 'ops' ? 200 : 110 });
@@ -96,12 +98,12 @@ SK.ui = (function () {
   // ---------- info panel ----------
   const info = $('info');
   let cur = null, curTab = 'overview';
-  const stationFor = { desk_economy: ['economy'], desk_priority: ['priority'], bagdrop: ['bagdrop'], special_desk: ['special'], kiosk: ['kiosk'], docpodium: ['doc', 'ftDoc'], lane: ['lanes', 'ftLane'], xray: ['lanes'], bodyscanner: ['lanes'], security: ['doc', 'lanes', 'ftLane'], checkin: ['economy', 'priority', 'bagdrop', 'kiosk', 'special'], passport: ['manual', 'egate'], booth: ['manual'], egate: ['egate'], cafe: ['cafe'], food: ['cafe'], lounge: ['lounge'], dutyfree: ['till0', 'till1'] };
+  const stationFor = { desk_economy: ['economy'], desk_priority: ['priority'], bagdrop: ['bagdrop'], special_desk: ['special'], kiosk: ['kiosk'], docpodium: ['doc', 'ftDoc'], lane: ['lanes', 'ftLane'], xray: ['lanes'], bodyscanner: ['lanes'], security: ['doc', 'lanes', 'ftLane'], checkin: ['economy', 'priority', 'bagdrop', 'kiosk', 'special'], passport: ['manual', 'egate'], booth: ['manual'], egate: ['egate'], cafe: ['cafe'], food: ['cafe'], lounge: ['lounge'], dutyfree: ['till0', 'till1'], arrimm: ['arrManual', 'arrEgate'], arr_booth: ['arrManual'], arr_egate: ['arrEgate'], bservices: ['arrServ'], customs: ['arrRed'], red_channel: ['arrRed'] };
   U.open = function (id, ctx) {
     const e = C[id];
     if (!e) return;
     cur = { e, ctx: ctx || {} };
-    const hasLive = !!(cur.ctx.agent || cur.ctx.bag || cur.ctx.flight || stationFor[id] || id === 'gates' || id === 'gatepodium' || id === 'bhs');
+    const hasLive = !!(cur.ctx.agent || cur.ctx.bag || cur.ctx.abag || cur.ctx.flight || stationFor[id] || ['gates', 'gatepodium', 'bhs', 'claim', 'carousel', 'arrivals'].includes(id));
     curTab = hasLive ? 'live' : 'overview';
     info.classList.add('on');
     $('infoKind').textContent = e.future ? 'Coming in pass ' + e.future : e.kind === 'role' ? 'Role' : e.kind === 'zone' ? 'Zone' : 'Equipment and process';
@@ -112,7 +114,7 @@ SK.ui = (function () {
   $('infoClose').addEventListener('click', U.close);
   function tabsFor(e, ctx) {
     const t = [];
-    if (ctx.agent || ctx.bag || ctx.flight || stationFor[e.id] || e.id === 'gates' || e.id === 'gatepodium' || e.id === 'bhs') t.push(['live', 'Live']);
+    if (ctx.agent || ctx.bag || ctx.abag || ctx.flight || stationFor[e.id] || ['gates', 'gatepodium', 'bhs', 'claim', 'carousel', 'arrivals'].includes(e.id)) t.push(['live', 'Live']);
     t.push(['overview', 'Overview']);
     if (e.sop.length) t.push(['sop', 'SOP']);
     if (e.regs.length) t.push(['rules', 'Rules']);
@@ -124,7 +126,7 @@ SK.ui = (function () {
     if (!cur) return;
     const { e, ctx } = cur;
     let title = e.name;
-    if (ctx.agent && ctx.agent.kind === 'pax') title = 'Passenger party · ' + ctx.agent.flight.num;
+    if (ctx.agent && ctx.agent.kind === 'pax') title = 'Passenger party · ' + (ctx.agent.arriving ? ctx.agent.arr.num + ' from ' + ctx.agent.arr.origin : ctx.agent.flight.num);
     if (ctx.bag) title = 'Bag ' + ctx.bag.tag;
     if (ctx.flight && !ctx.agent && !ctx.bag) title = ctx.flight.num + ' to ' + ctx.flight.city;
     $('infoTitle').textContent = title;
@@ -155,6 +157,10 @@ SK.ui = (function () {
     const t = SK.sim.now;
     if (ctx.agent) {
       const a = ctx.agent;
+      if (a.kind === 'pax' && a.arriving) {
+        const r = a.arr;
+        return `<div class="live"><b>${esc(r.num)}</b> from ${esc(r.origin)} · on blocks ${SK.fmtTime(r.blockIn)} · bags on carousel ${r.carousel + 1}<br>${a.bags ? 'one hold bag' : 'cabin bags only'}${a.egate ? ' · ePassport' : ''}</div><div class="eyebrow">Journey</div><ul class="timeline">${(a.log || []).slice().reverse().map((l) => `<li><span>${SK.fmtTime(l.t)}</span>${esc(l.text)}</li>`).join('')}</ul>`;
+      }
       if (a.kind === 'pax') {
         const f = a.flight;
         return `<div class="live"><b>${esc(f.num)}</b> to ${esc(f.city)} · gate ${f.gate} · ${esc(f.statusText || '')}<br>${a.cls === 'F' ? 'First' : a.cls === 'J' ? 'Business' : 'Economy'} · ${a.bags ? 'checked bag ' + esc((a.tags || []).join(', ') || 'not yet tagged') : 'no hold bag'}${a.prm ? ' · wheelchair assistance' : ''}${a.egate ? ' · ePassport' : ''} · boarding group ${a.group === 0 ? 'pre-board' : a.group}</div>
@@ -168,7 +174,13 @@ SK.ui = (function () {
       const b = ctx.bag;
       return `<div class="live">Tag <b>${esc(b.tag)}</b> · ${esc(b.f.num)} to ${esc(b.f.city)} · now: ${esc(b.state)}</div><div class="eyebrow">Tracking events</div><ul class="timeline">${b.log.slice().reverse().map((l) => `<li><span>${SK.fmtTime(l.t)}</span>${esc(l.text)}</li>`).join('')}</ul>`;
     }
+    if (ctx.abag) { const b = ctx.abag; return `<div class="live">Bag for a passenger on <b>${esc(b.rec.num)}</b> from ${esc(b.rec.origin)} · carousel ${b.rec.carousel + 1}</div><p>Its owner is ${b.owner.dead ? 'gone' : 'on the way or waiting at the belt'}.</p>`; }
     if (ctx.flight) return flightLive(ctx.flight, ctx.plane);
+    if (['claim', 'carousel', 'arrivals'].includes(e.id) && SK.arrivals) {
+      const k = OPS.kpi, list = SK.arrivals.list;
+      return `<div class="data"><div>Arriving passengers today</div><div>${(k.arrived || 0).toLocaleString()}</div><div>Avg first bag</div><div>${k.firstBag == null ? '–' : k.firstBag + ' min'}</div><div>Avg last bag</div><div>${k.lastBag == null ? '–' : k.lastBag + ' min'}</div><div>Delayed bag reports (PIR)</div><div>${k.pir}</div><div>Customs green-channel stops</div><div>${k.customsStops}</div><div>Duty collected</div><div>$${(k.duty || 0).toLocaleString()}</div></div>
+        <div class="eyebrow" style="margin-top:10px">Flights in reclaim</div><table class="fl"><tr><th>Flight</th><th>From</th><th>Belt</th><th>On blocks</th><th>First bag</th></tr>${list.map((r) => `<tr><td>${esc(r.num)}</td><td>${esc(r.origin)}</td><td>${r.carousel + 1}</td><td>${SK.fmtTime(r.blockIn)}</td><td>${r.firstBag ? Math.round((r.firstBag - r.blockIn) / 60) + ' min' : '–'}</td></tr>`).join('')}</table>`;
+    }
     if (e.id === 'gates' || e.id === 'gatepodium') {
       const list = OPS.flightsAhead(8).filter((f) => !f.offBlock);
       return `<div class="eyebrow">Next departures</div><table class="fl"><tr><th>STD</th><th>Flight</th><th>Gate</th><th>Status</th><th>Boarded</th></tr>${list.map((f) => `<tr><td>${SK.fmtTime(f.std)}</td><td>${esc(f.num)}</td><td>${f.gate}</td><td>${pill(f)}</td><td>${f.boarded * P}/${f.figures * P}</td></tr>`).join('')}</table>`;
@@ -240,7 +252,7 @@ SK.ui = (function () {
     clearFollow();
     a.highlight = true;
     SK.cam.follow(() => (a.dead || a.hidden && a.kind !== 'pax' ? null : { x: a.x, y: a.y, z: a.z }), 'agent');
-    showChip(a.kind === 'pax' ? 'Following a passenger party to ' + a.flight.city + ' (' + a.flight.num + ')' : 'Following ' + (C[a.role] ? C[a.role].name : 'staff'));
+    showChip(a.kind === 'pax' ? (a.arriving ? 'Following an arriving party from ' + a.arr.origin + ' (' + a.arr.num + ')' : 'Following a passenger party to ' + a.flight.city + ' (' + a.flight.num + ')') : 'Following ' + (C[a.role] ? C[a.role].name : 'staff'));
     U.open(a.role, { agent: a });
   };
   U.followBag = function (b) {
@@ -256,7 +268,7 @@ SK.ui = (function () {
     showChip('Following ' + p.f.num + ' to ' + p.f.city);
   };
   U.followRandom = function () {
-    const pool = AG.list.filter((a) => a.kind === 'pax' && !a.hidden && a.log && a.log.length < 4 && a.z > 29);
+    const pool = AG.list.filter((a) => a.kind === 'pax' && !a.arriving && !a.hidden && a.log && a.log.length < 4 && a.z > 29 && a.x < 110);
     const a = pool.length ? SK.rng.pick(pool) : AG.list.find((x) => x.kind === 'pax' && !x.hidden);
     if (a) U.followAgent(a);
   };

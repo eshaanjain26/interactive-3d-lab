@@ -1,5 +1,6 @@
 // SkyOps learn content: zones, entries (SOP, rules, data, roles, explainer), glossary, quiz. Pure data.
 // Figures are typical published ranges, labelled with their source. Airport, airlines and flights are fictional.
+SK.BUILT_PASS = 2;   // zones with pass <= this are live; later passes are massing only
 (function () {
   const L = SK.L;
   const g = (id) => L.gates.find((x) => x.id === id);
@@ -20,12 +21,14 @@
     { id: 'apron', name: 'Apron and stands', group: 'airside', pass: 1, x: 10, z: -70, d: 150, b: [-180, 120, -110, -40] },
     { id: 'runway', name: 'Runway 09/27', group: 'airside', pass: 1, x: 120, z: -200, d: 420, b: [-460, 460, -245, -140] },
     { id: 'tower', name: 'ATC tower', group: 'ops', pass: 1, x: 150, z: -70, d: 70, y: 40, b: [140, 160, -80, -60] },
-    { id: 'arrivals', name: 'Arrivals hall', group: 'landside', pass: 2, x: 230, z: 20, d: 90, b: [190, 270, -10, 50] },
-    { id: 'claim', name: 'Baggage claim', group: 'landside', pass: 2, x: 230, z: 20, d: 70, b: [190, 270, -10, 50] },
-    { id: 'customs', name: 'Customs', group: 'security', pass: 2, x: 230, z: 0, d: 60, b: [190, 270, -20, 10] },
+    { id: 'arrivals', name: 'Arrivals hall', group: 'landside', pass: 2, x: 281, z: 20, d: 60, b: [272, 306, -10, 50] },
+    { id: 'arrimm', name: 'Arrivals immigration', group: 'security', pass: 2, x: 222, z: 20, d: 62, b: [190, 236, -10, 50] },
+    { id: 'claim', name: 'Baggage claim', group: 'landside', pass: 2, x: 250, z: 22, d: 62, b: [236, 264, -10, 50] },
+    { id: 'customs', name: 'Customs', group: 'security', pass: 2, x: 268, z: 18, d: 40, b: [264, 272, -10, 50] },
+    { id: 'corridor', name: 'Arrivals corridor', group: 'airside', pass: 2, x: 120, z: -41, d: 120, y: 5, b: [-100, 190, -43, 22] },
     { id: 'cargo', name: 'Cargo terminal', group: 'ops', pass: 3, x: 330, z: -70, d: 120, b: [280, 380, -110, -30] },
     { id: 'hangar', name: 'Maintenance hangar', group: 'ops', pass: 3, x: -300, z: -80, d: 120, b: [-350, -250, -120, -40] },
-    { id: 'fuel', name: 'Fuel farm', group: 'ops', pass: 3, x: 300, z: 60, d: 90, b: [270, 330, 30, 90] },
+    { id: 'fuel', name: 'Fuel farm', group: 'ops', pass: 3, x: 360, z: 70, d: 90, b: [330, 390, 40, 100] },
     { id: 'fire', name: 'Fire station (ARFF)', group: 'ops', pass: 3, x: 40, z: -176, d: 70, b: [20, 60, -186, -166] },
     { id: 'eoc', name: 'Operations centre (SOC/EOC)', group: 'ops', pass: 3, x: 150, z: -40, d: 50, b: [140, 162, -48, -32] },
   ];
@@ -183,10 +186,10 @@
     data: [{ k: 'Radar rotation', v: 'Terminal surveillance radars sweep every 4 to 5 seconds' }],
     roles: ['r_atc'], keywords: 'atc tower air traffic control radar',
   });
-  ['arrivals', 'claim', 'customs', 'cargo', 'hangar', 'fuel', 'fire', 'eoc'].forEach((id) => {
+  ['cargo', 'hangar', 'fuel', 'fire', 'eoc'].forEach((id) => {
     const z = SK.ZONES.find((q) => q.id === id);
     add(id, {
-      kind: 'zone', name: z.name, zone: id, at: { x: z.x, z: z.z }, future: z.pass,
+      kind: 'zone', name: z.name, zone: id, at: { x: z.x, z: z.z }, future: z.pass > SK.BUILT_PASS ? z.pass : 0,
       summary: z.name + ' is placed on the map as massing and is scheduled for pass ' + z.pass + '. It will get the same depth as Departures: live agents, SOPs, rules, data and an explainer.',
       keywords: id,
     });
@@ -344,6 +347,80 @@
   add('car', { name: 'Private car', zone: 'curb', at: { x: 0, z: 68 }, summary: 'Private drop-offs should stop only long enough to unload.', keywords: 'car vehicle' });
   add('cordon', { name: 'Cordon', zone: 'security', at: { x: 0, z: 40 }, summary: 'Police tape and staff hold people away from a suspect item or an incident until it is resolved.', keywords: 'cordon tape evacuation' });
 
+
+  // ================= ARRIVALS (pass 2) =================
+  const AR = L.arr;
+  add('corridor', {
+    kind: 'zone', name: 'Arrivals corridor', zone: 'corridor', at: { x: 120, z: -41.4, y: 5.2 },
+    summary: 'Arriving passengers leave the aircraft through the jet bridge and turn into a glass corridor one level above the apron. It keeps them apart from departing passengers, who have already been screened, until arrivals immigration.',
+    sop: ['Deplane through the bridge; crew and gate staff direct passengers to "Arrivals".', 'Walk the sterile corridor to the arrivals building.', 'Escalator down to arrivals immigration.'],
+    regs: [{ src: 'ICAO Annex 17', text: 'Arriving passengers who have not been screened to the departure standard must not mix with screened departing passengers.' }, { src: 'ICAO Annex 9', text: 'Facilitation standards for the arrival border process.' }],
+    data: [{ k: 'Typical deplaning rate', v: 'About 15 to 25 passengers per minute per door' }],
+    roles: ['r_pax'], keywords: 'arrivals corridor deplane sterile segregation',
+    explainer: [
+      { x: -25, z: -44, y: 3, d: 30, text: 'Passengers leave the aircraft through the jet bridge.' },
+      { x: 0, z: -41.4, y: 5.2, d: 40, text: 'A glass corridor above the apron keeps arriving passengers away from screened departures.' },
+      { x: 172, z: -10, y: 5.2, d: 70, text: 'The corridor runs past the baggage hall and tower to the arrivals building.' },
+      { x: 198, z: 20, y: 3, d: 26, text: 'An escalator brings them down to immigration.' },
+    ],
+  });
+  add('arrimm', {
+    kind: 'zone', name: 'Arrivals immigration', zone: 'arrimm', at: { x: 222, z: 20 },
+    summary: 'Every arriving international passenger is admitted by a border officer or an e-gate before collecting bags. This is usually the longest wait on the arrivals side, and it decides how long bags sit on the carousel.',
+    sop: ['Choose a queue: e-gates for eligible ePassports, booths for everyone else.', 'Officer or gate reads the passport chip and matches the face.', 'Visa, watch-list and Advance Passenger Information checks.', 'Questions on purpose of visit and length of stay where required.', 'Admitted, refused, or referred to a secondary office.'],
+    regs: [{ src: 'ICAO Annex 9', text: 'States should use API and risk assessment so most passengers clear quickly and officers focus on the few who need attention.' }, { src: 'ICAO Doc 9303', text: 'ePassport chip and facial image used by e-gates.' }, { src: 'US CBP', text: 'In the US, Customs and Border Protection runs immigration and customs together; Global Entry kiosks serve trusted travellers.' }],
+    data: [{ k: 'IATA ADRM optimum wait', v: '5 to 10 min' }, { k: 'Booths / e-gates here', v: '10 / 8' }],
+    roles: ['r_immigration', 'r_pax'], keywords: 'arrivals immigration border control passport entry egate',
+    explainer: [
+      { x: 219, z: 38, d: 26, text: 'Booth queue: officers check documents, visas and purpose of visit.' },
+      { x: 219, z: 5, d: 26, text: 'e-gates admit eligible ePassport holders in seconds.' },
+      { x: 232, z: 37, d: 16, text: 'Referrals go to a secondary office; everyone else walks on to baggage claim.' },
+    ],
+  });
+  add('claim', {
+    kind: 'zone', name: 'Baggage claim', zone: 'claim', at: { x: 250, z: 22 },
+    summary: 'Bags come off the aircraft, ride a cart to the inbound baggage hall and are loaded onto the carousel shown on the screens. Passengers usually reach the carousel just as the first bags arrive, when immigration and unloading run in step.',
+    sop: ['Ramp agents unload the hold and tow carts to the inbound hall.', 'Handlers put bags on the carousel feed belt; priority-tagged bags go first.', 'Screens show the carousel for each flight.', 'Passengers collect their bag and check the tag.', 'A missing bag goes to the baggage services desk, which files a Property Irregularity Report.'],
+    regs: [{ src: 'IATA Resolution 753', text: 'Bags are tracked at arrival when they are delivered back to the passenger.' }, { src: 'Montreal Convention 1999', text: 'Airlines are liable for lost, delayed or damaged checked baggage up to a limit set in Special Drawing Rights.' }],
+    data: [{ k: 'Common service target', v: 'First bag within 15 to 20 min, last bag within 30 to 40 min of on-blocks' }, { k: 'Carousels here', v: '3' }],
+    roles: ['r_ramp', 'r_bservices', 'r_pax'], keywords: 'baggage claim reclaim carousel belt bags collect',
+    explainer: [
+      { x: 250, z: -12, d: 30, text: 'Carts arrive at the inbound baggage hall behind the claim area.' },
+      { x: 250, z: 22, d: 24, text: 'Handlers feed bags onto the carousel for that flight.' },
+      { x: 243, z: -6.5, d: 16, text: 'No bag? Baggage services files a report and traces it worldwide.' },
+    ],
+  });
+  add('customs', {
+    kind: 'zone', name: 'Customs', zone: 'customs', at: { x: 268, z: 18 },
+    summary: 'Customs controls what comes into the country: goods over the duty-free allowance, cash, food, plants, weapons and drugs. Passengers choose green (nothing to declare) or red (goods to declare); officers stop a share of green-channel passengers on risk and at random.',
+    sop: ['Green channel if within allowances; red channel to declare.', 'Red channel: declare goods, pay duty and tax, receive a receipt.', 'Green channel: officers select passengers on risk indicators and at random.', 'Selected bags are X-rayed or opened in front of the passenger.', 'Seizures and penalties for undeclared goods.'],
+    regs: [{ src: 'WCO Revised Kyoto Convention, Specific Annex J', text: 'Recommends the dual-channel (green/red) system for travellers.' }, { src: 'EU Directive 2007/74/EC', text: 'Travellers arriving by air from outside the EU may bring goods worth up to EUR 430 free of VAT and excise.' }, { src: 'US CBP', text: 'Returning US residents usually have an $800 duty-free personal exemption.' }, { src: 'Cash controls', text: 'Cash of EUR 10,000 or more entering the EU, or more than $10,000 entering the US, must be declared.' }],
+    data: [{ k: 'Channels here', v: 'Green (nothing to declare), red (goods to declare)' }],
+    roles: ['r_customs'], keywords: 'customs green channel red channel declare duty',
+    explainer: [
+      { x: 266, z: 12, d: 18, text: 'Green channel: nothing to declare.' },
+      { x: 268, z: 29, d: 16, text: 'Red channel: declare goods and pay duty.' },
+      { x: 269, z: 4, d: 14, text: 'Officers stop some green-channel passengers and search their bags.' },
+    ],
+  });
+  add('arrivals', {
+    kind: 'zone', name: 'Arrivals hall', zone: 'arrivals', at: { x: 281, z: 20 },
+    summary: 'Past customs, passengers walk into the public arrivals hall where friends, family and drivers wait behind the barrier. Currency exchange, SIM cards and car hire sit here, and the doors lead to the pickup curb.',
+    sop: ['Exit customs into the landside hall; re-entry is not allowed.', 'Meet greeters at the barrier.', 'Buy a SIM, change money or collect a hire car.', 'Leave by taxi, ride share, private car, bus or rail.'],
+    data: [{ k: 'Exits', v: '3 doors to the pickup curb' }],
+    roles: ['r_driver', 'r_pax'], keywords: 'arrivals hall meet greet pickup taxi',
+  });
+  add('arr_booth', { name: 'Arrivals passport booth', zone: 'arrimm', at: { x: 232, z: 38 }, summary: 'An officer admits the traveller: document and chip check, face match, visa and watch lists, and questions where needed.', sop: ['Scan passport and check the chip.', 'Compare face, check visa and lists.', 'Ask purpose and length of stay.', 'Admit, refuse or refer.'], regs: [{ src: 'ICAO Annex 9', text: 'Border inspection standards on arrival.' }], data: [{ k: 'Service time', v: 'About 45 to 90 seconds per traveller' }], roles: ['r_immigration'], keywords: 'immigration booth arrivals officer' });
+  add('arr_egate', { name: 'Arrivals e-gate', zone: 'arrimm', at: { x: 232, z: 5 }, summary: 'Eligible ePassport holders clear themselves: chip read, live face match, then the exit door opens.', sop: ['Passport on the reader.', 'Look at the camera.', 'Exit door opens, or an officer helps.'], regs: [{ src: 'ICAO Doc 9303', text: 'Chip and facial image standards.' }], roles: ['r_immigration'], keywords: 'egate arrivals automated border' });
+  add('carousel', { name: 'Baggage carousel', zone: 'claim', at: { x: 250, z: 22 }, summary: 'A sloped, continuously moving belt that holds a flight\'s bags until passengers collect them. A feed belt from the inbound baggage hall drops bags onto it.', sop: ['Feed starts when the first cart arrives.', 'Bags circulate until collected.', 'Unclaimed bags are taken to baggage services at the end of the flight.'], data: [{ k: 'Common service target', v: 'First bag within 15 to 20 min of on-blocks' }], roles: ['r_ramp'], keywords: 'carousel belt reclaim' });
+  add('bservices', { name: 'Baggage services (lost and found)', zone: 'claim', at: { x: 243, z: -6.5 }, summary: 'Where passengers report missing or damaged bags. The agent files a Property Irregularity Report (PIR) and the bag is traced through WorldTracer, the industry tracing system.', sop: ['Check the bag tag stub against the system.', 'File a PIR with a description and delivery address.', 'Give the passenger a file reference.', 'Track the bag; deliver it when found.'], regs: [{ src: 'Montreal Convention 1999', text: 'Airline liability for delayed, lost or damaged baggage, and claim time limits.' }], roles: ['r_bservices'], keywords: 'lost found baggage services pir worldtracer delayed bag' });
+  add('green_channel', { name: 'Green channel', zone: 'customs', at: { x: 266, z: 12 }, summary: 'Nothing to declare. Passengers walk through, but officers watch and stop some for checks.', sop: ['Walk through if within allowances.', 'Stop if an officer asks.'], regs: [{ src: 'WCO Revised Kyoto Convention', text: 'Dual-channel system.' }], roles: ['r_customs'], keywords: 'green channel nothing to declare' });
+  add('red_channel', { name: 'Red channel', zone: 'customs', at: { x: 268, z: 29 }, summary: 'Goods to declare: anything over the allowance, commercial goods, large amounts of cash, restricted food or plants.', sop: ['Declare goods.', 'Officer assesses duty and tax.', 'Pay and keep the receipt.'], regs: [{ src: 'EU Directive 2007/74/EC / US CBP', text: 'Traveller allowances: EUR 430 by air into the EU; $800 for returning US residents.' }], roles: ['r_customs'], keywords: 'red channel declare duty' });
+  add('meetgreet', { name: 'Meet and greet barrier', zone: 'arrivals', at: { x: 276, z: 20 }, summary: 'Greeters wait behind the barrier so the exit stream from customs stays clear.', sop: ['Greeters wait outside the exit lane.', 'Drivers hold name boards.'], keywords: 'meet greet barrier family drivers' });
+  add('kiosks_arr', { name: 'Currency, SIM and car hire', zone: 'arrivals', at: { x: 283, z: -6 }, summary: 'First stops for many visitors: local currency, a mobile SIM and the car hire desks. Like duty free, they pay concession fees that fund the airport.', keywords: 'currency exchange sim card car rental hire atm' });
+  add('pickup', { name: 'Pickup curb', zone: 'arrivals', at: { x: 296, z: 20 }, summary: 'Cars, taxis and ride shares collect arriving passengers. Short dwell limits keep the curb moving.', sop: ['Wait inside until your ride arrives.', 'Load and leave.'], roles: ['r_driver'], keywords: 'pickup curb taxi ride share' });
+  add('arrfids', { name: 'Arrivals board', zone: 'arrivals', at: { x: 244, z: 22 }, summary: 'Shows each arrival\'s origin, landing time, on-blocks time and its carousel number.', keywords: 'arrivals board screen carousel number' });
+
   // ================= ROLES =================
   const role = (id, name, zone, summary, sop, extra) => add(id, Object.assign({ kind: 'role', name, zone, summary, sop, at: C[zone].at }, extra || {}));
   role('r_pax', 'Passenger', 'checkin', 'Each figure here stands for ' + SK.PAX_PER_FIGURE + ' passengers on the same flight. Click one to follow its journey from the curb to the aircraft.', ['Arrive at the curb or station.', 'Check in and drop bags.', 'Clear security and passport control.', 'Shop, eat or relax, then go to the gate.', 'Board by group.']);
@@ -365,6 +442,9 @@
   role('r_bhs', 'BHS operator', 'bhs', 'Monitors the baggage system, clears jams and reviews bag images flagged by the scanners.', ['Watch the control screens.', 'Clear jams fast.', 'Review flagged images.']);
   role('r_atc', 'Air traffic controller', 'tower', 'Separates aircraft on the ground and in the air.', ['Issue clearances.', 'Sequence the runway.', 'Hand over to the next sector.']);
   role('r_paramedic', 'Paramedic', 'gates', 'Airport medical responders reach any gate within minutes and carry a defibrillator, oxygen and a stretcher.', ['Assess the patient.', 'Treat and stabilise.', 'Transfer to hospital or clear the passenger to fly.']);
+  role('r_customs', 'Customs officer', 'customs', 'Controls goods entering the country, collects duty and tax, and stops smuggling of drugs, cash, weapons and protected species.', ['Watch the channels and select passengers on risk.', 'Search bags with the passenger present.', 'Assess duty in the red channel.', 'Seize prohibited goods.']);
+  role('r_bservices', 'Baggage services agent', 'claim', 'Handles missing, delayed and damaged bags: files the PIR, traces the bag and arranges delivery.', ['Match tag stub to record.', 'File the PIR.', 'Trace and deliver.']);
+  role('r_greeter', 'Greeter', 'arrivals', 'Friends, family and drivers meeting arriving passengers in the public hall.', ['Wait behind the barrier.']);
   role('r_driver', 'Driver', 'curb', 'Taxi, shuttle and bus drivers who bring passengers to the curb.', ['Stop only in the assigned bay.', 'Unload and move on.']);
 
   SK.CONTENT = C;
@@ -422,6 +502,13 @@
     ['Stand', 'A marked aircraft parking position.'],
     ['STD', 'Scheduled time of departure.'],
     ['STEB', 'Security tamper-evident bag for liquids bought airside.'],
+    ['PIR', 'Property Irregularity Report. Filed at baggage services when a bag is missing or damaged.'],
+    ['WorldTracer', 'The shared airline system used to trace mishandled bags.'],
+    ['Green channel', 'Customs exit for passengers with nothing to declare.'],
+    ['Red channel', 'Customs exit for passengers with goods to declare.'],
+    ['Reclaim', 'Baggage claim; the carousels where passengers collect hold bags.'],
+    ['Deplaning', 'Passengers leaving the aircraft after arrival.'],
+    ['On-blocks', 'The moment an arriving aircraft stops on its stand; bag delivery times are measured from here.'],
     ['Sterile area', 'The screened zone between security and the aircraft.'],
     ['Taxiway', 'Paved path aircraft use to move between runway and apron.'],
     ['Tug', 'Vehicle that pushes aircraft or tows baggage carts.'],
@@ -453,5 +540,9 @@
     { q: 'IATA ADRM optimum wait at security is…', o: ['0 to 2 min', '5 to 10 min', '20 to 30 min', '45 min'], a: 1, why: 'ADRM gives 5 to 10 minutes as the optimum range.', ref: 'security' },
     { q: 'Why does a body scanner with ATR show a generic outline?', o: ['To save power', 'To protect privacy', 'Because it cannot see the body', 'To speed the belt'], a: 1, why: 'Automated target recognition flags areas on an outline; no image of the person is shown.', ref: 'bodyscanner' },
     { q: 'What is reactionary delay?', o: ['Delay caused by passenger complaints', 'Delay passed on from an earlier late flight of the same aircraft or crew', 'ATC delay', 'Delay from a bird strike'], a: 1, why: 'A late inbound aircraft delays the outbound flight, and the delay can cascade all day.', ref: 'apron' },
+    { q: 'Why do arriving passengers use a separate corridor from departing passengers?', o: ['To shorten the walk', 'Departing passengers are screened; unscreened arrivals must not mix with them', 'For duty free sales', 'Fire regulations'], a: 1, why: 'ICAO Annex 17 segregation keeps the screened departure area clean.', ref: 'corridor' },
+    { q: 'What does a passenger do if their bag does not arrive?', o: ['Wait until tomorrow', 'File a Property Irregularity Report at baggage services', 'Call the police', 'Go back airside'], a: 1, why: 'The PIR starts the trace in WorldTracer and the airline delivers the bag.', ref: 'bservices' },
+    { q: 'In the dual-channel customs system, the red channel is for…', o: ['Crew only', 'Goods to declare', 'Diplomats', 'Transfer passengers'], a: 1, why: 'Green means nothing to declare; red means goods to declare (WCO Revised Kyoto Convention).', ref: 'customs' },
+    { q: 'Bag delivery times are usually measured from…', o: ['Landing', 'On-blocks', 'Passport control', 'Gate close'], a: 1, why: 'Service targets for first and last bag count from on-blocks.', ref: 'claim' },
   ];
 })();

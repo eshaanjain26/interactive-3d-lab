@@ -505,6 +505,8 @@ SK.agents = (function () {
       if (a.visibleFn) a.hidden = !a.visibleFn();
     }
   };
+  // shared helpers for other sim modules (arrivals, crisis responders)
+  Object.assign(AG, { make, setPath, go, walkTo, use, station, waitSim, until, ARRIVE, log, jit, takeSeat, sit, freeSeat, WALK });
   AG.rendered = function () {
     const lay = SK.layers || {};
     return AG.list.filter((a) => !a.hidden && (a.kind === 'pax' ? lay.pax !== false : lay.staff !== false) && (!SK.filterFn || SK.filterFn(a)));
