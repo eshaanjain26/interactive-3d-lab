@@ -172,3 +172,24 @@ test('copy rules: no em dashes or banned words in learn content', () => {
   const m = all.match(banned);
   assert.equal(m, null, 'found: ' + (m && m[0]));
 });
+
+test('gate options respect aircraft size and turn spacing', () => {
+  const gates = SK.L.gates;
+  const H = 3600;
+  const fl = [
+    { id: 'a', gate: 'A1', wide: false, std: 10 * H },
+    { id: 'b', gate: 'A2', wide: false, std: 10 * H + 600 },
+    { id: 'c', gate: 'A3', wide: true, std: 12 * H },
+    { id: 'd', gate: 'A4', wide: false, std: 13 * H },
+  ];
+  const optsA = SK.gateOptions(fl, fl[0], gates);
+  const a2 = optsA.find((o) => o.gate === 'A2');
+  assert.ok(a2 && a2.swap === fl[1], 'A2 is busy 10 min later, so it is offered as a swap');
+  assert.ok(optsA.some((o) => o.gate === 'A5' && !o.swap), 'A5 is free');
+  assert.ok(optsA.some((o) => o.gate === 'A4' && !o.swap), 'A4 next departs 180 min later, so it is a plain move');
+  const optsC = SK.gateOptions(fl, fl[2], gates);
+  assert.equal(optsC.length, 0, 'only A3 takes wide-bodies');
+  assert.ok(SK.gateChangeable({}));
+  assert.ok(!SK.gateChangeable({ plane: {} }));
+  assert.ok(!SK.gateChangeable({ crewSent: true }));
+});

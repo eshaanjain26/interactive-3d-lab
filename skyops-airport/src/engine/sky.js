@@ -66,7 +66,7 @@ SK.sky = (function () {
   for (let i = 0; i < SNOW_N; i++) snowPos.set([(Math.random() - 0.5) * AREA, Math.random() * TOP, (Math.random() - 0.5) * AREA], i * 3);
   const snowGeo = new THREE.BufferGeometry();
   snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPos, 3));
-  const snow = new THREE.Points(snowGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.35, transparent: true, opacity: 0.9 }));
+  const snow = new THREE.Points(snowGeo, new THREE.PointsMaterial({ map: SK.kit.puff, depthWrite: false, color: 0xffffff, size: 0.35, transparent: true, opacity: 0.9 }));
   snow.frustumCulled = false; snow.visible = false;
   scene.add(snow);
 

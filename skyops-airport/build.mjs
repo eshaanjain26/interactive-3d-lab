@@ -10,7 +10,7 @@ export const ORDER = [
   'engine/renderer.js', 'engine/kit.js', 'engine/sky.js', 'engine/camera.js',
   'world/landside.js', 'world/terminal.js', 'world/airfield.js', 'world/aircraft.js',
   'sim/crowd.js', 'sim/agents.js', 'sim/bags.js', 'sim/ops.js', 'world/arrivals.js', 'world/support.js', 'sim/crisis.js',
-  'ui/a11y.js', 'ui/overlays.js', 'ui/hud.js', 'ui/edu.js', 'main.js',
+  'ui/a11y.js', 'ui/audio.js', 'ui/overlays.js', 'ui/hud.js', 'ui/edu.js', 'main.js',
 ];
 const body = ORDER.filter((f) => fs.existsSync(path.join(here, 'src', f))).map((f) => `// ===== ${f} =====\n${src(f)}`).join('\n');
 const guarded = `(function () {

@@ -211,7 +211,7 @@ SK.agents = (function () {
       const seat = takeSeat(D.loungeSeats.filter((s) => s.first === (a.cls === 'F') || !s.first));
       if (seat) { yield* walkTo(a, seat); sit(a, seat); log(a, 'Relaxing in the ' + (a.cls === 'F' ? 'first class room' : 'business lounge')); yield until(() => now() >= boardAt() - SK.minutes(8)); freeSeat(a); a.anim = 'idle'; }
       a.node = 'loungeIn';
-    } else if (!premium && room < 0.4 && boardAt() - now() > SK.minutes(35)) {
+    } else if (!premium && room < 0.4 && !(SK.ops && SK.ops.holds.foodClosed) && boardAt() - now() > SK.minutes(35)) {
       yield* use(a, AG.st.cafe, 'foodIn', 'Food court');
       const spend = Math.round(SK.rng.range(9, 28)) * P;
       SK.bus.emit('sale', { kind: 'food', amount: spend });
@@ -233,19 +233,27 @@ SK.agents = (function () {
       yield* go(a, which + 'In');
     }
 
-    // gate
-    if (f.gateClosed || f.offBlock) return yield* missed(a);
-    yield* go(a, 'gate' + f.gate);
-    log(a, 'At gate ' + f.gate);
-    const gd = D.gates[f.gate];
-    if (!(f.boarding && a.group <= f.groupCalled)) {
-      const seat = takeSeat(gd.seats);
-      if (seat) { yield* walkTo(a, seat); sit(a, seat); }
-      yield until(() => (f.boarding && a.group <= f.groupCalled) || f.gateClosed);
-      freeSeat(a); a.anim = 'idle';
-      if (f.gateClosed) return yield* missed(a);
-      a.node = 'gate' + f.gate;
+    // gate (follows a gate change announced while the passenger is on the way or seated)
+    let atGate = null;
+    for (;;) {
+      if (f.gateClosed || f.offBlock) { freeSeat(a); return yield* missed(a); }
+      if (atGate !== f.gate) {
+        if (atGate) { freeSeat(a); a.anim = 'idle'; a.node = 'gate' + atGate; log(a, 'Gate change: walking to ' + f.gate); }
+        const target = f.gate;
+        yield* go(a, 'gate' + target);
+        atGate = target;
+        log(a, 'At gate ' + target);
+        continue;
+      }
+      if (f.boarding && a.group <= f.groupCalled) break;
+      if (!a.seat) {
+        const seat = takeSeat(D.gates[f.gate].seats);
+        if (seat) { yield* walkTo(a, seat); if (atGate === f.gate) sit(a, seat); continue; }
+      }
+      yield until(() => (f.boarding && a.group <= f.groupCalled) || f.gateClosed || f.gate !== atGate);
     }
+    freeSeat(a); a.anim = 'idle';
+    a.node = 'gate' + f.gate;
     yield* use(a, AG.st['board' + f.gate], null, 'Boarding (group ' + (a.group === 0 ? 'pre-board' : a.group) + ')');
     log(a, 'Boarding pass scanned');
     f.walkingAboard = (f.walkingAboard || 0) + 1;

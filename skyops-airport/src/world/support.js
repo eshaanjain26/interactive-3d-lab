@@ -307,7 +307,7 @@ SK.support = (function () {
   const SPN = 600;
   const spPos = new Float32Array(SPN * 3), spVel = new Float32Array(SPN * 3), spLife = new Float32Array(SPN);
   const spGeo = new THREE.BufferGeometry(); spGeo.setAttribute('position', new THREE.BufferAttribute(spPos, 3));
-  const spray = new THREE.Points(spGeo, new THREE.PointsMaterial({ color: 0xe8f4ff, size: 0.5, transparent: true, opacity: 0.85 }));
+  const spray = new THREE.Points(spGeo, new THREE.PointsMaterial({ map: SK.kit.puff, depthWrite: false, color: 0xe8f4ff, size: 0.5, transparent: true, opacity: 0.85 }));
   spray.frustumCulled = false; root.add(spray);
   let spIdx = 0;
   S.drill = function (target, label) {
@@ -426,17 +426,106 @@ SK.support = (function () {
   const stPos = new Float32Array(STN * 3);
   for (let i = 0; i < STN; i++) stPos.set([(i % 2 ? -168 : -168) + SK.rng.range(-3, 3), 14 + SK.rng.range(0, 20), (i % 2 ? 104 : 122) + SK.rng.range(-3, 3)], i * 3);
   const stGeo = new THREE.BufferGeometry(); stGeo.setAttribute('position', new THREE.BufferAttribute(stPos, 3));
-  const steam = new THREE.Points(stGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 2.6, transparent: true, opacity: 0.35, depthWrite: false }));
+  const steam = new THREE.Points(stGeo, new THREE.PointsMaterial({ map: SK.kit.puff, depthWrite: false, color: 0xffffff, size: 4.5, transparent: true, opacity: 0.35, depthWrite: false }));
   steam.frustumCulled = false; root.add(steam);
 
   B.build(root);
   RB.build(roof);
 
+  // =============== TURNAROUND SERVICES ===============
+  // Ground power from block-in to pushback; cleaning, water, catering and lavatory trucks in their windows.
+  function svcVehicle(body, h, len, extra) {
+    const g = new THREE.Group();
+    K.box(2.2, 1.0, len, body, 0, 0.4, 0, g);
+    K.box(2.2, 1.3, 1.8, M.white, 0, 0.4, len / 2 - 0.9, g);
+    K.box(2.0, 0.6, 1.4, M.glassDark, 0, 1.2, len / 2 - 0.7, g);
+    if (extra) extra(g, h);
+    g.visible = false; root.add(g);
+    return g;
+  }
+  const blue = new THREE.MeshStandardMaterial({ color: 0x2a6fb5, roughness: 0.5 });
+  const grey = new THREE.MeshStandardMaterial({ color: 0x6b7680, roughness: 0.6 });
+  const SVC = [
+    // id, entry, window start / end (sim min after block-in; end null = until pushback), local offset (x right-negative, z aft), builder
+    { id: 'gpu', entry: 'gpu', t0: 1, t1: null, at: (d) => [-1.2, -3.2], make: () => { const g = new THREE.Group(); K.box(1.4, 1.1, 2, M.yellow, 0, 0.2, 0, g); g.visible = false; root.add(g); return g; } },
+    { id: 'clean', entry: 'cleaning', t0: 6, t1: 22, at: (d) => [-(d.r + 4.5), -9], make: () => svcVehicle(grey, 0, 5) },
+    { id: 'water', entry: 'water_lav', t0: 8, t1: 18, at: (d) => [-(d.r + 4.2), -d.len * 0.62], make: () => svcVehicle(blue, 0, 5, (g) => K.cyl(0.8, 0.8, 3, blue, 0, 1.3, -0.6, g, 12).rotation.set(Math.PI / 2, 0, 0)) },
+    { id: 'cater', entry: 'catering', t0: 12, t1: 30, at: (d) => [-(d.r + 3.4), -d.len * 0.82], make: () => svcVehicle(M.white, 0, 7, (g) => { const box = K.box(2.4, 2.6, 4.6, M.white, 0, 1.4, -1, g); g.userData.box = box; K.box(2.5, 0.3, 4.7, M.red, 0, 4.0, -1, g); g.userData.boxStripe = g.children[g.children.length - 1]; }) },
+    { id: 'lav', entry: 'water_lav', t0: 20, t1: 30, at: (d) => [d.r + 4.2, -d.len * 0.86], make: () => svcVehicle(grey, 0, 5) },
+  ];
+  const svcPool = {};
+  function serviceStand(p) {
+    const f = p.f, d = p.dim, t = now();
+    const k = f.wide ? 1.5 : 1;
+    const s = Math.sin(p.heading), c = Math.cos(p.heading);
+    SVC.forEach((v) => {
+      const key = p.g.id + v.id;
+      const g = svcPool[key] || (svcPool[key] = (() => { const m = v.make(); E.pick.add(m, v.entry); return m; })());
+      const start = f.blockIn + SK.minutes(v.t0 * k), end = v.t1 == null ? Infinity : f.blockIn + SK.minutes(v.t1 * k);
+      const on = p.state === 'parked' && !f.pushApproved && t >= start && t < end;
+      g.visible = on;
+      if (!on) return;
+      const [lx, lz] = v.at(d);
+      g.position.set(p.x + lx * c + lz * s, 0, p.z - lx * s + lz * c);
+      g.rotation.y = p.heading + (v.id === 'gpu' ? 0 : Math.PI / 2);
+      if (v.id === 'cater' && g.userData.box) {
+        // the catering box rides up to the door sill and back down
+        const u = SK.clamp((t - start) / SK.minutes(4), 0, 1) * SK.clamp((end - t) / SK.minutes(4), 0, 1);
+        g.userData.box.position.y = 1.4 + u * (d.doorH - 1.8);
+        g.userData.boxStripe.position.y = 4.0 + u * (d.doorH - 1.8);
+      }
+    });
+  }
+  function hideServices(gid) { SVC.forEach((v) => { const g = svcPool[gid + v.id]; if (g) g.visible = false; }); }
+
+  // =============== DE-ICING ===============
+  const orange = new THREE.MeshStandardMaterial({ color: 0xe8742a, roughness: 0.5 });
+  const deicers = [0, 1].map(() => {
+    const g = new THREE.Group();
+    K.box(2.6, 1.6, 8, orange, 0, 0.5, 0, g);
+    K.box(0.4, 0.4, 7, M.darkSteel, 0, 3.2, -1, g).rotation.x = -0.5;
+    K.box(1.4, 1.2, 1.4, M.white, 0, 6.2, -4.4, g);
+    g.visible = false; root.add(g); E.pick.add(g, 'deicing');
+    return g;
+  });
+  const DIN = 400;
+  const diPos = new Float32Array(DIN * 3), diVel = new Float32Array(DIN * 3), diLife = new Float32Array(DIN);
+  const diGeo = new THREE.BufferGeometry(); diGeo.setAttribute('position', new THREE.BufferAttribute(diPos, 3));
+  const diSpray = new THREE.Points(diGeo, new THREE.PointsMaterial({ map: SK.kit.puff, depthWrite: false, color: 0xffa040, size: 0.45, transparent: true, opacity: 0.8 }));
+  diSpray.frustumCulled = false; root.add(diSpray);
+  let diIdx = 0;
+  function updateDeicing(dt) {
+    const p = SK.aircraft.planes.find((q) => q.state === 'holding' && q.deicing && q.wait > 0);
+    deicers.forEach((g, i) => {
+      g.visible = !!p;
+      if (!p) return;
+      const side = i ? 1 : -1, d = p.dim, s = Math.sin(p.heading), c = Math.cos(p.heading);
+      const lx = side * (d.span * 0.32), lz = -d.len * 0.38;
+      g.position.set(p.x + lx * c + lz * s, 0, p.z - lx * s + lz * c);
+      g.rotation.y = p.heading + side * Math.PI / 2;
+      for (let k = 0; k < 6; k++) {
+        const j = diIdx++ % DIN;
+        const bx = g.position.x - Math.sin(g.rotation.y) * 4.4, bz = g.position.z - Math.cos(g.rotation.y) * 4.4;
+        diPos.set([bx, 6, bz], j * 3);
+        const toward = Math.atan2(p.x - bx, p.z - bz) + SK.rng.range(-0.3, 0.3);
+        diVel.set([Math.sin(toward) * 6, SK.rng.range(-1, 1), Math.cos(toward) * 6], j * 3);
+        diLife[j] = 0.9;
+      }
+    });
+    for (let i = 0; i < DIN; i++) {
+      if (diLife[i] <= 0) { diPos[i * 3 + 1] = -50; continue; }
+      diLife[i] -= dt; diVel[i * 3 + 1] -= 6 * dt;
+      diPos[i * 3] += diVel[i * 3] * dt; diPos[i * 3 + 1] = Math.max(0.05, diPos[i * 3 + 1] + diVel[i * 3 + 1] * dt); diPos[i * 3 + 2] += diVel[i * 3 + 2] * dt;
+    }
+    diGeo.attributes.position.needsUpdate = true;
+  }
+
   // =============== update ===============
   S.update = function (dt) {
     if (dt <= 0) return;
     S.freighters.forEach((f) => { if (!f.departed) freighterTurn(f, dt); });
-    SK.aircraft.planes.forEach((p) => { if (!p.g.cargo && !p.g.bus) fuelStand(p); });
+    SK.aircraft.planes.forEach((p) => { if (!p.g.cargo && !p.g.bus) { fuelStand(p); serviceStand(p); } });
+    L.gates.forEach((g) => { if (!SK.aircraft.planes.some((p) => p.g.id === g.id && p.state === 'parked')) hideServices(g.id); });
     Object.keys(disp).forEach((gid) => { if (!SK.aircraft.planes.some((p) => p.g.id === gid && p.state === 'parked')) disp[gid].visible = false; });
     updateTrucks(dt);
     forks.forEach((fk) => {
@@ -450,6 +539,7 @@ SK.support = (function () {
   let wallT = 0;
   S.visual = function (dtReal) {
     updateSpray(dtReal);
+    updateDeicing(dtReal);
     const p = stGeo.attributes.position.array;
     for (let i = 0; i < STN; i++) { p[i * 3 + 1] += dtReal * 2.2; p[i * 3] += dtReal * 0.8; if (p[i * 3 + 1] > 40) { p[i * 3 + 1] = 14; p[i * 3] = -168 + SK.rng.range(-3, 3); } }
     stGeo.attributes.position.needsUpdate = true;

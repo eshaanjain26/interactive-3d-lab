@@ -3,8 +3,8 @@
 A browser-based 3D simulation of a fictional international airport, SKY International.
 
 - **Pass 1, Departures:** curb and rail link, check-in, security with K9, passport control, walk-through duty free, food court, lounges, gates with jet bridges and a bus gate, the baggage hall, the apron and runway 27.
-- **Pass 3, Support:** a cargo terminal with freighter turns on stand C1 (ULD dolly trains, high loader, bonded area), a maintenance hangar with an aircraft on a check, a fuel farm with a hydrant pipe rack and dispensers fuelling every turnaround, an ARFF fire station with response drills, the airport operations centre with a live video wall, and the central utility plant.
 - **Pass 2, Arrivals:** deplaning from every inbound aircraft, a sterile arrivals corridor, arrivals immigration (booths and e-gates), baggage claim with three carousels and baggage services, green/red customs channels, the arrivals hall and the pickup curb.
+- **Pass 3, Support:** a cargo terminal with freighter turns on stand C1 (ULD dolly trains, high loader, bonded area), a maintenance hangar with an aircraft on a check, a fuel farm with a hydrant pipe rack and dispensers fuelling every turnaround, an ARFF fire station with response drills, the airport operations centre with a live video wall, and the central utility plant.
 
 Open `index.html` in a browser. No install, no build step for viewers.
 
@@ -13,10 +13,12 @@ Open `index.html` in a browser. No install, no build step for viewers.
 - **Explore.** Orbit, pan and zoom; fly to any zone from the panel, the minimap or the search box (`baggage`, `K9`, `runway 27`, a flight number).
 - **Click anything.** People, desks, scanners, bags and aircraft open a card with an overview, the SOP, the rules behind it (ICAO, IATA, TSA, FAA, EU), benchmark data, roles, and a live view. Every card has an animated explainer.
 - **Follow.** Follow a passenger party from the curb to their seat (their journey log fills in), a bag through CT screening to the hold, or an aircraft from landing to take-off.
-- **Cameras.** Strategy, top-down, walk (WASD or touch joystick), nine CCTV feeds, drone orbit.
+- **Cameras.** Strategy, top-down, walk (WASD or touch joystick), twelve CCTV feeds, drone orbit.
 - **Time and weather.** Pause to 8x; clear, rain, fog, snow, thunderstorm; lighting follows the clock or a fixed time of day.
-- **Modes.** Sandbox (auto staffing), Operations (you open and close desks, lanes, booths and e-gates against a staffing cost), Crisis (eight incidents with timed decisions and a scored debrief: unattended bag, medical, X-ray failure, check-in outage, thunderstorm, runway incursion, bird strike, ransomware).
-- **Learn.** Live KPI dashboard, a quiz, a 58-term glossary, and a "who does what" role directory.
+- **Modes.** Sandbox (auto staffing), Operations (you open and close desks, lanes, booths and e-gates against a staffing cost), Crisis (nine incidents with timed decisions and a scored debrief: unattended bag, medical with ambulance, X-ray failure, check-in outage, thunderstorm, runway incursion, bird strike, ransomware, food court fire evacuation).
+- **Gate plan.** Move a departure to another gate before its aircraft and crew are committed; passengers already at the old gate walk to the new one.
+- **Sound (opt-in).** Procedural terminal ambience, crowd murmur, jet rumble that follows nearby aircraft, boarding chimes and spoken ATC tower calls, all synthesised in the browser.
+- **Learn.** Live KPI dashboard, a 32-question quiz, a 79-term glossary, and a "who does what" role directory.
 
 ## What is simulated
 
@@ -31,7 +33,8 @@ Open `index.html` in a browser. No install, no build step for viewers.
 | Bags | Belt, CT level 1/3 screening, carousel, cart departure at STD-28, short-shipped bags counted as mishandled |
 | Aircraft | Approach, landing, taxi-in, marshalling, bridge docking, turnaround, pushback, de-icing in snow, take-off; single-runway lock; late inbound aircraft cause reactionary delays |
 | Arrivals | Each inbound aircraft deplanes 70 to 92% of seats; bags towed to the inbound hall and fed to a carousel; first and last bag times from on-blocks; 1.5% delayed bags filed as PIRs; 4% red channel with duty, 3% green-channel stops |
-| Support | Three freighter turns a day (imports to the bonded area, exports loaded in sequence); hydrant fuelling on every pax turnaround; ARFF drills report time to position |
+| Turnaround | Ground power, cabin cleaning, potable water, catering (box lifts to the galley door), lavatory service and hydrant fuelling, each in its time window; de-icing trucks spray at the holding point in snow |
+| Support | Three freighter turns a day (imports to the bonded area, exports loaded in sequence); ARFF drills report time to position; ops-centre video wall mirrors the live KPIs |
 | KPIs | Waits graded against IATA ADRM optimum ranges, security throughput, on-time (off-blocks within 15 min), mishandled bags per 1,000, missed-flight rate, retail and F&B sales, staffing cost, satisfaction |
 
 ## Develop

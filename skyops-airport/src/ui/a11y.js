@@ -1,8 +1,8 @@
 // SkyOps accessibility + settings: theme, colour-blind palette, text size, reduced motion, announcements, keyboard map.
 SK.settings = (function () {
-  const S = { theme: 'auto', cb: false, text: 1, reduced: window.matchMedia('(prefers-reduced-motion: reduce)').matches, speech: false, autoQuality: true };
+  const S = { theme: 'auto', cb: false, text: 1, reduced: window.matchMedia('(prefers-reduced-motion: reduce)').matches, speech: false, autoQuality: true, ambient: false, atc: false };
   try { Object.assign(S, JSON.parse(localStorage.getItem('skyops.settings') || '{}')); } catch (e) { /* storage unavailable */ }
-  S.save = function () { try { localStorage.setItem('skyops.settings', JSON.stringify({ theme: S.theme, cb: S.cb, text: S.text, reduced: S.reduced, speech: S.speech, autoQuality: S.autoQuality })); } catch (e) { /* ignore */ } };
+  S.save = function () { try { localStorage.setItem('skyops.settings', JSON.stringify({ theme: S.theme, cb: S.cb, text: S.text, reduced: S.reduced, speech: S.speech, autoQuality: S.autoQuality, ambient: S.ambient, atc: S.atc })); } catch (e) { /* ignore */ } };
   S.apply = function () {
     const r = document.documentElement;
     if (S.theme === 'auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', S.theme);

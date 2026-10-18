@@ -28,6 +28,18 @@ SK.ops = (function () {
     st.setOpen(v);
     return v;
   };
+  // move a departure to another gate before its aircraft and crew are committed
+  O.changeGate = function (f, gid) {
+    if (!SK.gateChangeable(f)) return false;
+    const opt = SK.gateOptions(O.flights, f, L.gates).find((o) => o.gate === gid);
+    if (!opt) return false;
+    const old = f.gate, set = (fl, id) => { fl.gate = id; fl.bus = L.gates.find((x) => x.id === id).bus; };
+    set(f, gid);
+    if (opt.swap) set(opt.swap, old);
+    SK.bus.emit('ops', { t: now(), kind: 'warn', msg: 'Gate change: ' + f.num + ' now departs from ' + gid + (opt.swap ? ', ' + opt.swap.num + ' moves to ' + old : ' (was ' + old + ')') });
+    return true;
+  };
+
   // sensible starting staffing
   O.setOpen('economy', 7); O.setOpen('priority', 3); O.setOpen('lanes', 4); O.setOpen('manual', 4);
 

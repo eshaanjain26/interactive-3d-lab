@@ -62,6 +62,30 @@ SK.buildSchedule = function (gates, fromSec, toSec, rng) {
   return out;
 };
 
+// Gate moves for a flight. A stand is busy from about STD-85 to STD+5, so two departures on one gate
+// must be at least 90 minutes apart. Returns [{ gate, swap }]: a plain move when the gate is free,
+// otherwise a swap with the one flight on that gate within 60 minutes, when both can move and both fit. Pure.
+SK.gateOptions = function (flights, f, gates) {
+  const GAP = SK.minutes(90);
+  const fits = (fl, gid, ignore) => {
+    const g = gates.find((x) => x.id === gid);
+    return (!fl.wide || g.wide) && !flights.some((o) => o !== fl && !ignore.includes(o) && o.gate === gid && !o.departed && Math.abs(o.std - fl.std) < GAP);
+  };
+  const out = [];
+  gates.forEach((g) => {
+    if (g.id === f.gate) return;
+    if (fits(f, g.id, [])) { out.push({ gate: g.id, swap: null }); return; }
+    const near = flights.filter((o) => o !== f && o.gate === g.id && !o.departed && Math.abs(o.std - f.std) < SK.minutes(60));
+    if (near.length !== 1) return;
+    const o = near[0];
+    if (!SK.gateChangeable(o) || !fits(f, g.id, [o]) || !fits(o, f.gate, [f])) return;
+    out.push({ gate: g.id, swap: o });
+  });
+  return out;
+};
+// A gate can change only before the inbound aircraft is airborne toward it and before the crew walks there.
+SK.gateChangeable = (f) => !f.plane && !f.crewSent && !f.boarding && !f.offBlock && !f.cargo;
+
 // Departure board status from the current sim time and flight state
 SK.flightStatus = function (f, now) {
   const m = (f.etd - now) / 60;

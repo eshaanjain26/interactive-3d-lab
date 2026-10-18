@@ -148,9 +148,23 @@ SK.kit = (function () {
   };
   K.sign = function (lines, w, h, o) {
     const tex = K.textTexture(lines, Object.assign({ w: Math.round(256 * w / h) * 2, h: 256 }, o || {}));
-    const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, toneMapped: false });
-    return new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+    // front and back faces share the texture so the text reads correctly from either side (never mirrored)
+    const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.FrontSide, toneMapped: false });
+    const geo = new THREE.PlaneGeometry(w, h);
+    const m = new THREE.Mesh(geo, mat);
+    const back = new THREE.Mesh(geo, mat);
+    back.rotation.y = Math.PI;
+    m.add(back);
+    return m;
   };
+  // soft round sprite for particles (smoke, steam, spray, snow)
+  K.puff = (function () {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.5, 'rgba(255,255,255,0.6)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  })();
   // flat painted marking on the ground (text)
   K.paint = function (text, w, h, color, parent, x, z, ry) {
     const tex = K.textTexture(text, { w: 512, h: Math.round(512 * h / w), bg: 'rgba(0,0,0,0)', fg: color || '#f2f2ee', font: 'bold ' + Math.round(380 * h / w) + 'px system-ui, sans-serif' });

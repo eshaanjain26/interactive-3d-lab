@@ -44,6 +44,7 @@ src/
   ui/overlays.js        minimap, labels, heat map, flow lines
   ui/edu.js             explainer player, quiz, glossary, tutorial, search box
   ui/a11y.js            colour-blind palettes, text size, reduced motion, keyboard map
+  ui/audio.js           opt-in procedural ambience, boarding chimes, spoken ATC tower calls (WebAudio + speechSynthesis)
   main.js               bootstrap and warm-up
 ```
 

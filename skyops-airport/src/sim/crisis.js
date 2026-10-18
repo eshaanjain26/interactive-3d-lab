@@ -27,6 +27,35 @@ SK.crisis = (function () {
       a.x = x + (a.x - x) * k; a.z = z + (a.z - z) * k;
     });
   }
+  function ambulance(x, z, ry) {
+    const g = new THREE.Group();
+    K.box(2.3, 2.4, 6, M.white, 0, 0.4, 0, g);
+    K.box(2.35, 0.4, 6.05, M.red, 0, 1.4, 0, g);
+    K.box(2.2, 1.2, 1.6, M.glassDark, 0, 1.4, 2.6, g);
+    const light = new THREE.MeshBasicMaterial({ color: 0x3a7bff });
+    K.box(1.6, 0.25, 0.4, light, 0, 2.8, 2.2, g);
+    g.userData.light = light;
+    g.position.set(x, 0, z); g.rotation.y = ry || 0;
+    props.add(g); E.pick.add(g, 'r_paramedic');
+    return g;
+  }
+  // smoke column for the fire scenario
+  const SMN = 260;
+  const smPos = new Float32Array(SMN * 3), smGeo = new THREE.BufferGeometry();
+  smGeo.setAttribute('position', new THREE.BufferAttribute(smPos, 3));
+  const smoke = new THREE.Points(smGeo, new THREE.PointsMaterial({ map: SK.kit.puff, depthWrite: false, color: 0x3a3a3a, size: 4.5, transparent: true, opacity: 0.55, depthWrite: false }));
+  smoke.visible = false; smoke.frustumCulled = false; E.scene.add(smoke);
+  function startSmoke(x, z) {
+    smoke.userData.o = { x, z };
+    for (let i = 0; i < SMN; i++) smPos.set([x + SK.rng.range(-3, 3), SK.rng.range(0, 14), z + SK.rng.range(-3, 3)], i * 3);
+    smoke.visible = true;
+  }
+  function tickSmoke(dt) {
+    if (!smoke.visible) return;
+    const o = smoke.userData.o;
+    for (let i = 0; i < SMN; i++) { smPos[i * 3 + 1] += dt * 2.5; smPos[i * 3] += dt * 0.6; if (smPos[i * 3 + 1] > 14) { smPos[i * 3 + 1] = 1; smPos[i * 3] = o.x + SK.rng.range(-3, 3); smPos[i * 3 + 2] = o.z + SK.rng.range(-3, 3); } }
+    smGeo.attributes.position.needsUpdate = true;
+  }
   function responders(role, n, from, to) {
     const out = [];
     for (let i = 0; i < n; i++) {
@@ -73,6 +102,7 @@ SK.crisis = (function () {
       brief: 'A passenger waiting for boarding at A2 collapses and is not responding. Boarding is due to start in minutes.',
       start(c) {
         c.vic = AG.post('r_pax', -27, -31, 0, null, 'lie');
+        c.amb = ambulance(-30, -46, Math.PI / 2);
         c.vic.role = 'r_pax'; c.vic.look.case = null;
         log('Medical emergency at gate A2');
       },
@@ -80,7 +110,7 @@ SK.crisis = (function () {
         {
           text: 'You are the gate agent. What do you do first?',
           opts: [
-            { t: 'Call the airport emergency number for paramedics and send for the nearest defibrillator', s: 2, why: 'Correct. Raise the alarm and get the AED moving while trained staff start CPR if needed.', fx: (c) => { c.medics = responders('r_paramedic', 2, { x: 0, z: -27 }, { x: -27, z: -31 }); } },
+            { t: 'Call the airport emergency number for paramedics and send for the nearest defibrillator', s: 2, why: 'Correct. Raise the alarm and get the AED moving while trained staff start CPR if needed.', fx: (c) => { c.medics = responders('r_paramedic', 2, { x: -16, z: -39 }, { x: -27, z: -31 }); } },
             { t: 'Sit them up and give them water', s: 0, why: 'Never give food or drink to an unresponsive person, and do not move them. Raise the alarm first.' },
             { t: 'Carry on boarding to protect the departure time', s: 0, why: 'Life safety outranks punctuality. The delay is acceptable and expected.' },
           ],
@@ -100,7 +130,7 @@ SK.crisis = (function () {
       },
       end(c) {
         if (c.held && c.wasBoarding !== undefined) c.held.boarding = c.held.boarding || c.wasBoarding || c.held.groupCalled > 0;
-        dismiss(c.medics); if (c.vic) AG.kill(c.vic);
+        dismiss(c.medics); if (c.vic) AG.kill(c.vic); if (c.amb) { props.remove(c.amb); E.pick.remove(c.amb); }
         log('Passenger taken to hospital. A2 boarding resumed', 'go');
       },
       sop: ['Raise the alarm: airport emergency number, AED to the scene.', 'Trained staff check response and breathing; start CPR if needed.', 'Do not move the person or give food or drink.', 'Keep the area clear; pause boarding if needed.', 'Hand over to paramedics; record the incident.'],
@@ -232,6 +262,38 @@ SK.crisis = (function () {
       sop: ['Detect and confirm: operations and IT security centres.', 'Contain: isolate infected networks.', 'Continue: manual check-in, whiteboards, PA.', 'Recover: clean backups, staged reconnection.', 'Report to the national cyber authority and the regulator.'],
     },
   ];
+  SCEN.push({
+    id: 'fire', title: 'Kitchen fire in the food court', ref: 'food', at: { x: -78, z: -16 }, dist: 55,
+    brief: 'A deep-fat fryer in the grill kitchen has caught fire. The kitchen suppression system has discharged, but smoke is spreading into the food court and detectors on that zone are in alarm.',
+    start(c) {
+      startSmoke(-82, -12.5);
+      OPS.holds.foodClosed = true;
+      AG.st.cafe.servers.forEach((s) => (s.open = false));
+      log('Fire alarm: food court kitchen, smoke spreading');
+    },
+    steps: [
+      {
+        text: 'You are the terminal duty manager. First action?',
+        opts: [
+          { t: 'Confirm the alarm, evacuate the food court zone, call the fire service, and stop people walking into the smoke', s: 2, why: 'Correct. Zoned (phased) evacuation clears the people at risk first; the fire service is called on every confirmed fire.', fx: (c) => { pushOut(-73, -18, 26); c.ff = responders('r_firefighter', 3, { x: -60, z: -27 }, { x: -80, z: -16 }); } },
+          { t: 'Use extinguishers yourself and keep the food court open', s: 0, why: 'Staff may use an extinguisher on a small fire only if it is safe, but with smoke spreading the priority is getting people out and calling the fire service.' },
+          { t: 'Evacuate the whole airport to the car parks', s: 1, why: 'A full evacuation of a sterile area forces every passenger to be re-screened and is not needed for a contained kitchen fire.' },
+        ],
+      },
+      {
+        text: 'Passengers from the food court are gathering in the concourse. Where should they wait?',
+        opts: [
+          { t: 'Keep them airside at a safe gate area away from the smoke, so they stay in the sterile zone', s: 2, why: 'Correct. Moving people landside means everyone must be screened again before they can fly; a safe airside holding area keeps flights moving.', fx: () => {} },
+          { t: 'Send them out through security to the landside curb', s: 1, why: 'Safe, but everyone becomes unscreened and must queue at security again. Use it only if the airside is unsafe.' },
+          { t: 'Let them go back to finish their meals', s: 0, why: 'Nobody re-enters a fire zone until the fire service declares it safe.' },
+        ],
+      },
+    ],
+    duration: 45,
+    tick(c, dt) { tickSmoke(dt); },
+    end(c) { smoke.visible = false; OPS.holds.foodClosed = false; AG.st.cafe.servers.forEach((s) => (s.open = true)); dismiss(c.ff); log('Fire service declares the food court safe; kitchen closed for cleanup, seating reopened', 'go'); },
+    sop: ['Detection: alarm on one zone, confirmed by staff or CCTV.', 'Zoned evacuation of the affected area; call the fire service.', 'Keep evacuees airside where safe so they stay screened.', 'Fire service controls the scene; reopen only on their all-clear.', 'Investigate and record.'],
+  });
   CR.scenarios = SCEN;
   OPS.svcMul = OPS.svcMul || {};
 

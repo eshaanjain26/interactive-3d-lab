@@ -41,6 +41,15 @@ SK.landside = (function () {
     root.add(s);
   });
 
+  // curb desks: valet, VIP chauffeur, hotel shuttle
+  [[30, 'VALET', '#1d4e89', 'valet'], [-58, 'VIP · CHAUFFEUR', '#2b2116', 'vip'], [96, 'HOTEL SHUTTLES', '#0f5c4d', 'hotel_shuttle']].forEach(([x, t, col, id]) => {
+    B.box(2.4, 1.1, 1, new THREE.MeshStandardMaterial({ color: col, roughness: 0.5 }), x, 0.12, 59.4);
+    const s = K.sign(t, 3.6, 0.7, { bg: col, font: 'bold 100px system-ui, sans-serif' });
+    s.position.set(x, 2.6, 59.1); root.add(s);
+    K.hit(3, 2.4, 1.6, x, 0, 59.4, root, id);
+  });
+  SK.landsideDesks = [[30, 'valet'], [-58, 'vip'], [96, 'hotel_shuttle']];
+
   // ---------- garage ----------
   const G = L.garage, gw = G.x1 - G.x0, gd = G.z1 - G.z0;
   for (let d = 0; d < G.decks; d++) {

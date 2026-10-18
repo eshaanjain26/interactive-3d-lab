@@ -720,6 +720,30 @@ SK.buildSchedule = function (gates, fromSec, toSec, rng) {
   return out;
 };
 
+// Gate moves for a flight. A stand is busy from about STD-85 to STD+5, so two departures on one gate
+// must be at least 90 minutes apart. Returns [{ gate, swap }]: a plain move when the gate is free,
+// otherwise a swap with the one flight on that gate within 60 minutes, when both can move and both fit. Pure.
+SK.gateOptions = function (flights, f, gates) {
+  const GAP = SK.minutes(90);
+  const fits = (fl, gid, ignore) => {
+    const g = gates.find((x) => x.id === gid);
+    return (!fl.wide || g.wide) && !flights.some((o) => o !== fl && !ignore.includes(o) && o.gate === gid && !o.departed && Math.abs(o.std - fl.std) < GAP);
+  };
+  const out = [];
+  gates.forEach((g) => {
+    if (g.id === f.gate) return;
+    if (fits(f, g.id, [])) { out.push({ gate: g.id, swap: null }); return; }
+    const near = flights.filter((o) => o !== f && o.gate === g.id && !o.departed && Math.abs(o.std - f.std) < SK.minutes(60));
+    if (near.length !== 1) return;
+    const o = near[0];
+    if (!SK.gateChangeable(o) || !fits(f, g.id, [o]) || !fits(o, f.gate, [f])) return;
+    out.push({ gate: g.id, swap: o });
+  });
+  return out;
+};
+// A gate can change only before the inbound aircraft is airborne toward it and before the crew walks there.
+SK.gateChangeable = (f) => !f.plane && !f.crewSent && !f.boarding && !f.offBlock && !f.cargo;
+
 // Departure board status from the current sim time and flight state
 SK.flightStatus = function (f, now) {
   const m = (f.etd - now) / 60;
@@ -987,6 +1011,17 @@ SK.BUILT_PASS = 3;   // zones with pass <= this are live; later passes are massi
     regs: [{ src: 'ICAO Annex 14', text: 'Secondary power for airfield lighting, with maximum switch-over times set by the type of approach.' }],
     keywords: 'power plant utility hvac chiller generator water',
   });
+  add('gpu', { name: 'Ground power unit', zone: 'apron', at: { x: -25, z: -52 }, summary: 'Supplies 400 Hz electrical power to a parked aircraft so the crew can switch off the auxiliary power unit, which saves fuel, noise and emissions.', sop: ['Connect after chocks are in and the beacon is off.', 'Disconnect before pushback.'], roles: ['r_ramp'], keywords: 'gpu ground power 400hz apu' });
+  add('cleaning', { name: 'Cabin cleaning crew', zone: 'apron', at: { x: -32, z: -58 }, summary: 'Between flights a crew clears seat pockets, vacuums, cleans lavatories and resets the cabin, usually in 10 to 15 minutes on a short-haul turn.', sop: ['Board after the last passenger leaves.', 'Clean, restock, report damage.', 'Leave before boarding starts.'], roles: ['r_cleaner'], keywords: 'cabin cleaning crew turnaround' });
+  add('water_lav', { name: 'Potable water and lavatory service', zone: 'apron', at: { x: -32, z: -76 }, summary: 'One truck fills the potable water tanks; a separate truck empties the lavatory waste tank. They never use the same hoses.', sop: ['Water: sample and fill to the requested level.', 'Lavatory: drain and rinse the waste tank.'], regs: [{ src: 'Health rules', text: 'Potable water and waste servicing are kept strictly separate to prevent contamination.' }], roles: ['r_ramp'], keywords: 'water lavatory toilet service truck' });
+  add('catering', { name: 'Catering truck', zone: 'apron', at: { x: -32, z: -84 }, summary: 'A truck whose box body lifts to the aft galley door to swap used carts for fresh meals and drinks.', sop: ['Box rises to the door sill.', 'Swap carts and seal them.', 'Box lowers, truck backs away.'], roles: ['r_ramp'], keywords: 'catering truck galley meals' });
+  add('deicing', { name: 'De-icing truck', zone: 'runway', at: { x: 430, z: -190 }, summary: 'In snow and frost, trucks spray heated glycol fluid to remove ice (Type I, orange) and then a thicker fluid that keeps the wings clean until take-off (Type IV, green). Ice on a wing can stop it producing lift.', sop: ['Crew requests de-icing.', 'Spray Type I, then anti-icing fluid.', 'Crew notes the holdover time and must take off within it.'], regs: [{ src: 'Clean aircraft concept', text: 'No aircraft may take off with frost, ice or snow on critical surfaces.' }], keywords: 'deicing de-icing glycol snow ice' });
+  add('kids', { name: 'Kids play area', zone: 'dutyfree', at: { x: 68, z: -5 }, summary: 'Soft play for children waiting to board, near seating so parents can watch.', keywords: 'kids play area children family' });
+  add('pods', { name: 'Sleep pods and spa', zone: 'dutyfree', at: { x: 80, z: -5 }, summary: 'Rentable sleep pods and a small spa for long layovers and early starts.', keywords: 'sleep pods spa shower rest' });
+  add('adscreen', { name: 'Digital advertising screen', zone: 'dutyfree', at: { x: 46, z: -26.4 }, summary: 'Advertising is a non-aeronautical revenue line; screens rotate campaigns from airlines, retailers and the city.', keywords: 'advertising screen digital signage' });
+  add('valet', { name: 'Valet parking', zone: 'curb', at: { x: 30, z: 59 }, summary: 'Drivers hand their car to an attendant at the curb; it is parked in the garage and returned on arrival.', keywords: 'valet parking' });
+  add('vip', { name: 'VIP and chauffeur desk', zone: 'curb', at: { x: -58, z: 59 }, summary: 'Meet-and-assist service for premium travellers, with chauffeured cars and escorted fast track.', keywords: 'vip chauffeur meet assist' });
+  add('hotel_shuttle', { name: 'Hotel shuttle desk', zone: 'curb', at: { x: 96, z: 59 }, summary: 'Information point for hotel and parking shuttles that loop between their lots and the curb bays.', keywords: 'hotel shuttle bus' });
   add('freighter', { name: 'Wide-body freighter', zone: 'cargo', at: { x: 345, z: -95 }, summary: 'A freighter version of a twin-aisle jet, with a large main-deck cargo door and no passenger windows in use. It carries about 100 tonnes on long-haul routes.', sop: ['Unload imports.', 'Load exports in load-plan order.', 'Weight and balance sign-off.'], roles: ['r_cargo'], keywords: 'freighter cargo plane' });
   add('uld', { name: 'ULD on dolly', zone: 'cargo', at: { x: 330, z: -70 }, summary: 'Unit Load Devices are the containers and pallets that fit the aircraft hold. Each has an ID like AKE 12345 SK, tracked like a bag.', sop: ['Check the ULD is serviceable.', 'Build up within the contour and weight limits.', 'Net or close it and attach the tag.'], keywords: 'uld container pallet ake ld3 pmc dolly' });
   add('kloader', { name: 'High loader', zone: 'cargo', at: { x: 330, z: -82 }, summary: 'A scissor-lift platform with powered rollers that raises ULDs to the main-deck door.', roles: ['r_cargo'], keywords: 'k loader high loader main deck loader' });
@@ -1369,6 +1404,9 @@ SK.BUILT_PASS = 3;   // zones with pass <= this are live; later passes are massi
     { q: 'Why is a fuel dispenser bonded to the aircraft before fuelling?', o: ['To stop it rolling', 'To equalise static electricity so it cannot spark', 'To measure the fuel', 'To tow the aircraft'], a: 1, why: 'Bonding is a basic into-plane fuelling safety step.', ref: 'dispenser' },
     { q: 'Who can release an aircraft back to service after maintenance?', o: ['Any mechanic', 'An authorised licensed engineer signing a CRS', 'The captain', 'The airport'], a: 1, why: 'Part-145 and Part-66 rules require certifying staff.', ref: 'hangar' },
     { q: 'How often must an airport run a full-scale emergency exercise under ICAO Annex 14?', o: ['Every month', 'At least every two years', 'Every ten years', 'Never'], a: 1, why: 'The emergency plan is tested by a full-scale exercise at intervals not exceeding two years.', ref: 'eoc' },
+    { q: 'Why is an aircraft sprayed with a second, thicker fluid after de-icing?', o: ['To clean the paint', 'To keep ice from re-forming until take-off (holdover time)', 'To cool the brakes', 'To mark it as de-iced'], a: 1, why: 'Type I fluid removes ice; anti-icing fluid such as Type IV protects the wing until take-off.', ref: 'deicing' },
+    { q: 'If airside passengers are evacuated landside during a fire, what must happen before they fly?', o: ['Nothing', 'They must be screened again', 'They must check in again', 'They must change flights'], a: 1, why: 'Leaving the sterile area means re-screening, which is why safe airside holding areas are preferred.', ref: 'food' },
+    { q: 'What does a ground power unit let the crew switch off?', o: ['The engines', 'The auxiliary power unit (APU)', 'The transponder', 'The cabin lights'], a: 1, why: 'Ground power and pre-conditioned air let the APU shut down, saving fuel, noise and emissions.', ref: 'gpu' },
   ];
 })();
 
@@ -1841,9 +1879,23 @@ SK.kit = (function () {
   };
   K.sign = function (lines, w, h, o) {
     const tex = K.textTexture(lines, Object.assign({ w: Math.round(256 * w / h) * 2, h: 256 }, o || {}));
-    const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, toneMapped: false });
-    return new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+    // front and back faces share the texture so the text reads correctly from either side (never mirrored)
+    const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.FrontSide, toneMapped: false });
+    const geo = new THREE.PlaneGeometry(w, h);
+    const m = new THREE.Mesh(geo, mat);
+    const back = new THREE.Mesh(geo, mat);
+    back.rotation.y = Math.PI;
+    m.add(back);
+    return m;
   };
+  // soft round sprite for particles (smoke, steam, spray, snow)
+  K.puff = (function () {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.5, 'rgba(255,255,255,0.6)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  })();
   // flat painted marking on the ground (text)
   K.paint = function (text, w, h, color, parent, x, z, ry) {
     const tex = K.textTexture(text, { w: 512, h: Math.round(512 * h / w), bg: 'rgba(0,0,0,0)', fg: color || '#f2f2ee', font: 'bold ' + Math.round(380 * h / w) + 'px system-ui, sans-serif' });
@@ -1926,7 +1978,7 @@ SK.sky = (function () {
   for (let i = 0; i < SNOW_N; i++) snowPos.set([(Math.random() - 0.5) * AREA, Math.random() * TOP, (Math.random() - 0.5) * AREA], i * 3);
   const snowGeo = new THREE.BufferGeometry();
   snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPos, 3));
-  const snow = new THREE.Points(snowGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.35, transparent: true, opacity: 0.9 }));
+  const snow = new THREE.Points(snowGeo, new THREE.PointsMaterial({ map: SK.kit.puff, depthWrite: false, color: 0xffffff, size: 0.35, transparent: true, opacity: 0.9 }));
   snow.frustumCulled = false; snow.visible = false;
   scene.add(snow);
 
@@ -2228,6 +2280,15 @@ SK.landside = (function () {
     s.position.set(x, 5.2, 59.6);
     root.add(s);
   });
+
+  // curb desks: valet, VIP chauffeur, hotel shuttle
+  [[30, 'VALET', '#1d4e89', 'valet'], [-58, 'VIP · CHAUFFEUR', '#2b2116', 'vip'], [96, 'HOTEL SHUTTLES', '#0f5c4d', 'hotel_shuttle']].forEach(([x, t, col, id]) => {
+    B.box(2.4, 1.1, 1, new THREE.MeshStandardMaterial({ color: col, roughness: 0.5 }), x, 0.12, 59.4);
+    const s = K.sign(t, 3.6, 0.7, { bg: col, font: 'bold 100px system-ui, sans-serif' });
+    s.position.set(x, 2.6, 59.1); root.add(s);
+    K.hit(3, 2.4, 1.6, x, 0, 59.4, root, id);
+  });
+  SK.landsideDesks = [[30, 'valet'], [-58, 'vip'], [96, 'hotel_shuttle']];
 
   // ---------- garage ----------
   const G = L.garage, gw = G.x1 - G.x0, gd = G.z1 - G.z0;
@@ -2774,6 +2835,43 @@ SK.terminal = (function () {
   });
   D.rooms = { prayer: { x: -93, z: -4 }, nursing: { x: -81.5, z: -4 }, smoking: { x: 93, z: -4 } };
 
+  // kids play area and sleep pods / spa on the airside spine
+  K.ground(12, 8, new THREE.MeshStandardMaterial({ color: 0x5fb3a8, roughness: 1 }), 68, 0.045, -5, root);
+  [[64, -7, M.red], [66.5, -3, M.yellow], [70, -6.5, M.blueMark], [72, -2.5, M.green]].forEach(([x, z, m], i) => B.box(1.6, 0.8 + (i % 2) * 0.6, 1.6, m, x, 0, z));
+  B.cyl(1.2, 0.5, M.orange, 69, 0, -2.2, 16);
+  const slide = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.1, 4), M.yellow); slide.position.set(73, 1, -6.5); slide.rotation.x = 0.4; root.add(slide);
+  for (let x = 62; x <= 74; x += 1.5) B.cyl(0.04, 0.8, M.steel, x, 0, -9, 6);
+  K.hit(12, 1.6, 8, 68, 0, -5, root, 'kids');
+  [77, 80, 83].forEach((x) => { B.box(2.4, 1.3, 2.2, M.white, x, 0, -7.5); B.box(2.4, 1.3, 2.2, M.white, x, 1.3, -7.5); B.box(0.6, 0.6, 0.05, M.glassDark, x, 0.4, -6.38); });
+  B.box(7, 1.0, 1, M.wood, 80, 0, -2); B.box(6, 0.5, 0.05, M.screenWarm, 80, 1.8, -1.4);
+  K.hit(10, 2.8, 8, 80, 0, -5, root, 'pods');
+  const kp = K.sign(['Kids play · Sleep pods · Spa'], 9, 0.8, { bg: '#2f3a48', font: 'bold 90px system-ui, sans-serif' });
+  kp.position.set(74, 3.2, -9.6); kp.rotation.y = Math.PI; root.add(kp);
+
+  // digital advertising screens (rotating fictional campaigns)
+  const ADS = [['AURORA', 'Pacific Business Class', '#7b3fa0'], ['NORTHWIND MILES', 'Earn on every flight', '#1d7a5f'], ['SKY DUTY FREE', '20% off fragrance today', '#4a1d2e'], ['VISIT SKY CITY', 'Rail to downtown in 18 min', '#0f5c4d'], ['COBALT', 'New: Lisbon from June', '#163a6b']];
+  const adCanvas = document.createElement('canvas'); adCanvas.width = 256; adCanvas.height = 512;
+  const adTex = new THREE.CanvasTexture(adCanvas); adTex.encoding = THREE.sRGBEncoding;
+  const adMat = new THREE.MeshBasicMaterial({ map: adTex, toneMapped: false });
+  [[-46, -26.4, Math.PI], [46, -26.4, Math.PI], [-90, 41, 0], [90, 41, 0], [0, 4.6, 0]].forEach(([x, z, ry]) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 2.8), adMat);
+    m.position.set(x, 1.7, z); m.rotation.y = ry; root.add(m);
+    B.box(1.6, 3.2, 0.25, M.black, x, 0.1, z + (ry ? 0.15 : -0.15));
+    E.pick.add(m, 'adscreen');
+  });
+  let adIdx = -1;
+  T.updateAds = function () {
+    const i = Math.floor(performance.now() / 6000) % ADS.length;
+    if (i === adIdx) return;
+    adIdx = i;
+    const [h, sub, col] = ADS[i], c = adCanvas.getContext('2d');
+    c.fillStyle = col; c.fillRect(0, 0, 256, 512);
+    c.fillStyle = 'rgba(255,255,255,0.12)'; c.beginPath(); c.arc(200, 120, 140, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#fff'; c.textAlign = 'center'; c.font = 'bold 30px system-ui, sans-serif'; c.fillText(h, 128, 300);
+    c.font = '20px system-ui, sans-serif'; c.fillText(sub, 128, 340);
+    adTex.needsUpdate = true;
+  };
+
   // ---------- gates ----------
   D.gates = {};
   const seatGeo = new THREE.BoxGeometry(0.55, 0.45, 0.5);
@@ -2859,6 +2957,7 @@ SK.terminal = (function () {
   };
   T.egate = function (i, which) { T.egateDoors[i].open[which] = 1.6; };
   T.update = function (dt) {
+    if (T.updateAds) T.updateAds();
     T.egateDoors.forEach((g) => g.doors.forEach((d, k) => {
       if (g.open[k] > 0) g.open[k] -= dt;
       const target = g.open[k] > 0 ? 0.06 : 1;
@@ -3842,7 +3941,7 @@ SK.agents = (function () {
       const seat = takeSeat(D.loungeSeats.filter((s) => s.first === (a.cls === 'F') || !s.first));
       if (seat) { yield* walkTo(a, seat); sit(a, seat); log(a, 'Relaxing in the ' + (a.cls === 'F' ? 'first class room' : 'business lounge')); yield until(() => now() >= boardAt() - SK.minutes(8)); freeSeat(a); a.anim = 'idle'; }
       a.node = 'loungeIn';
-    } else if (!premium && room < 0.4 && boardAt() - now() > SK.minutes(35)) {
+    } else if (!premium && room < 0.4 && !(SK.ops && SK.ops.holds.foodClosed) && boardAt() - now() > SK.minutes(35)) {
       yield* use(a, AG.st.cafe, 'foodIn', 'Food court');
       const spend = Math.round(SK.rng.range(9, 28)) * P;
       SK.bus.emit('sale', { kind: 'food', amount: spend });
@@ -3864,19 +3963,27 @@ SK.agents = (function () {
       yield* go(a, which + 'In');
     }
 
-    // gate
-    if (f.gateClosed || f.offBlock) return yield* missed(a);
-    yield* go(a, 'gate' + f.gate);
-    log(a, 'At gate ' + f.gate);
-    const gd = D.gates[f.gate];
-    if (!(f.boarding && a.group <= f.groupCalled)) {
-      const seat = takeSeat(gd.seats);
-      if (seat) { yield* walkTo(a, seat); sit(a, seat); }
-      yield until(() => (f.boarding && a.group <= f.groupCalled) || f.gateClosed);
-      freeSeat(a); a.anim = 'idle';
-      if (f.gateClosed) return yield* missed(a);
-      a.node = 'gate' + f.gate;
+    // gate (follows a gate change announced while the passenger is on the way or seated)
+    let atGate = null;
+    for (;;) {
+      if (f.gateClosed || f.offBlock) { freeSeat(a); return yield* missed(a); }
+      if (atGate !== f.gate) {
+        if (atGate) { freeSeat(a); a.anim = 'idle'; a.node = 'gate' + atGate; log(a, 'Gate change: walking to ' + f.gate); }
+        const target = f.gate;
+        yield* go(a, 'gate' + target);
+        atGate = target;
+        log(a, 'At gate ' + target);
+        continue;
+      }
+      if (f.boarding && a.group <= f.groupCalled) break;
+      if (!a.seat) {
+        const seat = takeSeat(D.gates[f.gate].seats);
+        if (seat) { yield* walkTo(a, seat); if (atGate === f.gate) sit(a, seat); continue; }
+      }
+      yield until(() => (f.boarding && a.group <= f.groupCalled) || f.gateClosed || f.gate !== atGate);
     }
+    freeSeat(a); a.anim = 'idle';
+    a.node = 'gate' + f.gate;
     yield* use(a, AG.st['board' + f.gate], null, 'Boarding (group ' + (a.group === 0 ? 'pre-board' : a.group) + ')');
     log(a, 'Boarding pass scanned');
     f.walkingAboard = (f.walkingAboard || 0) + 1;
@@ -4435,6 +4542,18 @@ SK.ops = (function () {
     st.setOpen(v);
     return v;
   };
+  // move a departure to another gate before its aircraft and crew are committed
+  O.changeGate = function (f, gid) {
+    if (!SK.gateChangeable(f)) return false;
+    const opt = SK.gateOptions(O.flights, f, L.gates).find((o) => o.gate === gid);
+    if (!opt) return false;
+    const old = f.gate, set = (fl, id) => { fl.gate = id; fl.bus = L.gates.find((x) => x.id === id).bus; };
+    set(f, gid);
+    if (opt.swap) set(opt.swap, old);
+    SK.bus.emit('ops', { t: now(), kind: 'warn', msg: 'Gate change: ' + f.num + ' now departs from ' + gid + (opt.swap ? ', ' + opt.swap.num + ' moves to ' + old : ' (was ' + old + ')') });
+    return true;
+  };
+
   // sensible starting staffing
   O.setOpen('economy', 7); O.setOpen('priority', 3); O.setOpen('lanes', 4); O.setOpen('manual', 4);
 
@@ -5575,7 +5694,7 @@ SK.support = (function () {
   const SPN = 600;
   const spPos = new Float32Array(SPN * 3), spVel = new Float32Array(SPN * 3), spLife = new Float32Array(SPN);
   const spGeo = new THREE.BufferGeometry(); spGeo.setAttribute('position', new THREE.BufferAttribute(spPos, 3));
-  const spray = new THREE.Points(spGeo, new THREE.PointsMaterial({ color: 0xe8f4ff, size: 0.5, transparent: true, opacity: 0.85 }));
+  const spray = new THREE.Points(spGeo, new THREE.PointsMaterial({ map: SK.kit.puff, depthWrite: false, color: 0xe8f4ff, size: 0.5, transparent: true, opacity: 0.85 }));
   spray.frustumCulled = false; root.add(spray);
   let spIdx = 0;
   S.drill = function (target, label) {
@@ -5694,17 +5813,106 @@ SK.support = (function () {
   const stPos = new Float32Array(STN * 3);
   for (let i = 0; i < STN; i++) stPos.set([(i % 2 ? -168 : -168) + SK.rng.range(-3, 3), 14 + SK.rng.range(0, 20), (i % 2 ? 104 : 122) + SK.rng.range(-3, 3)], i * 3);
   const stGeo = new THREE.BufferGeometry(); stGeo.setAttribute('position', new THREE.BufferAttribute(stPos, 3));
-  const steam = new THREE.Points(stGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 2.6, transparent: true, opacity: 0.35, depthWrite: false }));
+  const steam = new THREE.Points(stGeo, new THREE.PointsMaterial({ map: SK.kit.puff, depthWrite: false, color: 0xffffff, size: 4.5, transparent: true, opacity: 0.35, depthWrite: false }));
   steam.frustumCulled = false; root.add(steam);
 
   B.build(root);
   RB.build(roof);
 
+  // =============== TURNAROUND SERVICES ===============
+  // Ground power from block-in to pushback; cleaning, water, catering and lavatory trucks in their windows.
+  function svcVehicle(body, h, len, extra) {
+    const g = new THREE.Group();
+    K.box(2.2, 1.0, len, body, 0, 0.4, 0, g);
+    K.box(2.2, 1.3, 1.8, M.white, 0, 0.4, len / 2 - 0.9, g);
+    K.box(2.0, 0.6, 1.4, M.glassDark, 0, 1.2, len / 2 - 0.7, g);
+    if (extra) extra(g, h);
+    g.visible = false; root.add(g);
+    return g;
+  }
+  const blue = new THREE.MeshStandardMaterial({ color: 0x2a6fb5, roughness: 0.5 });
+  const grey = new THREE.MeshStandardMaterial({ color: 0x6b7680, roughness: 0.6 });
+  const SVC = [
+    // id, entry, window start / end (sim min after block-in; end null = until pushback), local offset (x right-negative, z aft), builder
+    { id: 'gpu', entry: 'gpu', t0: 1, t1: null, at: (d) => [-1.2, -3.2], make: () => { const g = new THREE.Group(); K.box(1.4, 1.1, 2, M.yellow, 0, 0.2, 0, g); g.visible = false; root.add(g); return g; } },
+    { id: 'clean', entry: 'cleaning', t0: 6, t1: 22, at: (d) => [-(d.r + 4.5), -9], make: () => svcVehicle(grey, 0, 5) },
+    { id: 'water', entry: 'water_lav', t0: 8, t1: 18, at: (d) => [-(d.r + 4.2), -d.len * 0.62], make: () => svcVehicle(blue, 0, 5, (g) => K.cyl(0.8, 0.8, 3, blue, 0, 1.3, -0.6, g, 12).rotation.set(Math.PI / 2, 0, 0)) },
+    { id: 'cater', entry: 'catering', t0: 12, t1: 30, at: (d) => [-(d.r + 3.4), -d.len * 0.82], make: () => svcVehicle(M.white, 0, 7, (g) => { const box = K.box(2.4, 2.6, 4.6, M.white, 0, 1.4, -1, g); g.userData.box = box; K.box(2.5, 0.3, 4.7, M.red, 0, 4.0, -1, g); g.userData.boxStripe = g.children[g.children.length - 1]; }) },
+    { id: 'lav', entry: 'water_lav', t0: 20, t1: 30, at: (d) => [d.r + 4.2, -d.len * 0.86], make: () => svcVehicle(grey, 0, 5) },
+  ];
+  const svcPool = {};
+  function serviceStand(p) {
+    const f = p.f, d = p.dim, t = now();
+    const k = f.wide ? 1.5 : 1;
+    const s = Math.sin(p.heading), c = Math.cos(p.heading);
+    SVC.forEach((v) => {
+      const key = p.g.id + v.id;
+      const g = svcPool[key] || (svcPool[key] = (() => { const m = v.make(); E.pick.add(m, v.entry); return m; })());
+      const start = f.blockIn + SK.minutes(v.t0 * k), end = v.t1 == null ? Infinity : f.blockIn + SK.minutes(v.t1 * k);
+      const on = p.state === 'parked' && !f.pushApproved && t >= start && t < end;
+      g.visible = on;
+      if (!on) return;
+      const [lx, lz] = v.at(d);
+      g.position.set(p.x + lx * c + lz * s, 0, p.z - lx * s + lz * c);
+      g.rotation.y = p.heading + (v.id === 'gpu' ? 0 : Math.PI / 2);
+      if (v.id === 'cater' && g.userData.box) {
+        // the catering box rides up to the door sill and back down
+        const u = SK.clamp((t - start) / SK.minutes(4), 0, 1) * SK.clamp((end - t) / SK.minutes(4), 0, 1);
+        g.userData.box.position.y = 1.4 + u * (d.doorH - 1.8);
+        g.userData.boxStripe.position.y = 4.0 + u * (d.doorH - 1.8);
+      }
+    });
+  }
+  function hideServices(gid) { SVC.forEach((v) => { const g = svcPool[gid + v.id]; if (g) g.visible = false; }); }
+
+  // =============== DE-ICING ===============
+  const orange = new THREE.MeshStandardMaterial({ color: 0xe8742a, roughness: 0.5 });
+  const deicers = [0, 1].map(() => {
+    const g = new THREE.Group();
+    K.box(2.6, 1.6, 8, orange, 0, 0.5, 0, g);
+    K.box(0.4, 0.4, 7, M.darkSteel, 0, 3.2, -1, g).rotation.x = -0.5;
+    K.box(1.4, 1.2, 1.4, M.white, 0, 6.2, -4.4, g);
+    g.visible = false; root.add(g); E.pick.add(g, 'deicing');
+    return g;
+  });
+  const DIN = 400;
+  const diPos = new Float32Array(DIN * 3), diVel = new Float32Array(DIN * 3), diLife = new Float32Array(DIN);
+  const diGeo = new THREE.BufferGeometry(); diGeo.setAttribute('position', new THREE.BufferAttribute(diPos, 3));
+  const diSpray = new THREE.Points(diGeo, new THREE.PointsMaterial({ map: SK.kit.puff, depthWrite: false, color: 0xffa040, size: 0.45, transparent: true, opacity: 0.8 }));
+  diSpray.frustumCulled = false; root.add(diSpray);
+  let diIdx = 0;
+  function updateDeicing(dt) {
+    const p = SK.aircraft.planes.find((q) => q.state === 'holding' && q.deicing && q.wait > 0);
+    deicers.forEach((g, i) => {
+      g.visible = !!p;
+      if (!p) return;
+      const side = i ? 1 : -1, d = p.dim, s = Math.sin(p.heading), c = Math.cos(p.heading);
+      const lx = side * (d.span * 0.32), lz = -d.len * 0.38;
+      g.position.set(p.x + lx * c + lz * s, 0, p.z - lx * s + lz * c);
+      g.rotation.y = p.heading + side * Math.PI / 2;
+      for (let k = 0; k < 6; k++) {
+        const j = diIdx++ % DIN;
+        const bx = g.position.x - Math.sin(g.rotation.y) * 4.4, bz = g.position.z - Math.cos(g.rotation.y) * 4.4;
+        diPos.set([bx, 6, bz], j * 3);
+        const toward = Math.atan2(p.x - bx, p.z - bz) + SK.rng.range(-0.3, 0.3);
+        diVel.set([Math.sin(toward) * 6, SK.rng.range(-1, 1), Math.cos(toward) * 6], j * 3);
+        diLife[j] = 0.9;
+      }
+    });
+    for (let i = 0; i < DIN; i++) {
+      if (diLife[i] <= 0) { diPos[i * 3 + 1] = -50; continue; }
+      diLife[i] -= dt; diVel[i * 3 + 1] -= 6 * dt;
+      diPos[i * 3] += diVel[i * 3] * dt; diPos[i * 3 + 1] = Math.max(0.05, diPos[i * 3 + 1] + diVel[i * 3 + 1] * dt); diPos[i * 3 + 2] += diVel[i * 3 + 2] * dt;
+    }
+    diGeo.attributes.position.needsUpdate = true;
+  }
+
   // =============== update ===============
   S.update = function (dt) {
     if (dt <= 0) return;
     S.freighters.forEach((f) => { if (!f.departed) freighterTurn(f, dt); });
-    SK.aircraft.planes.forEach((p) => { if (!p.g.cargo && !p.g.bus) fuelStand(p); });
+    SK.aircraft.planes.forEach((p) => { if (!p.g.cargo && !p.g.bus) { fuelStand(p); serviceStand(p); } });
+    L.gates.forEach((g) => { if (!SK.aircraft.planes.some((p) => p.g.id === g.id && p.state === 'parked')) hideServices(g.id); });
     Object.keys(disp).forEach((gid) => { if (!SK.aircraft.planes.some((p) => p.g.id === gid && p.state === 'parked')) disp[gid].visible = false; });
     updateTrucks(dt);
     forks.forEach((fk) => {
@@ -5718,6 +5926,7 @@ SK.support = (function () {
   let wallT = 0;
   S.visual = function (dtReal) {
     updateSpray(dtReal);
+    updateDeicing(dtReal);
     const p = stGeo.attributes.position.array;
     for (let i = 0; i < STN; i++) { p[i * 3 + 1] += dtReal * 2.2; p[i * 3] += dtReal * 0.8; if (p[i * 3 + 1] > 40) { p[i * 3 + 1] = 14; p[i * 3] = -168 + SK.rng.range(-3, 3); } }
     stGeo.attributes.position.needsUpdate = true;
@@ -5765,6 +5974,35 @@ SK.crisis = (function () {
       a.x = x + (a.x - x) * k; a.z = z + (a.z - z) * k;
     });
   }
+  function ambulance(x, z, ry) {
+    const g = new THREE.Group();
+    K.box(2.3, 2.4, 6, M.white, 0, 0.4, 0, g);
+    K.box(2.35, 0.4, 6.05, M.red, 0, 1.4, 0, g);
+    K.box(2.2, 1.2, 1.6, M.glassDark, 0, 1.4, 2.6, g);
+    const light = new THREE.MeshBasicMaterial({ color: 0x3a7bff });
+    K.box(1.6, 0.25, 0.4, light, 0, 2.8, 2.2, g);
+    g.userData.light = light;
+    g.position.set(x, 0, z); g.rotation.y = ry || 0;
+    props.add(g); E.pick.add(g, 'r_paramedic');
+    return g;
+  }
+  // smoke column for the fire scenario
+  const SMN = 260;
+  const smPos = new Float32Array(SMN * 3), smGeo = new THREE.BufferGeometry();
+  smGeo.setAttribute('position', new THREE.BufferAttribute(smPos, 3));
+  const smoke = new THREE.Points(smGeo, new THREE.PointsMaterial({ map: SK.kit.puff, depthWrite: false, color: 0x3a3a3a, size: 4.5, transparent: true, opacity: 0.55, depthWrite: false }));
+  smoke.visible = false; smoke.frustumCulled = false; E.scene.add(smoke);
+  function startSmoke(x, z) {
+    smoke.userData.o = { x, z };
+    for (let i = 0; i < SMN; i++) smPos.set([x + SK.rng.range(-3, 3), SK.rng.range(0, 14), z + SK.rng.range(-3, 3)], i * 3);
+    smoke.visible = true;
+  }
+  function tickSmoke(dt) {
+    if (!smoke.visible) return;
+    const o = smoke.userData.o;
+    for (let i = 0; i < SMN; i++) { smPos[i * 3 + 1] += dt * 2.5; smPos[i * 3] += dt * 0.6; if (smPos[i * 3 + 1] > 14) { smPos[i * 3 + 1] = 1; smPos[i * 3] = o.x + SK.rng.range(-3, 3); smPos[i * 3 + 2] = o.z + SK.rng.range(-3, 3); } }
+    smGeo.attributes.position.needsUpdate = true;
+  }
   function responders(role, n, from, to) {
     const out = [];
     for (let i = 0; i < n; i++) {
@@ -5811,6 +6049,7 @@ SK.crisis = (function () {
       brief: 'A passenger waiting for boarding at A2 collapses and is not responding. Boarding is due to start in minutes.',
       start(c) {
         c.vic = AG.post('r_pax', -27, -31, 0, null, 'lie');
+        c.amb = ambulance(-30, -46, Math.PI / 2);
         c.vic.role = 'r_pax'; c.vic.look.case = null;
         log('Medical emergency at gate A2');
       },
@@ -5818,7 +6057,7 @@ SK.crisis = (function () {
         {
           text: 'You are the gate agent. What do you do first?',
           opts: [
-            { t: 'Call the airport emergency number for paramedics and send for the nearest defibrillator', s: 2, why: 'Correct. Raise the alarm and get the AED moving while trained staff start CPR if needed.', fx: (c) => { c.medics = responders('r_paramedic', 2, { x: 0, z: -27 }, { x: -27, z: -31 }); } },
+            { t: 'Call the airport emergency number for paramedics and send for the nearest defibrillator', s: 2, why: 'Correct. Raise the alarm and get the AED moving while trained staff start CPR if needed.', fx: (c) => { c.medics = responders('r_paramedic', 2, { x: -16, z: -39 }, { x: -27, z: -31 }); } },
             { t: 'Sit them up and give them water', s: 0, why: 'Never give food or drink to an unresponsive person, and do not move them. Raise the alarm first.' },
             { t: 'Carry on boarding to protect the departure time', s: 0, why: 'Life safety outranks punctuality. The delay is acceptable and expected.' },
           ],
@@ -5838,7 +6077,7 @@ SK.crisis = (function () {
       },
       end(c) {
         if (c.held && c.wasBoarding !== undefined) c.held.boarding = c.held.boarding || c.wasBoarding || c.held.groupCalled > 0;
-        dismiss(c.medics); if (c.vic) AG.kill(c.vic);
+        dismiss(c.medics); if (c.vic) AG.kill(c.vic); if (c.amb) { props.remove(c.amb); E.pick.remove(c.amb); }
         log('Passenger taken to hospital. A2 boarding resumed', 'go');
       },
       sop: ['Raise the alarm: airport emergency number, AED to the scene.', 'Trained staff check response and breathing; start CPR if needed.', 'Do not move the person or give food or drink.', 'Keep the area clear; pause boarding if needed.', 'Hand over to paramedics; record the incident.'],
@@ -5970,6 +6209,38 @@ SK.crisis = (function () {
       sop: ['Detect and confirm: operations and IT security centres.', 'Contain: isolate infected networks.', 'Continue: manual check-in, whiteboards, PA.', 'Recover: clean backups, staged reconnection.', 'Report to the national cyber authority and the regulator.'],
     },
   ];
+  SCEN.push({
+    id: 'fire', title: 'Kitchen fire in the food court', ref: 'food', at: { x: -78, z: -16 }, dist: 55,
+    brief: 'A deep-fat fryer in the grill kitchen has caught fire. The kitchen suppression system has discharged, but smoke is spreading into the food court and detectors on that zone are in alarm.',
+    start(c) {
+      startSmoke(-82, -12.5);
+      OPS.holds.foodClosed = true;
+      AG.st.cafe.servers.forEach((s) => (s.open = false));
+      log('Fire alarm: food court kitchen, smoke spreading');
+    },
+    steps: [
+      {
+        text: 'You are the terminal duty manager. First action?',
+        opts: [
+          { t: 'Confirm the alarm, evacuate the food court zone, call the fire service, and stop people walking into the smoke', s: 2, why: 'Correct. Zoned (phased) evacuation clears the people at risk first; the fire service is called on every confirmed fire.', fx: (c) => { pushOut(-73, -18, 26); c.ff = responders('r_firefighter', 3, { x: -60, z: -27 }, { x: -80, z: -16 }); } },
+          { t: 'Use extinguishers yourself and keep the food court open', s: 0, why: 'Staff may use an extinguisher on a small fire only if it is safe, but with smoke spreading the priority is getting people out and calling the fire service.' },
+          { t: 'Evacuate the whole airport to the car parks', s: 1, why: 'A full evacuation of a sterile area forces every passenger to be re-screened and is not needed for a contained kitchen fire.' },
+        ],
+      },
+      {
+        text: 'Passengers from the food court are gathering in the concourse. Where should they wait?',
+        opts: [
+          { t: 'Keep them airside at a safe gate area away from the smoke, so they stay in the sterile zone', s: 2, why: 'Correct. Moving people landside means everyone must be screened again before they can fly; a safe airside holding area keeps flights moving.', fx: () => {} },
+          { t: 'Send them out through security to the landside curb', s: 1, why: 'Safe, but everyone becomes unscreened and must queue at security again. Use it only if the airside is unsafe.' },
+          { t: 'Let them go back to finish their meals', s: 0, why: 'Nobody re-enters a fire zone until the fire service declares it safe.' },
+        ],
+      },
+    ],
+    duration: 45,
+    tick(c, dt) { tickSmoke(dt); },
+    end(c) { smoke.visible = false; OPS.holds.foodClosed = false; AG.st.cafe.servers.forEach((s) => (s.open = true)); dismiss(c.ff); log('Fire service declares the food court safe; kitchen closed for cleanup, seating reopened', 'go'); },
+    sop: ['Detection: alarm on one zone, confirmed by staff or CCTV.', 'Zoned evacuation of the affected area; call the fire service.', 'Keep evacuees airside where safe so they stay screened.', 'Fire service controls the scene; reopen only on their all-clear.', 'Investigate and record.'],
+  });
   CR.scenarios = SCEN;
   OPS.svcMul = OPS.svcMul || {};
 
@@ -6043,9 +6314,9 @@ SK.crisis = (function () {
 // ===== ui/a11y.js =====
 // SkyOps accessibility + settings: theme, colour-blind palette, text size, reduced motion, announcements, keyboard map.
 SK.settings = (function () {
-  const S = { theme: 'auto', cb: false, text: 1, reduced: window.matchMedia('(prefers-reduced-motion: reduce)').matches, speech: false, autoQuality: true };
+  const S = { theme: 'auto', cb: false, text: 1, reduced: window.matchMedia('(prefers-reduced-motion: reduce)').matches, speech: false, autoQuality: true, ambient: false, atc: false };
   try { Object.assign(S, JSON.parse(localStorage.getItem('skyops.settings') || '{}')); } catch (e) { /* storage unavailable */ }
-  S.save = function () { try { localStorage.setItem('skyops.settings', JSON.stringify({ theme: S.theme, cb: S.cb, text: S.text, reduced: S.reduced, speech: S.speech, autoQuality: S.autoQuality })); } catch (e) { /* ignore */ } };
+  S.save = function () { try { localStorage.setItem('skyops.settings', JSON.stringify({ theme: S.theme, cb: S.cb, text: S.text, reduced: S.reduced, speech: S.speech, autoQuality: S.autoQuality, ambient: S.ambient, atc: S.atc })); } catch (e) { /* ignore */ } };
   S.apply = function () {
     const r = document.documentElement;
     if (S.theme === 'auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', S.theme);
@@ -6074,6 +6345,100 @@ SK.settings = (function () {
     ['Z', 'Zones and layers panel'], [', / .', 'Previous / next CCTV camera'], ['Esc', 'Close panels, stop following'], ['?', 'This help'],
   ];
   return S;
+})();
+
+// ===== ui/audio.js =====
+// SkyOps audio (opt-in): procedural ambience (terminal hum, crowd murmur, jet rumble near aircraft) and ATC radio calls.
+// Everything is synthesised with WebAudio and speechSynthesis, so there are no audio files to load.
+SK.audio = (function () {
+  const S = SK.settings;
+  const A = { ctx: null };
+  let master, hum, crowd, jet, jetGain, crowdGain;
+
+  function noiseBuffer(ctx, seconds) {
+    const b = ctx.createBuffer(1, ctx.sampleRate * seconds, ctx.sampleRate), d = b.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < d.length; i++) { const w = Math.random() * 2 - 1; last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; }   // brown noise
+    return b;
+  }
+  function loop(ctx, buf) { const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; s.start(); return s; }
+
+  // AudioContext can only start after a user gesture; settings toggles provide one
+  A.start = function () {
+    if (A.ctx) { A.ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    const ctx = (A.ctx = new AC());
+    master = ctx.createGain(); master.gain.value = 0.5; master.connect(ctx.destination);
+    const buf = noiseBuffer(ctx, 4);
+    // terminal HVAC hum: low-passed noise plus a quiet 60 Hz tone
+    hum = ctx.createBiquadFilter(); hum.type = 'lowpass'; hum.frequency.value = 180;
+    const hg = ctx.createGain(); hg.gain.value = 0.18;
+    loop(ctx, buf).connect(hum); hum.connect(hg); hg.connect(master);
+    const tone = ctx.createOscillator(); tone.frequency.value = 60; const tg = ctx.createGain(); tg.gain.value = 0.015; tone.connect(tg); tg.connect(master); tone.start();
+    // crowd murmur: band-passed noise whose level follows how many people are near the camera
+    crowd = ctx.createBiquadFilter(); crowd.type = 'bandpass'; crowd.frequency.value = 600; crowd.Q.value = 0.8;
+    crowdGain = ctx.createGain(); crowdGain.gain.value = 0;
+    loop(ctx, buf).connect(crowd); crowd.connect(crowdGain); crowdGain.connect(master);
+    // jet rumble: louder near moving aircraft, much louder at take-off
+    jet = ctx.createBiquadFilter(); jet.type = 'lowpass'; jet.frequency.value = 400;
+    jetGain = ctx.createGain(); jetGain.gain.value = 0;
+    loop(ctx, buf).connect(jet); jet.connect(jetGain); jetGain.connect(master);
+  };
+  A.stop = function () { if (A.ctx) A.ctx.suspend(); };
+
+  // chime before a terminal announcement
+  A.chime = function () {
+    if (!A.ctx || !S.ambient) return;
+    const t = A.ctx.currentTime;
+    [659, 523].forEach((f, i) => {
+      const o = A.ctx.createOscillator(), g = A.ctx.createGain();
+      o.frequency.value = f; g.gain.setValueAtTime(0.0001, t + i * 0.45); g.gain.exponentialRampToValueAtTime(0.25, t + i * 0.45 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.45 + 0.9);
+      o.connect(g); g.connect(master); o.start(t + i * 0.45); o.stop(t + i * 0.45 + 1);
+    });
+  };
+
+  // ATC radio: short tower calls in standard phraseology when an aircraft lands, lines up or takes off
+  let lastRadio = 0;
+  SK.bus.on('ops', (e) => {
+    if (!S.atc || !window.speechSynthesis) return;
+    if (performance.now() - lastRadio < 4000) return;
+    let msg = null;
+    const call = (txt) => txt.replace(/\b([A-Z]{2}) (\d+)/g, (m, a, n) => ({ SK: 'Sky', NW: 'Northwind', AU: 'Aurora', MR: 'Meridian', CB: 'Cobalt', SC: 'Sky Cargo' }[a] || a) + ' ' + n.split('').join(' '));
+    if (/cleared for take-off/.test(e.msg)) msg = call(e.msg.split(' cleared')[0]) + ', runway two seven, wind calm, cleared for take-off.';
+    else if (/landed on 27/.test(e.msg)) msg = call(e.msg.split(' landed')[0]) + ', vacate left when able, contact ground.';
+    else if (/pushback approved/.test(e.msg)) msg = call(e.msg.split(' pushback')[0]) + ', push and start approved, face east.';
+    if (!msg) return;
+    lastRadio = performance.now();
+    const u = new SpeechSynthesisUtterance('Sky Tower. ' + msg);
+    u.rate = 1.15; u.pitch = 0.85; u.volume = 0.8;
+    window.speechSynthesis.speak(u);
+  });
+  SK.bus.on('ops', (e) => { if (/now boarding|final call/.test(e.msg)) A.chime(); });
+
+  window.addEventListener('pointerdown', () => { if ((S.ambient || S.atc) && (!A.ctx || A.ctx.state !== 'running')) A.start(); }, { once: false });
+  const v = new THREE.Vector3();
+  A.frame = function () {
+    if (!A.ctx || A.ctx.state !== 'running') return;
+    const cam = SK.engine.camera.position, t = A.ctx.currentTime;
+    // people within 40 m of the camera target
+    const tg = SK.engine.controls.target;
+    let n = 0;
+    for (const a of SK.agents.list) if (!a.hidden && Math.abs(a.x - tg.x) < 40 && Math.abs(a.z - tg.z) < 40) n++;
+    const near = SK.clamp(1 - cam.distanceTo(tg) / 250, 0, 1);
+    crowdGain.gain.setTargetAtTime(S.ambient ? Math.min(0.5, n / 120) * near : 0, t, 0.5);
+    let jl = 0;
+    for (const p of SK.aircraft.planes) {
+      if (!p.grp.visible || p.state === 'parked' || p.state === 'queued') continue;
+      v.set(p.x, p.y || 0, p.z);
+      const d = cam.distanceTo(v);
+      const loud = p.state === 'takeoff' ? 1 : p.state === 'approach' || p.state === 'rollout' ? 0.6 : 0.25;
+      jl = Math.max(jl, loud * SK.clamp(1 - d / 700, 0, 1));
+    }
+    jetGain.gain.setTargetAtTime(S.ambient ? jl * 0.9 : 0, t, 0.3);
+    master.gain.setTargetAtTime(S.ambient || S.atc ? 0.5 : 0, t, 0.2);
+  };
+  return A;
 })();
 
 // ===== ui/overlays.js =====
@@ -6348,10 +6713,21 @@ SK.ui = (function () {
           <small>Queue ${q * P} pax · wait ${w === Infinity || isNaN(w) ? 'closed' : w + ' min'} · $${lv.cost}/hr each</small><div class="bar"><i style="width:${pct}%;background:${pct > 70 ? 'var(--bad)' : pct > 40 ? 'var(--warn)' : 'var(--ok)'}"></i></div></div>`;
       }).join('') +
       `<div class="eyebrow group-h">Shift economics</div><div class="data"><div>Staff + equipment</div><div>$${(k.staffCost || 0).toLocaleString()}/hr</div><div>Labour so far</div><div>$${Math.round(OPS.money.staff).toLocaleString()}</div><div>Retail + F&amp;B sales</div><div>$${Math.round(OPS.money.retail + OPS.money.food).toLocaleString()}</div><div>Satisfaction</div><div>${k.satisfaction}</div></div>` +
-      (OPS.mode === 'ops' ? `<p style="color:var(--muted);font-size:12px;margin-top:10px">Operations mode: you run the staffing. Keep security under 10 min and check-in under 20 min without overspending.</p>` : '');
+      (OPS.mode === 'ops' ? `<p style="color:var(--muted);font-size:12px;margin-top:10px">Operations mode: you run the staffing. Keep security under 10 min and check-in under 20 min without overspending.</p>` : '') +
+      `<div class="eyebrow group-h">Gate plan</div><p style="color:var(--muted);font-size:11.5px;margin:0 0 6px">Move or swap a departure before its aircraft and crew are committed. Stands need 90 min between departures; wide-bodies need A3.</p>` +
+      OPS.flightsAhead(16).filter((f) => !f.offBlock).slice(0, 7).map((f) => {
+        const can = SK.gateChangeable(f), opts = can ? SK.gateOptions(OPS.flights, f, SK.L.gates) : [];
+        return `<div class="row"><label for="gp_${f.id}"><b>${esc(f.num)}</b> ${SK.fmtTime(f.std)} ${esc(f.city)}</label><select id="gp_${f.id}" data-gf="${f.id}" ${can && opts.length ? '' : 'disabled'} aria-label="Gate for ${esc(f.num)}" style="height:28px;border-radius:7px;border:1px solid var(--border);background:var(--chip)"><option value="${f.gate}">${f.gate}</option>${opts.map((o) => `<option value="${o.gate}">${o.gate}${o.swap ? ' (swap ' + esc(o.swap.num) + ')' : ''}</option>`).join('')}</select></div>`;
+      }).join('');
     if (full) {
       leftBody.innerHTML = html;
       leftBody.querySelector('#autoStaff').addEventListener('change', (e) => { OPS.autoStaff = e.target.checked; renderStaff(true); });
+      leftBody.querySelectorAll('[data-gf]').forEach((sel) => sel.addEventListener('change', () => {
+        const f = OPS.flights.find((x) => x.id === sel.dataset.gf);
+        OPS.changeGate(f, sel.value);
+        sel.blur();
+        renderStaff(true);
+      }));
       leftBody.querySelectorAll('[data-lv]').forEach((b) => b.addEventListener('click', () => {
         const lv = OPS.levers.find((l) => l.id === b.dataset.lv);
         OPS.setOpen(lv.id, AG.st[lv.st].openCount() + Number(b.dataset.d));
@@ -6665,10 +7041,12 @@ SK.ui = (function () {
       <div class="row"><label for="s_rm">Reduced motion (instant camera cuts, no glow pulse)</label><input type="checkbox" class="toggle" id="s_rm" ${S.reduced ? 'checked' : ''}></div>
       <div class="row"><label for="s_sp">Spoken boarding announcements</label><input type="checkbox" class="toggle" id="s_sp" ${S.speech ? 'checked' : ''}></div>
       <div class="row"><label for="s_aq">Adaptive quality (keeps the frame rate up)</label><input type="checkbox" class="toggle" id="s_aq" ${S.autoQuality ? 'checked' : ''}></div>
+      <div class="row"><label for="s_amb">Ambient sound (terminal hum, crowd, jet engines, chimes)</label><input type="checkbox" class="toggle" id="s_amb" ${S.ambient ? 'checked' : ''}></div>
+      <div class="row"><label for="s_atc">ATC radio calls (spoken tower clearances)</label><input type="checkbox" class="toggle" id="s_atc" ${S.atc ? 'checked' : ''}></div>
       <p style="color:var(--muted)">Quality level now: ${['Low', 'Medium', 'High', 'Ultra'][SK.engine.quality.level]}. Each figure in the sim stands for ${P} passengers; the clock runs ${SK.TIME_SCALE} times faster than real time.</p>`, (body) => {
       body.querySelectorAll('[data-theme-set]').forEach((b) => b.addEventListener('click', () => { S.theme = b.dataset.themeSet; S.apply(); S.save(); U.repaintModal(); }));
       body.querySelectorAll('[data-text]').forEach((b) => b.addEventListener('click', () => { S.text = Number(b.dataset.text); S.apply(); S.save(); U.repaintModal(); }));
-      [['s_cb', 'cb'], ['s_rm', 'reduced'], ['s_sp', 'speech'], ['s_aq', 'autoQuality']].forEach(([id, k]) => body.querySelector('#' + id).addEventListener('change', (e) => { S[k] = e.target.checked; S.apply(); S.save(); }));
+      [['s_cb', 'cb'], ['s_rm', 'reduced'], ['s_sp', 'speech'], ['s_aq', 'autoQuality'], ['s_amb', 'ambient'], ['s_atc', 'atc']].forEach(([id, k]) => body.querySelector('#' + id).addEventListener('change', (e) => { S[k] = e.target.checked; S.apply(); S.save(); if ((k === 'ambient' || k === 'atc') && e.target.checked) SK.audio.start(); }));
     });
   });
   $('helpBtn').addEventListener('click', () => U.openHelp());
@@ -6723,6 +7101,7 @@ SK.ui = (function () {
     SK.overlays.frame(dtGame, dtReal);
     if (SK.edu) SK.edu.frame(dtReal);
     if (SK.crisis) SK.crisis.frame(dtGame, dtReal);
+    if (SK.audio) SK.audio.frame();
     slow -= dtReal;
     if (slow > 0) return;
     slow = 0.25;

@@ -83,10 +83,21 @@ SK.ui = (function () {
           <small>Queue ${q * P} pax · wait ${w === Infinity || isNaN(w) ? 'closed' : w + ' min'} · $${lv.cost}/hr each</small><div class="bar"><i style="width:${pct}%;background:${pct > 70 ? 'var(--bad)' : pct > 40 ? 'var(--warn)' : 'var(--ok)'}"></i></div></div>`;
       }).join('') +
       `<div class="eyebrow group-h">Shift economics</div><div class="data"><div>Staff + equipment</div><div>$${(k.staffCost || 0).toLocaleString()}/hr</div><div>Labour so far</div><div>$${Math.round(OPS.money.staff).toLocaleString()}</div><div>Retail + F&amp;B sales</div><div>$${Math.round(OPS.money.retail + OPS.money.food).toLocaleString()}</div><div>Satisfaction</div><div>${k.satisfaction}</div></div>` +
-      (OPS.mode === 'ops' ? `<p style="color:var(--muted);font-size:12px;margin-top:10px">Operations mode: you run the staffing. Keep security under 10 min and check-in under 20 min without overspending.</p>` : '');
+      (OPS.mode === 'ops' ? `<p style="color:var(--muted);font-size:12px;margin-top:10px">Operations mode: you run the staffing. Keep security under 10 min and check-in under 20 min without overspending.</p>` : '') +
+      `<div class="eyebrow group-h">Gate plan</div><p style="color:var(--muted);font-size:11.5px;margin:0 0 6px">Move or swap a departure before its aircraft and crew are committed. Stands need 90 min between departures; wide-bodies need A3.</p>` +
+      OPS.flightsAhead(16).filter((f) => !f.offBlock).slice(0, 7).map((f) => {
+        const can = SK.gateChangeable(f), opts = can ? SK.gateOptions(OPS.flights, f, SK.L.gates) : [];
+        return `<div class="row"><label for="gp_${f.id}"><b>${esc(f.num)}</b> ${SK.fmtTime(f.std)} ${esc(f.city)}</label><select id="gp_${f.id}" data-gf="${f.id}" ${can && opts.length ? '' : 'disabled'} aria-label="Gate for ${esc(f.num)}" style="height:28px;border-radius:7px;border:1px solid var(--border);background:var(--chip)"><option value="${f.gate}">${f.gate}</option>${opts.map((o) => `<option value="${o.gate}">${o.gate}${o.swap ? ' (swap ' + esc(o.swap.num) + ')' : ''}</option>`).join('')}</select></div>`;
+      }).join('');
     if (full) {
       leftBody.innerHTML = html;
       leftBody.querySelector('#autoStaff').addEventListener('change', (e) => { OPS.autoStaff = e.target.checked; renderStaff(true); });
+      leftBody.querySelectorAll('[data-gf]').forEach((sel) => sel.addEventListener('change', () => {
+        const f = OPS.flights.find((x) => x.id === sel.dataset.gf);
+        OPS.changeGate(f, sel.value);
+        sel.blur();
+        renderStaff(true);
+      }));
       leftBody.querySelectorAll('[data-lv]').forEach((b) => b.addEventListener('click', () => {
         const lv = OPS.levers.find((l) => l.id === b.dataset.lv);
         OPS.setOpen(lv.id, AG.st[lv.st].openCount() + Number(b.dataset.d));
@@ -400,10 +411,12 @@ SK.ui = (function () {
       <div class="row"><label for="s_rm">Reduced motion (instant camera cuts, no glow pulse)</label><input type="checkbox" class="toggle" id="s_rm" ${S.reduced ? 'checked' : ''}></div>
       <div class="row"><label for="s_sp">Spoken boarding announcements</label><input type="checkbox" class="toggle" id="s_sp" ${S.speech ? 'checked' : ''}></div>
       <div class="row"><label for="s_aq">Adaptive quality (keeps the frame rate up)</label><input type="checkbox" class="toggle" id="s_aq" ${S.autoQuality ? 'checked' : ''}></div>
+      <div class="row"><label for="s_amb">Ambient sound (terminal hum, crowd, jet engines, chimes)</label><input type="checkbox" class="toggle" id="s_amb" ${S.ambient ? 'checked' : ''}></div>
+      <div class="row"><label for="s_atc">ATC radio calls (spoken tower clearances)</label><input type="checkbox" class="toggle" id="s_atc" ${S.atc ? 'checked' : ''}></div>
       <p style="color:var(--muted)">Quality level now: ${['Low', 'Medium', 'High', 'Ultra'][SK.engine.quality.level]}. Each figure in the sim stands for ${P} passengers; the clock runs ${SK.TIME_SCALE} times faster than real time.</p>`, (body) => {
       body.querySelectorAll('[data-theme-set]').forEach((b) => b.addEventListener('click', () => { S.theme = b.dataset.themeSet; S.apply(); S.save(); U.repaintModal(); }));
       body.querySelectorAll('[data-text]').forEach((b) => b.addEventListener('click', () => { S.text = Number(b.dataset.text); S.apply(); S.save(); U.repaintModal(); }));
-      [['s_cb', 'cb'], ['s_rm', 'reduced'], ['s_sp', 'speech'], ['s_aq', 'autoQuality']].forEach(([id, k]) => body.querySelector('#' + id).addEventListener('change', (e) => { S[k] = e.target.checked; S.apply(); S.save(); }));
+      [['s_cb', 'cb'], ['s_rm', 'reduced'], ['s_sp', 'speech'], ['s_aq', 'autoQuality'], ['s_amb', 'ambient'], ['s_atc', 'atc']].forEach(([id, k]) => body.querySelector('#' + id).addEventListener('change', (e) => { S[k] = e.target.checked; S.apply(); S.save(); if ((k === 'ambient' || k === 'atc') && e.target.checked) SK.audio.start(); }));
     });
   });
   $('helpBtn').addEventListener('click', () => U.openHelp());
@@ -458,6 +471,7 @@ SK.ui = (function () {
     SK.overlays.frame(dtGame, dtReal);
     if (SK.edu) SK.edu.frame(dtReal);
     if (SK.crisis) SK.crisis.frame(dtGame, dtReal);
+    if (SK.audio) SK.audio.frame();
     slow -= dtReal;
     if (slow > 0) return;
     slow = 0.25;

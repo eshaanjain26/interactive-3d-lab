@@ -341,6 +341,43 @@ SK.terminal = (function () {
   });
   D.rooms = { prayer: { x: -93, z: -4 }, nursing: { x: -81.5, z: -4 }, smoking: { x: 93, z: -4 } };
 
+  // kids play area and sleep pods / spa on the airside spine
+  K.ground(12, 8, new THREE.MeshStandardMaterial({ color: 0x5fb3a8, roughness: 1 }), 68, 0.045, -5, root);
+  [[64, -7, M.red], [66.5, -3, M.yellow], [70, -6.5, M.blueMark], [72, -2.5, M.green]].forEach(([x, z, m], i) => B.box(1.6, 0.8 + (i % 2) * 0.6, 1.6, m, x, 0, z));
+  B.cyl(1.2, 0.5, M.orange, 69, 0, -2.2, 16);
+  const slide = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.1, 4), M.yellow); slide.position.set(73, 1, -6.5); slide.rotation.x = 0.4; root.add(slide);
+  for (let x = 62; x <= 74; x += 1.5) B.cyl(0.04, 0.8, M.steel, x, 0, -9, 6);
+  K.hit(12, 1.6, 8, 68, 0, -5, root, 'kids');
+  [77, 80, 83].forEach((x) => { B.box(2.4, 1.3, 2.2, M.white, x, 0, -7.5); B.box(2.4, 1.3, 2.2, M.white, x, 1.3, -7.5); B.box(0.6, 0.6, 0.05, M.glassDark, x, 0.4, -6.38); });
+  B.box(7, 1.0, 1, M.wood, 80, 0, -2); B.box(6, 0.5, 0.05, M.screenWarm, 80, 1.8, -1.4);
+  K.hit(10, 2.8, 8, 80, 0, -5, root, 'pods');
+  const kp = K.sign(['Kids play · Sleep pods · Spa'], 9, 0.8, { bg: '#2f3a48', font: 'bold 90px system-ui, sans-serif' });
+  kp.position.set(74, 3.2, -9.6); kp.rotation.y = Math.PI; root.add(kp);
+
+  // digital advertising screens (rotating fictional campaigns)
+  const ADS = [['AURORA', 'Pacific Business Class', '#7b3fa0'], ['NORTHWIND MILES', 'Earn on every flight', '#1d7a5f'], ['SKY DUTY FREE', '20% off fragrance today', '#4a1d2e'], ['VISIT SKY CITY', 'Rail to downtown in 18 min', '#0f5c4d'], ['COBALT', 'New: Lisbon from June', '#163a6b']];
+  const adCanvas = document.createElement('canvas'); adCanvas.width = 256; adCanvas.height = 512;
+  const adTex = new THREE.CanvasTexture(adCanvas); adTex.encoding = THREE.sRGBEncoding;
+  const adMat = new THREE.MeshBasicMaterial({ map: adTex, toneMapped: false });
+  [[-46, -26.4, Math.PI], [46, -26.4, Math.PI], [-90, 41, 0], [90, 41, 0], [0, 4.6, 0]].forEach(([x, z, ry]) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 2.8), adMat);
+    m.position.set(x, 1.7, z); m.rotation.y = ry; root.add(m);
+    B.box(1.6, 3.2, 0.25, M.black, x, 0.1, z + (ry ? 0.15 : -0.15));
+    E.pick.add(m, 'adscreen');
+  });
+  let adIdx = -1;
+  T.updateAds = function () {
+    const i = Math.floor(performance.now() / 6000) % ADS.length;
+    if (i === adIdx) return;
+    adIdx = i;
+    const [h, sub, col] = ADS[i], c = adCanvas.getContext('2d');
+    c.fillStyle = col; c.fillRect(0, 0, 256, 512);
+    c.fillStyle = 'rgba(255,255,255,0.12)'; c.beginPath(); c.arc(200, 120, 140, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#fff'; c.textAlign = 'center'; c.font = 'bold 30px system-ui, sans-serif'; c.fillText(h, 128, 300);
+    c.font = '20px system-ui, sans-serif'; c.fillText(sub, 128, 340);
+    adTex.needsUpdate = true;
+  };
+
   // ---------- gates ----------
   D.gates = {};
   const seatGeo = new THREE.BoxGeometry(0.55, 0.45, 0.5);
@@ -426,6 +463,7 @@ SK.terminal = (function () {
   };
   T.egate = function (i, which) { T.egateDoors[i].open[which] = 1.6; };
   T.update = function (dt) {
+    if (T.updateAds) T.updateAds();
     T.egateDoors.forEach((g) => g.doors.forEach((d, k) => {
       if (g.open[k] > 0) g.open[k] -= dt;
       const target = g.open[k] > 0 ? 0.06 : 1;
