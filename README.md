@@ -1,6 +1,6 @@
 # Interactive 3D Lab
 
-Twenty-one interactive Three.js explorers covering chips, quantum computing, AI, robotics, audio, anatomy, cardiology, embryology, energy, logistics, space and U.S. immigration law. Each one is a single self-contained HTML file.
+Twenty-two interactive Three.js explorers covering chips, quantum computing, AI, robotics, audio, anatomy, cardiology, embryology, energy, logistics, space, U.S. immigration law and EU AI regulation. Each one is a single self-contained HTML file.
 
 **Live site:** https://eshaanjain26.github.io/interactive-3d-lab/
 
@@ -26,6 +26,7 @@ Twenty-one interactive Three.js explorers covering chips, quantum computing, AI,
 | [Warehouse Dock Twin](https://eshaanjain26.github.io/interactive-3d-lab/warehouse-dock-twin/) | A six-bay warehouse dock as a digital twin: trucks run their own arrive, dock, unload, load and depart timelines while pallets flow from truck to conveyor to racking and forklifts work the aisles |
 | [Warehouse Ops Academy](https://eshaanjain26.github.io/interactive-3d-lab/warehouse-ops-academy/) | An end-to-end distribution center for teaching: gate check-in, intermodal rail and drayage, docking, receiving, putaway, pick-to-light, AMR goods-to-person, packing, sortation, shipping, cycle counts and andons, with 20+ animated workers, a guided tour and a walkable floor |
 | [Rocket Launch Broadcast](https://eshaanjain26.github.io/interactive-3d-lab/rocket-launch-broadcast/) | A heavy-lift launch from T-10 to orbit as a live broadcast: umbilicals and swing arms release, ignition and liftoff with flame-trench smoke, booster and stage separation, fairing deploy, then a pull-back to Earth's curvature, with telemetry, an altitude tape, a cutaway view and a scrubbable timeline |
+| [EU AI Act Risk Explorer](https://eshaanjain26.github.io/interactive-3d-lab/eu-ai-act-explorer/) | The EU AI Act's four risk tiers as floating islands: prohibited practices (Article 5), high-risk Annex III areas and the provider checklist, Article 50 transparency duties, and minimal risk, plus a providers vs deployers hub, penalty tiers, and a five-scenario classify-the-system quiz that unlocks new objects |
 | [SkyOps Airport Simulator](https://eshaanjain26.github.io/interactive-3d-lab/skyops-airport/) | An international airport run as a strategy-game sim, departures and arrivals: passengers from curb and rail through check-in, security lanes with K9, passport e-gates, duty free and lounges to jet-bridge and bus-gate boarding, bags through CT screening to the hold, aircraft landing, pushing back and taking off on runway 27; arriving passengers through the sterile corridor, immigration, baggage claim and green/red customs to the pickup curb; freighter turns at the cargo terminal, a hangar check, hydrant fuelling, ARFF drills and an ops-centre video wall; live IATA ADRM wait KPIs, staffing levers, nine crisis drills, gate swaps, turnaround vehicles, opt-in sound, SOP and regulation cards, explainers, quiz and glossary |
 
 ## Run locally

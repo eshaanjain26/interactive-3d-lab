@@ -1,0 +1,1363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI Act Risk Explorer</title>
+<meta name="description" content="A 3D, game-like study guide to the EU AI Act's four risk tiers, with a classify-the-system quiz.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #070914;
+    --glass: rgba(13, 16, 34, 0.86);
+    --glass-strong: rgba(15, 18, 38, 0.96);
+    --line: rgba(255, 255, 255, 0.09);
+    --line-strong: rgba(255, 255, 255, 0.18);
+    --text: #eef0fa;
+    --muted: #a6abc6;
+    --dim: #737896;
+    --red: #ff4d5e;
+    --amber: #ff9f43;
+    --yellow: #ffd93d;
+    --green: #2ee6a6;
+    --violet: #8b7bff;
+    --good: #2ee6a6;
+    --bad: #ff4d5e;
+    --radius: 18px;
+    --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --display: "Space Grotesk", var(--font);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font);
+    color: var(--text);
+    background: radial-gradient(1200px 700px at 50% 20%, #151a3a 0%, #0b0e22 45%, var(--bg) 100%);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; touch-action: none; }
+
+  .glass {
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar {
+    position: fixed; top: 16px; left: 16px; right: 16px;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+    pointer-events: none; z-index: 10;
+  }
+  .topbar > * { pointer-events: auto; }
+  .brand { padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
+  .brand .logo {
+    width: 34px; height: 34px; border-radius: 10px; flex: none;
+    background: conic-gradient(from 200deg, var(--red), var(--amber), var(--yellow), var(--green), var(--red));
+    display: grid; place-items: center;
+  }
+  .brand .logo::after { content: ""; width: 14px; height: 14px; border-radius: 4px; background: var(--bg); transform: rotate(45deg); }
+  .brand h1 { font-family: var(--display); font-size: 15px; font-weight: 700; letter-spacing: 0.01em; }
+  .brand p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .brand .meter { display: inline-flex; align-items: center; gap: 6px; }
+  .brand .bar { width: 70px; height: 5px; border-radius: 99px; background: rgba(255,255,255,.1); overflow: hidden; }
+  .brand .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--green), var(--violet)); transition: width .4s; }
+  .icon-btn {
+    width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line-strong);
+    background: rgba(255,255,255,.05); color: var(--muted); font-weight: 700; font-size: 14px; flex: none;
+  }
+  .icon-btn:hover { color: #fff; background: rgba(255,255,255,.12); }
+  .quiz-launch {
+    border: 0; border-radius: 999px; padding: 12px 20px; font-weight: 700; font-size: 14px;
+    background: linear-gradient(135deg, #7b6bff, #b05cff); color: #fff;
+    box-shadow: 0 10px 30px rgba(139, 123, 255, 0.45);
+    display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+  }
+  .quiz-launch:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .quiz-launch .best { font-weight: 600; font-size: 12px; opacity: .85; }
+
+  /* ---------- Bottom HUD ---------- */
+  .hud {
+    position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+    display: flex; gap: 6px; padding: 7px; border-radius: 999px; z-index: 10;
+    max-width: calc(100vw - 32px); overflow-x: auto; scrollbar-width: none;
+  }
+  .hud::-webkit-scrollbar { display: none; }
+  .hud button {
+    --c: var(--violet);
+    display: inline-flex; align-items: center; gap: 8px; flex: none;
+    padding: 9px 14px; border-radius: 999px; border: 1px solid transparent;
+    background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; white-space: nowrap;
+    transition: background .2s, color .2s, border-color .2s;
+  }
+  .hud button .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c); box-shadow: 0 0 10px var(--c); }
+  .hud button:hover { color: #fff; background: rgba(255,255,255,.07); }
+  .hud button.active { color: #fff; background: color-mix(in srgb, var(--c) 22%, transparent); border-color: color-mix(in srgb, var(--c) 60%, transparent); }
+  .hud .sep { width: 1px; background: var(--line); margin: 6px 2px; flex: none; }
+
+  /* ---------- Floating zone labels ---------- */
+  .zlabel {
+    --c: #fff;
+    position: fixed; left: 0; top: 0; z-index: 4; pointer-events: auto;
+    transform: translate(-50%, -100%); white-space: nowrap; text-align: center;
+    padding: 6px 12px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--c) 55%, transparent);
+    background: rgba(8, 10, 24, .72); color: #fff; font-family: var(--display); font-weight: 700; font-size: 13px; letter-spacing: .06em; text-transform: uppercase;
+    box-shadow: 0 0 22px color-mix(in srgb, var(--c) 35%, transparent);
+    transition: opacity .3s;
+  }
+  .zlabel small { display: block; font-family: var(--font); font-weight: 500; font-size: 10.5px; letter-spacing: .02em; text-transform: none; color: var(--muted); }
+  .zlabel::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin-right: 7px; vertical-align: 1px; box-shadow: 0 0 8px var(--c); }
+  .zlabel.hidden { opacity: 0; pointer-events: none; }
+
+  .tooltip {
+    position: fixed; z-index: 15; pointer-events: none; padding: 6px 10px; border-radius: 8px;
+    background: rgba(8,10,24,.9); border: 1px solid var(--line-strong); font-size: 12.5px; font-weight: 600;
+    transform: translate(14px, 14px); opacity: 0; transition: opacity .15s;
+  }
+  .tooltip.on { opacity: 1; }
+  .tooltip small { color: var(--muted); font-weight: 500; }
+
+  /* ---------- Side panel ---------- */
+  .panel {
+    --c: var(--violet);
+    position: fixed; top: 84px; right: 16px; z-index: 9;
+    width: min(380px, calc(100vw - 32px)); max-height: calc(100vh - 180px); overflow-y: auto;
+    padding: 22px 22px 20px; border-top: 3px solid var(--c);
+    opacity: 0; transform: translateX(24px); pointer-events: none; transition: opacity .3s, transform .35s cubic-bezier(.2,.8,.2,1);
+  }
+  .panel.open { opacity: 1; transform: none; pointer-events: auto; }
+  .panel .close { position: absolute; top: 14px; right: 14px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+    font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    background: color-mix(in srgb, var(--c) 20%, transparent); color: var(--c); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+  }
+  .panel h2 { font-family: var(--display); font-size: 23px; line-height: 1.2; margin: 12px 30px 8px 0; }
+  .panel p.lead { font-size: 14.5px; line-height: 1.55; color: #d4d7ea; }
+  .panel h3 { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); margin: 18px 0 8px; }
+  .panel ul.ex { list-style: none; display: grid; gap: 6px; }
+  .panel ul.ex li { font-size: 13.5px; color: #cfd3e8; padding-left: 18px; position: relative; line-height: 1.45; }
+  .panel ul.ex li::before { content: ""; position: absolute; left: 3px; top: 7px; width: 7px; height: 7px; border-radius: 2px; background: var(--c); transform: rotate(45deg); }
+  .oblig {
+    display: inline-flex; gap: 8px; align-items: center; margin-top: 16px; padding: 8px 12px; border-radius: 10px;
+    background: rgba(255,255,255,.05); border: 1px dashed color-mix(in srgb, var(--c) 60%, transparent); font-size: 13px; font-weight: 600;
+  }
+  .oblig b { color: var(--c); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+  .ref { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); display: flex; gap: 8px; }
+  .ref b { color: var(--dim); font-weight: 600; }
+  .kv { display: grid; grid-template-columns: 88px 1fr; gap: 6px 10px; margin-top: 14px; font-size: 13px; line-height: 1.45; }
+  .kv dt { color: var(--dim); font-weight: 600; }
+  .kv dd { color: #d4d7ea; }
+  .chips { display: grid; gap: 8px; }
+  .chip {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,.035);
+    font-size: 13.5px; font-weight: 600; transition: border-color .2s, background .2s;
+  }
+  .chip:hover { border-color: color-mix(in srgb, var(--c) 60%, transparent); background: rgba(255,255,255,.07); }
+  .chip .ic { width: 26px; height: 26px; border-radius: 8px; flex: none; display: grid; place-items: center; background: color-mix(in srgb, var(--c) 22%, transparent); color: var(--c); font-size: 12px; }
+  .chip .seen { margin-left: auto; font-size: 11px; color: var(--good); font-weight: 600; }
+  .chip.locked { color: var(--dim); border-style: dashed; }
+  .chip.locked .ic { background: rgba(255,255,255,.06); color: var(--dim); }
+  .chip.fresh { border-color: var(--c); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 18%, transparent); }
+  .panel-nav { display: flex; justify-content: space-between; gap: 8px; margin-top: 18px; }
+  .ghost {
+    padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line-strong); background: transparent;
+    color: var(--muted); font-size: 12.5px; font-weight: 600;
+  }
+  .ghost:hover { color: #fff; background: rgba(255,255,255,.07); }
+  .stack { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 10px; }
+  .stack span { font-size: 10.5px; padding: 5px 6px; border-radius: 6px; background: rgba(255,255,255,.05); color: var(--muted); text-align: center; }
+
+  /* ---------- Modal shell ---------- */
+  .scrim {
+    position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 16px;
+    background: rgba(4, 5, 14, .55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    opacity: 0; pointer-events: none; transition: opacity .3s;
+  }
+  .scrim.open { opacity: 1; pointer-events: auto; }
+  .card { width: min(560px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; padding: 28px; background: var(--glass-strong); }
+  .card h2 { font-family: var(--display); font-size: 26px; line-height: 1.15; }
+  .card .sub { color: var(--muted); font-size: 14.5px; line-height: 1.55; margin-top: 10px; }
+
+  /* Intro pyramid */
+  .pyramid { display: grid; gap: 6px; margin: 22px 0 6px; }
+  .tier-row {
+    --c: #fff; --w: 100%;
+    width: var(--w); margin: 0 auto; display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--c) 50%, transparent);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--c) 26%, transparent), color-mix(in srgb, var(--c) 8%, transparent));
+    text-align: left; font-size: 13px; color: #e6e8f5;
+    opacity: 0; transform: translateY(8px); animation: rise .5s forwards;
+  }
+  .tier-row b { font-family: var(--display); font-size: 14px; color: #fff; min-width: 108px; }
+  .tier-row em { margin-left: auto; font-style: normal; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+  .primary {
+    border: 0; border-radius: 12px; padding: 12px 20px; font-weight: 700; font-size: 14.5px;
+    background: linear-gradient(135deg, #7b6bff, #b05cff); color: #fff; box-shadow: 0 8px 24px rgba(139,123,255,.4);
+  }
+  .primary:hover { filter: brightness(1.1); }
+  .secondary { border: 1px solid var(--line-strong); border-radius: 12px; padding: 12px 18px; font-weight: 600; font-size: 14.5px; background: rgba(255,255,255,.05); }
+  .secondary:hover { background: rgba(255,255,255,.1); }
+  .hint { margin-top: 16px; font-size: 12.5px; color: var(--dim); }
+  kbd { font-family: var(--font); font-size: 11px; padding: 1px 6px; border-radius: 5px; border: 1px solid var(--line-strong); background: rgba(255,255,255,.06); color: var(--muted); }
+
+  /* Quiz */
+  .quiz-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .dots { display: flex; gap: 6px; }
+  .dots i { width: 26px; height: 6px; border-radius: 99px; background: rgba(255,255,255,.12); transition: background .3s; }
+  .dots i.now { background: var(--violet); }
+  .dots i.ok { background: var(--good); }
+  .dots i.no { background: var(--bad); }
+  .score { font-size: 13px; color: var(--muted); font-weight: 600; }
+  .score b { color: #fff; }
+  .eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); margin-top: 22px; }
+  .scenario { font-family: var(--display); font-size: 21px; line-height: 1.35; margin-top: 8px; min-height: 84px; }
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+  .choice {
+    --c: #fff;
+    display: flex; align-items: center; gap: 10px; padding: 14px; border-radius: 14px; text-align: left;
+    border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); background: color-mix(in srgb, var(--c) 9%, transparent);
+    font-weight: 700; font-size: 14px; transition: transform .15s, background .2s, opacity .2s;
+  }
+  .choice:hover:not(:disabled) { background: color-mix(in srgb, var(--c) 22%, transparent); transform: translateY(-2px); }
+  .choice .k { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-size: 11px; background: color-mix(in srgb, var(--c) 30%, transparent); color: var(--c); flex: none; }
+  .choice small { display: block; font-weight: 500; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .choice:disabled { cursor: default; opacity: .4; }
+  .choice.right { opacity: 1; background: color-mix(in srgb, var(--good) 22%, transparent); border-color: var(--good); }
+  .choice.wrong { opacity: 1; background: color-mix(in srgb, var(--bad) 22%, transparent); border-color: var(--bad); }
+  .feedback { margin-top: 16px; min-height: 48px; font-size: 14px; line-height: 1.5; color: #d4d7ea; }
+  .feedback strong.ok { color: var(--good); }
+  .feedback strong.no { color: var(--bad); }
+  .feedback .unlock { display: block; margin-top: 6px; font-size: 13px; color: var(--yellow); font-weight: 600; }
+  .quiz-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; gap: 10px; }
+  .card.good { animation: goodPulse .7s; }
+  .card.bad { animation: shake .45s; }
+  @keyframes goodPulse {
+    0% { box-shadow: 0 0 0 0 rgba(46,230,166,.7); }
+    100% { box-shadow: 0 0 0 26px rgba(46,230,166,0); }
+  }
+  @keyframes shake {
+    0%,100% { transform: none; } 20% { transform: translateX(-10px); } 40% { transform: translateX(9px); }
+    60% { transform: translateX(-6px); } 80% { transform: translateX(4px); }
+  }
+  .result-big { font-family: var(--display); font-size: 64px; font-weight: 700; line-height: 1; margin-top: 18px; background: linear-gradient(135deg, var(--green), var(--violet)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .recap { display: grid; gap: 6px; margin-top: 16px; }
+  .recap div { display: flex; gap: 10px; font-size: 13px; color: #cfd3e8; line-height: 1.4; }
+  .recap div i { font-style: normal; font-weight: 700; flex: none; width: 16px; }
+
+  /* Toast */
+  .toast {
+    position: fixed; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom)); z-index: 20;
+    transform: translate(-50%, 20px); opacity: 0; pointer-events: none; transition: opacity .3s, transform .3s;
+    padding: 10px 12px 10px 16px; display: flex; align-items: center; gap: 12px; font-size: 13.5px; font-weight: 600; max-width: calc(100vw - 32px);
+  }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  .toast button { border: 0; border-radius: 9px; padding: 7px 12px; background: var(--violet); color: #fff; font-weight: 700; font-size: 12.5px; flex: none; }
+
+  .fallback { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; max-width: 360px; padding: 22px; z-index: 3; display: none; }
+  .fallback.on { display: block; }
+  .fallback p { color: var(--muted); font-size: 14px; margin-top: 8px; line-height: 1.5; }
+
+  @media (max-width: 860px) {
+    .panel { width: min(340px, 44vw); top: 80px; }
+    .brand p .bar { width: 46px; }
+  }
+  @media (max-width: 680px) {
+    .panel {
+      top: auto; right: 12px; left: 12px; width: auto;
+      bottom: calc(80px + env(safe-area-inset-bottom)); max-height: 44vh; transform: translateY(24px);
+    }
+    .panel h2 { font-size: 20px; }
+    .brand { padding: 10px 12px; }
+    .brand p .bar { width: 46px; }
+  }
+  @media (max-width: 560px) {
+    .topbar { top: 10px; left: 10px; right: 10px; }
+    .brand h1 { font-size: 13.5px; }
+    .quiz-launch { padding: 11px 14px; }
+    .quiz-launch .best { display: none; }
+    .hud button { padding: 8px 11px; font-size: 12px; }
+    .card { padding: 22px 18px; }
+    .scenario { font-size: 18px; min-height: 0; }
+    .choices { grid-template-columns: 1fr; gap: 8px; }
+    .choice { padding: 11px 12px; }
+    .tier-row b { min-width: 0; }
+    .tier-row em { display: none; }
+    .zlabel { font-size: 11px; padding: 4px 9px; }
+    .zlabel small { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+  <div id="stage" aria-hidden="true"></div>
+
+  <div class="fallback glass" id="fallback">
+    <h2>3D view unavailable</h2>
+    <p>Your browser couldn't start WebGL. Use the island buttons below to read every card, and the quiz still works.</p>
+  </div>
+
+  <header class="topbar">
+    <div class="brand glass">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <h1>AI Act Risk Explorer</h1>
+        <p class="meter"><span class="bar"><i id="discBar"></i></span><span id="discText">0 of 21 discovered</span></p>
+      </div>
+      <button class="icon-btn" id="helpBtn" aria-label="Show the intro again">?</button>
+    </div>
+    <button class="quiz-launch" id="quizBtn">Quiz mode <span class="best" id="bestScore"></span></button>
+  </header>
+
+  <nav class="hud glass" id="hud" aria-label="Islands"></nav>
+
+  <aside class="panel glass" id="panel" aria-live="polite" aria-label="Details">
+    <button class="icon-btn close" id="panelClose" aria-label="Close panel">&times;</button>
+    <div id="panelBody"></div>
+  </aside>
+
+  <div class="tooltip" id="tooltip"></div>
+  <div id="labels"></div>
+
+  <div class="toast glass" id="toast" role="status"><span id="toastText"></span><button id="toastBtn">Show me</button></div>
+
+  <div class="scrim" id="intro" role="dialog" aria-modal="true" aria-labelledby="introTitle">
+    <div class="card glass">
+      <span class="pill" style="--c: var(--violet)">EU AI Act study guide</span>
+      <h2 id="introTitle" style="margin-top:14px">Four islands. Four levels of risk.</h2>
+      <p class="sub">The EU AI Act sorts AI systems by how much harm they could cause. The higher the island, the stricter the rules. Fly between them, tap the glowing objects, then test yourself.</p>
+      <div class="pyramid" id="pyramid"></div>
+      <div class="actions">
+        <button class="primary" id="startBtn">Start exploring</button>
+        <button class="secondary" id="startQuizBtn">Quiz me first</button>
+      </div>
+      <p class="hint">Tip: <kbd>&larr;</kbd> <kbd>&rarr;</kbd> hop between islands, <kbd>Q</kbd> opens the quiz, <kbd>Esc</kbd> closes things.</p>
+    </div>
+  </div>
+
+  <div class="scrim" id="quiz" role="dialog" aria-modal="true" aria-labelledby="quizScenario">
+    <div class="card glass" id="quizCard"></div>
+  </div>
+
+  <script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+  </script>
+
+  <script type="module">
+  import * as THREE from 'three';
+
+  // ================================================================
+  // CONTENT
+  // Every panel's description + examples stays under 40 words.
+  // ================================================================
+  const TIERS = [
+    {
+      key: 'red', name: 'Unacceptable risk', short: 'Prohibited', hex: 0xff4d5e, css: 'var(--red)',
+      pos: [11, 3, 1], sub: 'Article 5',
+      lead: 'Banned outright. These practices threaten safety or fundamental rights, so no compliance path exists.',
+      rule: 'Cannot be placed on the EU market or used.',
+      basis: 'Article 5 lists the prohibited practices.',
+      stakes: 'Up to €35M or 7% of worldwide annual turnover.',
+      items: [
+        { id: 'social', shape: 'totem', title: 'Social scoring', desc: 'Scoring people on social behaviour or personal traits in ways that lead to unjustified or detrimental treatment is banned, for public and private actors alike.', ex: ['A city ranks residents’ “trustworthiness” to ration public housing'], ref: 'Article 5(1)(c)', tag: 'Prohibited' },
+        { id: 'rbi', shape: 'cctv', title: 'Real-time biometric ID', desc: 'Live remote facial recognition in public spaces for law enforcement is banned, with narrow exceptions such as searching for missing persons or stopping an imminent terrorist threat.', ex: ['Police scanning every face at a train station'], ref: 'Article 5(1)(h)', tag: 'Prohibited (narrow exceptions)' },
+        { id: 'manip', shape: 'spiral', title: 'Manipulation & exploitation', desc: 'AI using subliminal or deceptive techniques, or exploiting vulnerabilities linked to age, disability or social situation, to distort behaviour and cause significant harm.', ex: ['A toy nudging children into risky challenges'], ref: 'Article 5(1)(a) and (b)', tag: 'Prohibited' },
+        { id: 'emowork', shape: 'moodface', locked: true, title: 'Emotion recognition at work or school', desc: 'Inferring the emotions of people in workplaces or education institutions is banned, unless it is for medical or safety reasons.', ex: ['Webcam AI rating staff mood during meetings'], ref: 'Article 5(1)(f)', tag: 'Prohibited' },
+        { id: 'scrape', shape: 'net', locked: true, title: 'Untargeted face scraping', desc: 'Building or expanding facial recognition databases through untargeted scraping of images from the internet or CCTV footage is banned.', ex: ['A crawler harvesting selfies for a face search engine'], ref: 'Article 5(1)(e)', tag: 'Prohibited' }
+      ]
+    },
+    {
+      key: 'amber', name: 'High risk', short: 'High risk', hex: 0xff9f43, css: 'var(--amber)',
+      pos: [5, 2, -7.5], sub: 'Article 6 + Annex I / III',
+      lead: 'Allowed, but only after meeting strict requirements before market entry and throughout the system’s life.',
+      rule: 'Conformity with Articles 9–15, then registration.',
+      basis: 'Article 6 with Annex I (regulated products) and Annex III (eight sensitive areas).',
+      stakes: 'Up to €15M or 3% of worldwide annual turnover.',
+      annex: ['Biometrics', 'Critical infrastructure', 'Education', 'Employment', 'Essential services', 'Law enforcement', 'Migration & borders', 'Justice & democracy'],
+      items: [
+        { id: 'hiring', shape: 'robot', title: 'Hiring and HR AI', desc: 'AI that filters applications, ranks candidates, or decides promotions and terminations falls under the employment area of Annex III.', ex: ['CV ranking tool', 'Automated interview scoring'], ref: 'Annex III, point 4', tag: 'High-risk obligations' },
+        { id: 'triage', shape: 'hospital', title: 'Emergency patient triage', desc: 'AI that sets priority in emergency healthcare patient triage falls under the essential-services area of Annex III.', ex: ['Emergency department patient prioritisation'], ref: 'Annex III, point 5(d)', tag: 'High-risk obligations' },
+        { id: 'checklist', shape: 'shield', title: 'The provider checklist', desc: 'Risk management, data governance, technical documentation, logging, instructions for use, human oversight, accuracy, robustness and cybersecurity. Then registration in the EU database.', ex: [], ref: 'Articles 9–15, 16 and 49', tag: 'Comply before market' },
+        { id: 'credit', shape: 'credit', locked: true, title: 'Credit scoring', desc: 'Evaluating the creditworthiness of individuals or setting their credit score is high-risk. AI used only to detect financial fraud is excluded.', ex: ['A bank’s loan approval model'], ref: 'Annex III, point 5(b)', tag: 'High-risk obligations' },
+        { id: 'proctor', shape: 'laptop', locked: true, title: 'Education and exam proctoring', desc: 'AI that steers admissions, grades learning outcomes, or monitors students for prohibited behaviour during tests is high-risk.', ex: ['Remote exam software flagging cheating'], ref: 'Annex III, point 3', tag: 'High-risk obligations' }
+      ]
+    },
+    {
+      key: 'yellow', name: 'Transparency risk', short: 'Transparency', hex: 0xffd93d, css: 'var(--yellow)',
+      pos: [-5, 1, -7.5], sub: 'Article 50',
+      lead: 'Allowed, but people must know. Disclose that they are dealing with AI, or that content is AI-generated.',
+      rule: 'Disclose and label.',
+      basis: 'Article 50 sets the transparency obligations.',
+      stakes: 'Up to €15M or 3% of worldwide annual turnover.',
+      items: [
+        { id: 'chatbot', shape: 'chat', title: 'Chatbots', desc: 'AI that talks with people must be designed so they are told it is AI, unless that is obvious from the context.', ex: ['Customer service bot', 'AI voice agent on a hotline'], ref: 'Article 50(1)', tag: 'Say it’s AI' },
+        { id: 'deepfake', shape: 'mask', title: 'Deepfakes', desc: 'Deployers publishing AI-generated or manipulated image, audio or video resembling real people, places or events must disclose that it is artificial.', ex: ['Synthetic video of a politician', 'Cloned voice in an ad'], ref: 'Article 50(4)', tag: 'Label it' },
+        { id: 'emotion', shape: 'scanface', title: 'Emotion recognition', desc: 'Deployers must inform people exposed to it. Tiers can stack: it is also high-risk under Annex III, and banned at work or school.', ex: ['Store camera reading shopper reactions'], ref: 'Article 50(3); Annex III, point 1(c)', tag: 'Inform people' },
+        { id: 'marking', shape: 'frame', locked: true, title: 'Machine-readable marking', desc: 'Providers of AI that generates synthetic audio, images, video or text must mark outputs in a machine-readable format so they are detectable as AI-generated.', ex: ['Invisible watermark on generated images'], ref: 'Article 50(2)', tag: 'Mark outputs' }
+      ]
+    },
+    {
+      key: 'green', name: 'Minimal risk', short: 'Minimal', hex: 0x2ee6a6, css: 'var(--green)',
+      pos: [-11, 0, 1], sub: 'Voluntary codes, Art. 95',
+      lead: 'Most AI in use today. The Act adds no mandatory obligations for these systems; voluntary codes of conduct are encouraged.',
+      rule: 'Build freely. Other laws such as GDPR still apply.',
+      basis: 'Outside Articles 5, 6 and 50. Article 4 AI literacy duties still apply to every provider and deployer.',
+      stakes: 'No AI Act fines tied to the system itself.',
+      items: [
+        { id: 'spam', shape: 'envelope', title: 'Spam filters', desc: 'Filtering junk email poses minimal risk, so the AI Act sets no specific obligations. GDPR still governs any personal data involved.', ex: ['Inbox spam detection'], ref: 'Outside Articles 5, 6 and 50', tag: 'No mandatory obligations' },
+        { id: 'game', shape: 'gamepad', title: 'Video game AI', desc: 'AI-driven characters and level design in games carry minimal risk.', ex: ['Enemy NPC behaviour', 'Procedural level generation'], ref: 'Outside Articles 5, 6 and 50', tag: 'No mandatory obligations' },
+        { id: 'codes', shape: 'book', title: 'Voluntary codes of conduct', desc: 'Providers and deployers can voluntarily apply high-risk-style requirements, or commit to goals like environmental sustainability, accessibility and AI literacy.', ex: [], ref: 'Article 95', tag: 'Voluntary' },
+        { id: 'stock', shape: 'crates', locked: true, title: 'Inventory forecasting', desc: 'Predicting how much stock a warehouse should order is minimal risk. No mandatory AI Act obligations apply.', ex: ['Retail demand forecasting'], ref: 'Outside Articles 5, 6 and 50', tag: 'No mandatory obligations' }
+      ]
+    }
+  ];
+
+  const HUB = {
+    key: 'hub', name: 'Who’s who', short: 'Who’s who', hex: 0x8b7bff, css: 'var(--violet)',
+    pos: [0, -0.4, 6], sub: 'Providers vs deployers',
+    lead: 'Your obligations depend on your role. Providers carry most of them; deployers carry lighter but real duties.',
+    rule: 'Put your name on, or substantially modify, a high-risk system and you become its provider.',
+    basis: 'Article 3 definitions; Article 25 role shifts.',
+    stakes: 'Prohibited practices: €35M or 7%. Most other breaches: €15M or 3%.',
+    items: [
+      { id: 'provider', shape: 'factory', title: 'Provider', desc: 'Develops an AI system, or has one developed, and places it on the market or puts it into service under its own name or trademark.', ex: ['A vendor selling a CV-screening tool'], ref: 'Article 3(3); duties in Article 16', tag: 'Carries most obligations' },
+      { id: 'deployer', shape: 'office', title: 'Deployer', desc: 'Uses an AI system under its authority in a professional context. High-risk deployers follow instructions, assign human oversight, keep logs and inform affected workers.', ex: ['An employer using that CV tool'], ref: 'Article 3(4); duties in Article 26', tag: 'Use it as instructed' },
+      { id: 'fines', shape: 'coin', title: 'Penalties', desc: 'Prohibited practices: up to €35M or 7% of worldwide annual turnover, whichever is higher. Most other breaches: up to €15M or 3%.', ex: [], ref: 'Article 99(3) and (4)', tag: 'Whichever is higher' }
+    ]
+  };
+
+  const ZONES = [...TIERS, HUB];
+  const ALL_ITEMS = ZONES.flatMap((z, zi) => z.items.map(it => Object.assign(it, { zone: zi })));
+  ALL_ITEMS.forEach(it => { it.wasLocked = !!it.locked; });
+
+  const QUIZ_POOL = [
+    { a: 0, q: 'A city council scores residents on their social behaviour and uses the score to limit access to public housing.', why: 'Social scoring that leads to detrimental treatment is banned under Article 5(1)(c).' },
+    { a: 0, q: 'An employer runs webcam AI that infers how staff feel during meetings.', why: 'Emotion recognition in the workplace is banned under Article 5(1)(f), outside medical or safety reasons.' },
+    { a: 0, q: 'A startup scrapes millions of selfies from social media to build a face search engine.', why: 'Untargeted scraping to build facial recognition databases is banned under Article 5(1)(e).' },
+    { a: 0, q: 'Police predict whether someone will commit a crime based solely on their personality profile.', why: 'Predicting crime risk solely from profiling or personality traits is banned under Article 5(1)(d).' },
+    { a: 1, q: 'A hospital uses AI to decide which emergency patients are seen first.', why: 'Emergency healthcare patient triage is listed in Annex III, point 5(d).' },
+    { a: 1, q: 'A company uses AI to rank CVs and shortlist job candidates.', why: 'Recruitment and candidate selection is listed in Annex III, point 4.' },
+    { a: 1, q: 'A bank uses AI to decide whether individuals qualify for a loan.', why: 'Creditworthiness assessment of individuals is listed in Annex III, point 5(b).' },
+    { a: 1, q: 'A university uses AI to flag students it suspects of cheating in online exams.', why: 'Monitoring students for prohibited behaviour during tests is listed in Annex III, point 3.' },
+    { a: 2, q: 'An online shop adds an AI chatbot to answer customer questions.', why: 'People must be told they are interacting with AI under Article 50(1).' },
+    { a: 2, q: 'An agency publishes an AI-generated video of a real politician giving a speech they never gave.', why: 'Deepfakes must be disclosed as artificially generated under Article 50(4).' },
+    { a: 2, q: 'An image generator produces pictures for millions of users.', why: 'Providers must mark synthetic outputs in a machine-readable way under Article 50(2).' },
+    { a: 3, q: 'Your email provider uses AI to filter spam.', why: 'Spam filtering is minimal risk, with no mandatory AI Act obligations.' },
+    { a: 3, q: 'A video game uses AI to control enemy characters.', why: 'Game AI is minimal risk. Voluntary codes of conduct are optional.' },
+    { a: 3, q: 'A retailer uses AI to forecast how much stock to order next month.', why: 'Inventory forecasting is minimal risk, with no mandatory obligations.' }
+  ];
+  const ROUND = 5;
+
+  // ================================================================
+  // UTIL
+  // ================================================================
+  const $ = s => document.querySelector(s);
+  const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch {} }
+  };
+
+  // ================================================================
+  // STATE
+  // ================================================================
+  const state = { view: 'overview', panelOpen: false, discovered: new Set(), lastUnlockZone: null };
+
+  // ================================================================
+  // 3D SCENE
+  // ================================================================
+  let renderer = null;
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  } catch (e) {
+    $('#fallback').classList.add('on');
+  }
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x0a0d22, 34, 80);
+  const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 200);
+  const cam = { pos: new THREE.Vector3(0, 34, 46), look: new THREE.Vector3(0, 0, -2), tPos: new THREE.Vector3(), tLook: new THREE.Vector3() };
+  const parallax = new THREE.Vector3();
+  const pointerN = new THREE.Vector2(0, 0);
+  const pickTargets = [];
+  const holders = [];   // bobbing item holders
+  const spinners = [];  // meshes with userData.spin
+  const pulses = [];    // expanding rings
+  const packets = [];   // bridge light packets
+  const zoneGroups = [];
+
+  const isMobile = matchMedia('(pointer: coarse)').matches || innerWidth < 700;
+
+  if (renderer) {
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setClearColor(0x000000, 0);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    $('#stage').appendChild(renderer.domElement);
+  }
+
+  function mat(color, ei = 0.1, extra = {}) {
+    return new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: ei, roughness: 0.5, metalness: 0.12, flatShading: true, ...extra });
+  }
+  function neon(color, opacity = 1) {
+    return new THREE.MeshBasicMaterial({ color, transparent: opacity < 1, opacity, toneMapped: false, side: THREE.DoubleSide, depthWrite: opacity >= 1 });
+  }
+  function part(g, geo, m, p = [0, 0, 0], r = [0, 0, 0], s = null) {
+    const mesh = new THREE.Mesh(geo, m);
+    mesh.position.set(...p); mesh.rotation.set(...r);
+    if (s) mesh.scale.set(...s);
+    mesh.castShadow = true;
+    g.add(mesh);
+    return mesh;
+  }
+  function glowTexture() {
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const x = c.getContext('2d');
+    const gr = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = gr; x.fillRect(0, 0, 128, 128);
+    return new THREE.CanvasTexture(c);
+  }
+  function textTexture(l1, l2, color) {
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const x = c.getContext('2d');
+    x.fillStyle = color; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.font = '800 78px system-ui, sans-serif'; x.fillText(l1, 128, 106);
+    x.font = '700 46px system-ui, sans-serif'; x.fillText(l2, 128, 172);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }
+
+  function face(g, color, mood) {
+    part(g, new THREE.SphereGeometry(0.58, 16, 12), mat(color, 0.12), [0, 1.25, 0]);
+    const dark = mat(0x111428, 0);
+    part(g, new THREE.SphereGeometry(0.08, 8, 6), dark, [-0.2, 1.36, 0.52]);
+    part(g, new THREE.SphereGeometry(0.08, 8, 6), dark, [0.2, 1.36, 0.52]);
+    const mouth = new THREE.TorusGeometry(0.2, 0.04, 6, 16, Math.PI);
+    if (mood === 'smile') part(g, mouth, dark, [0, 1.12, 0.52], [0, 0, Math.PI]);
+    else part(g, mouth, dark, [0, 0.98, 0.52]);
+  }
+
+  // Procedural low-poly shapes. Base sits at y = 0, height roughly 1.6–2.4.
+  const SHAPES = {
+    totem(g, c) {
+      part(g, new THREE.CylinderGeometry(0.5, 0.62, 0.5, 6), mat(c, 0.15), [0, 0.25, 0]);
+      part(g, new THREE.CylinderGeometry(0.4, 0.48, 0.6, 6), mat(0x262b52, 0.05), [0, 0.8, 0]);
+      part(g, new THREE.CylinderGeometry(0.33, 0.4, 0.5, 6), mat(c, 0.15), [0, 1.35, 0]);
+      const top = part(g, new THREE.OctahedronGeometry(0.34, 0), mat(0xffd93d, 0.6), [0, 2.0, 0]);
+      top.userData.spin = 1.4; spinners.push(top);
+      part(g, new THREE.TorusGeometry(0.62, 0.035, 8, 40), neon(c, 0.9), [0, 2.0, 0], [Math.PI / 2, 0, 0]);
+      [0, 1, 2].forEach(i => part(g, new THREE.BoxGeometry(0.12, 0.12, 0.05), neon(i < 2 ? 0xffd93d : 0x3a3f66), [-0.17 + i * 0.17, 0.85, 0.47]));
+    },
+    cctv(g, c) {
+      part(g, new THREE.CylinderGeometry(0.07, 0.09, 1.7, 8), mat(0x9aa0c4, 0.05), [0, 0.85, -0.2]);
+      part(g, new THREE.BoxGeometry(0.12, 0.12, 0.6), mat(0x9aa0c4, 0.05), [0, 1.66, 0.05]);
+      part(g, new THREE.BoxGeometry(0.5, 0.42, 0.9), mat(c, 0.15), [0, 1.78, 0.42], [0.3, 0, 0]);
+      part(g, new THREE.CylinderGeometry(0.15, 0.15, 0.12, 16), neon(c), [0, 1.62, 0.9], [Math.PI / 2 + 0.3, 0, 0]);
+      const beam = part(g, new THREE.ConeGeometry(0.9, 1.6, 24, 1, true), neon(c, 0.13), [0, 0.95, 1.35], [-0.75, 0, 0]);
+      beam.castShadow = false;
+    },
+    spiral(g, c) {
+      part(g, new THREE.CylinderGeometry(0.35, 0.5, 0.3, 6), mat(0x262b52, 0.05), [0, 0.15, 0]);
+      const k = part(g, new THREE.TorusKnotGeometry(0.46, 0.12, 100, 10, 2, 3), mat(c, 0.25), [0, 1.3, 0]);
+      k.userData.spin = 0.9; spinners.push(k);
+    },
+    moodface(g, c) {
+      face(g, c, 'frown');
+      [0xff4d5e, 0xffd93d, 0x2ee6a6].forEach((col, i) => part(g, new THREE.BoxGeometry(0.18, 0.3 + i * 0.22, 0.12), neon(col), [0.9, 0.2 + (0.3 + i * 0.22) / 2, -0.25 + i * 0.25]));
+      part(g, new THREE.BoxGeometry(1.0, 0.08, 0.6), mat(0x3b3f66, 0.05), [0, 0.55, 0]);
+    },
+    net(g, c) {
+      part(g, new THREE.SphereGeometry(0.42, 14, 10), mat(0xdfe3f5, 0.08), [0, 1.2, 0]);
+      const n = new THREE.Mesh(new THREE.IcosahedronGeometry(0.95, 1), new THREE.MeshBasicMaterial({ color: c, wireframe: true, toneMapped: false }));
+      n.position.y = 1.2; n.userData.spin = 0.5; spinners.push(n); g.add(n);
+    },
+    robot(g, c) {
+      part(g, new THREE.BoxGeometry(0.9, 0.85, 0.65), mat(c, 0.12), [0, 0.75, 0]);
+      part(g, new THREE.BoxGeometry(0.72, 0.55, 0.58), mat(0xdfe3f5, 0.05), [0, 1.48, 0]);
+      const eye = neon(0x00e5ff);
+      part(g, new THREE.SphereGeometry(0.07, 8, 6), eye, [-0.16, 1.52, 0.3]);
+      part(g, new THREE.SphereGeometry(0.07, 8, 6), eye, [0.16, 1.52, 0.3]);
+      part(g, new THREE.CylinderGeometry(0.03, 0.03, 0.35, 6), mat(0x9aa0c4), [0, 1.9, 0]);
+      part(g, new THREE.SphereGeometry(0.08, 8, 6), neon(c), [0, 2.1, 0]);
+      const cv = new THREE.Group(); cv.position.set(0.78, 1.0, 0.25); cv.rotation.set(0, -0.4, -0.15); g.add(cv);
+      part(cv, new THREE.BoxGeometry(0.5, 0.66, 0.03), mat(0xf4f5fb, 0.15));
+      [0.18, 0.06, -0.06, -0.18].forEach((y, i) => part(cv, new THREE.BoxGeometry(i ? 0.34 : 0.2, 0.04, 0.02), neon(i ? 0x9aa0c4 : c), [i ? 0 : -0.07, y, 0.025]));
+    },
+    hospital(g, c) {
+      part(g, new THREE.BoxGeometry(1.4, 1.2, 1.0), mat(0xe9ecf8, 0.06), [0, 0.6, 0]);
+      part(g, new THREE.BoxGeometry(1.52, 0.12, 1.12), mat(c, 0.2), [0, 1.26, 0]);
+      const cross = neon(c);
+      part(g, new THREE.BoxGeometry(0.14, 0.52, 0.06), cross, [0, 0.72, 0.52]);
+      part(g, new THREE.BoxGeometry(0.52, 0.14, 0.06), cross, [0, 0.72, 0.52]);
+      const sign = part(g, new THREE.OctahedronGeometry(0.22, 0), mat(c, 0.6), [0, 1.65, 0]);
+      sign.userData.spin = 1.2; spinners.push(sign);
+    },
+    shield(g, c) {
+      part(g, new THREE.CylinderGeometry(0.8, 0.8, 0.16, 6), mat(c, 0.18), [0, 1.15, 0], [Math.PI / 2, 0, 0]);
+      [1.42, 1.15, 0.88].forEach(y => {
+        part(g, new THREE.BoxGeometry(0.12, 0.12, 0.04), neon(0x2ee6a6), [-0.36, y, 0.1]);
+        part(g, new THREE.BoxGeometry(0.5, 0.07, 0.03), neon(0xf4f5fb), [0.08, y, 0.1]);
+      });
+      part(g, new THREE.CylinderGeometry(0.06, 0.08, 0.4, 6), mat(0x9aa0c4), [0, 0.2, 0]);
+    },
+    credit(g, c) {
+      for (let i = 0; i < 5; i++) part(g, new THREE.CylinderGeometry(0.36, 0.36, 0.11, 20), mat(0xf5c542, 0.18), [-0.35, 0.06 + i * 0.12, 0.1]);
+      const card = new THREE.Group(); card.position.set(0.35, 0.95, -0.05); card.rotation.set(0, -0.35, 0.12); g.add(card);
+      part(card, new THREE.BoxGeometry(1.0, 0.64, 0.05), mat(c, 0.2));
+      part(card, new THREE.BoxGeometry(1.0, 0.1, 0.06), mat(0x1b1f3d, 0), [0, 0.16, 0]);
+      part(card, new THREE.BoxGeometry(0.18, 0.13, 0.06), neon(0xffd93d), [-0.3, -0.06, 0.01]);
+    },
+    laptop(g, c) {
+      part(g, new THREE.BoxGeometry(1.15, 0.07, 0.78), mat(0x9aa0c4, 0.05), [0, 0.45, 0.1]);
+      const lid = new THREE.Group(); lid.position.set(0, 0.48, -0.28); lid.rotation.x = -0.28; g.add(lid);
+      part(lid, new THREE.BoxGeometry(1.15, 0.74, 0.05), mat(0x1b1f3d, 0), [0, 0.37, 0]);
+      part(lid, new THREE.BoxGeometry(1.0, 0.6, 0.02), neon(c, 0.85), [0, 0.37, 0.03]);
+      part(g, new THREE.SphereGeometry(0.24, 14, 10), mat(0xf4f5fb, 0.1), [0, 1.55, 0]);
+      part(g, new THREE.SphereGeometry(0.11, 10, 8), neon(c), [0, 1.55, 0.18]);
+      part(g, new THREE.BoxGeometry(0.9, 0.42, 0.9), mat(0x2a2f55, 0.04), [0, 0.21, 0.1]);
+    },
+    chat(g, c) {
+      part(g, new THREE.SphereGeometry(0.78, 14, 10), mat(c, 0.18), [0, 1.25, 0], [0, 0, 0], [1.25, 0.85, 0.9]);
+      part(g, new THREE.ConeGeometry(0.28, 0.6, 8), mat(c, 0.18), [-0.55, 0.62, 0], [0, 0, -0.6]);
+      [-0.35, 0, 0.35].forEach((x, i) => {
+        const d = part(g, new THREE.SphereGeometry(0.11, 8, 6), neon(0x1b1f3d), [x, 1.25, 0.68]);
+        d.userData.dot = i;
+      });
+    },
+    mask(g, c) {
+      part(g, new THREE.SphereGeometry(0.62, 14, 12), mat(0xdfe3f5, 0.06), [-0.12, 1.25, 0], [0, 0, 0], [1, 1.15, 0.85]);
+      const ghost = part(g, new THREE.SphereGeometry(0.62, 14, 12), mat(c, 0.5, { transparent: true, opacity: 0.45 }), [0.22, 1.25, -0.05], [0, 0, 0], [1, 1.15, 0.85]);
+      ghost.castShadow = false;
+      part(g, new THREE.BoxGeometry(0.78, 0.26, 0.2), mat(0x1b1f3d, 0), [-0.12, 1.36, 0.5]);
+      part(g, new THREE.BoxGeometry(0.16, 0.08, 0.05), neon(c), [-0.3, 1.36, 0.61]);
+      part(g, new THREE.BoxGeometry(0.16, 0.08, 0.05), neon(c), [0.06, 1.36, 0.61]);
+    },
+    scanface(g, c) {
+      face(g, c, 'smile');
+      const ring = part(g, new THREE.TorusGeometry(0.85, 0.03, 6, 48), neon(0x00e5ff, 0.9), [0, 1.25, 0], [Math.PI / 2, 0, 0]);
+      ring.castShadow = false; ring.userData.scan = true;
+    },
+    frame(g, c) {
+      part(g, new THREE.BoxGeometry(1.3, 0.95, 0.1), mat(c, 0.2), [0, 1.2, 0]);
+      part(g, new THREE.BoxGeometry(1.12, 0.78, 0.04), mat(0x1b2148, 0.05), [0, 1.2, 0.05]);
+      part(g, new THREE.ConeGeometry(0.28, 0.4, 4), mat(0x5b6bd6, 0.2), [-0.2, 1.06, 0.1]);
+      part(g, new THREE.ConeGeometry(0.2, 0.28, 4), mat(0x8b7bff, 0.2), [0.15, 1.0, 0.1]);
+      part(g, new THREE.SphereGeometry(0.08, 8, 6), neon(0xffd93d), [0.3, 1.38, 0.1]);
+      part(g, new THREE.CylinderGeometry(0.15, 0.15, 0.05, 16), neon(0xf4f5fb), [0.48, 0.82, 0.08], [Math.PI / 2, 0, 0]);
+      part(g, new THREE.CylinderGeometry(0.05, 0.07, 0.75, 6), mat(0x9aa0c4), [0, 0.37, 0]);
+    },
+    envelope(g, c) {
+      part(g, new THREE.BoxGeometry(1.2, 0.76, 0.1), mat(0xe9ecf8, 0.06), [0, 1.35, 0]);
+      const flap = neon(c);
+      part(g, new THREE.BoxGeometry(0.74, 0.06, 0.04), flap, [-0.29, 1.53, 0.06], [0, 0, -0.55]);
+      part(g, new THREE.BoxGeometry(0.74, 0.06, 0.04), flap, [0.29, 1.53, 0.06], [0, 0, 0.55]);
+      part(g, new THREE.ConeGeometry(0.55, 0.7, 16, 1, true), mat(c, 0.2, { side: THREE.DoubleSide }), [0, 0.55, 0], [Math.PI, 0, 0]);
+    },
+    gamepad(g, c) {
+      part(g, new THREE.BoxGeometry(1.1, 0.34, 0.6), mat(c, 0.15), [0, 1.1, 0]);
+      part(g, new THREE.CylinderGeometry(0.24, 0.2, 0.62, 10), mat(c, 0.15), [-0.55, 0.98, 0.02], [Math.PI / 2, 0, 0.25]);
+      part(g, new THREE.CylinderGeometry(0.24, 0.2, 0.62, 10), mat(c, 0.15), [0.55, 0.98, 0.02], [Math.PI / 2, 0, -0.25]);
+      [[0.32, 0x8b7bff], [0.46, 0xff4d5e]].forEach(([x, col]) => part(g, new THREE.SphereGeometry(0.07, 8, 6), neon(col), [x, 1.2, 0.3]));
+      part(g, new THREE.BoxGeometry(0.26, 0.07, 0.07), neon(0x1b1f3d), [-0.36, 1.2, 0.3]);
+      part(g, new THREE.BoxGeometry(0.07, 0.26, 0.07), neon(0x1b1f3d), [-0.36, 1.2, 0.3]);
+      part(g, new THREE.CylinderGeometry(0.05, 0.07, 0.6, 6), mat(0x9aa0c4), [0, 0.6, 0]);
+    },
+    book(g, c) {
+      part(g, new THREE.BoxGeometry(0.26, 1.25, 0.95), mat(c, 0.15), [-0.25, 0.63, 0]);
+      part(g, new THREE.BoxGeometry(0.2, 1.15, 0.88), mat(0xf4f5fb, 0.05), [-0.08, 0.63, 0]);
+      part(g, new THREE.BoxGeometry(0.24, 1.05, 0.85), mat(0x8b7bff, 0.15), [0.3, 0.6, 0.05], [0, 0, -0.22]);
+      const badge = part(g, new THREE.TorusGeometry(0.2, 0.05, 8, 24), neon(c), [-0.25, 1.62, 0]);
+      badge.userData.spin = 1.2; spinners.push(badge);
+    },
+    crates(g, c) {
+      const wood = mat(0xc89b6d, 0.05);
+      part(g, new THREE.BoxGeometry(0.6, 0.6, 0.6), wood, [-0.33, 0.3, 0]);
+      part(g, new THREE.BoxGeometry(0.6, 0.6, 0.6), wood, [0.33, 0.3, 0.05]);
+      part(g, new THREE.BoxGeometry(0.6, 0.6, 0.6), wood, [0, 0.9, 0.02], [0, 0.3, 0]);
+      part(g, new THREE.BoxGeometry(0.1, 0.5, 0.1), neon(c), [0, 1.55, 0]);
+      part(g, new THREE.ConeGeometry(0.2, 0.32, 4), neon(c), [0, 1.95, 0]);
+    },
+    factory(g, c) {
+      part(g, new THREE.BoxGeometry(1.4, 0.8, 1.0), mat(0xdfe3f5, 0.05), [0, 0.4, 0]);
+      part(g, new THREE.BoxGeometry(1.5, 0.1, 1.1), mat(c, 0.25), [0, 0.85, 0]);
+      part(g, new THREE.CylinderGeometry(0.13, 0.17, 1.0, 8), mat(0x9aa0c4), [0.45, 1.3, -0.2]);
+      const gear = part(g, new THREE.TorusGeometry(0.3, 0.11, 6, 10), mat(c, 0.35), [-0.3, 1.3, 0.2]);
+      gear.userData.spin = 1.6; gear.userData.axis = 'z'; spinners.push(gear);
+      [-0.4, 0, 0.4].forEach(x => part(g, new THREE.BoxGeometry(0.22, 0.22, 0.04), neon(c, 0.85), [x, 0.42, 0.51]));
+    },
+    office(g, c) {
+      part(g, new THREE.BoxGeometry(0.95, 1.6, 0.9), mat(0x2f3566, 0.05), [-0.25, 0.8, 0]);
+      for (let r = 0; r < 4; r++) for (let k = 0; k < 2; k++) part(g, new THREE.BoxGeometry(0.22, 0.18, 0.03), neon(c, 0.85), [-0.45 + k * 0.4, 0.35 + r * 0.34, 0.46]);
+      part(g, new THREE.CapsuleGeometry(0.17, 0.42, 4, 8), mat(0xf4f5fb, 0.08), [0.62, 0.42, 0.35]);
+      part(g, new THREE.SphereGeometry(0.16, 10, 8), mat(0xf4f5fb, 0.08), [0.62, 0.98, 0.35]);
+    },
+    coin(g, c) {
+      const coin = new THREE.Group(); coin.position.y = 1.25; g.add(coin);
+      coin.userData.spin = 0.8; spinners.push(coin);
+      part(coin, new THREE.CylinderGeometry(0.85, 0.85, 0.16, 40), mat(0xf5c542, 0.22, { metalness: 0.5, roughness: 0.35 }), [0, 0, 0], [Math.PI / 2, 0, 0]);
+      part(coin, new THREE.TorusGeometry(0.85, 0.05, 8, 40), mat(0xffe08a, 0.3), [0, 0, 0]);
+      const tex = textTexture('€35M', 'or 7%', '#4a3000');
+      const face = new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false });
+      const front = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.4), face); front.position.z = 0.085; coin.add(front);
+      const back = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.4), face); back.position.z = -0.085; back.rotation.y = Math.PI; coin.add(back);
+      part(g, new THREE.CylinderGeometry(0.06, 0.08, 0.45, 6), mat(0x9aa0c4), [0, 0.22, 0]);
+    },
+    locked(g, c) {
+      const shell = new THREE.Mesh(new THREE.IcosahedronGeometry(0.6, 0), new THREE.MeshBasicMaterial({ color: c, wireframe: true, transparent: true, opacity: 0.55, toneMapped: false }));
+      shell.position.y = 1.2; shell.userData.spin = 0.7; spinners.push(shell); g.add(shell);
+      part(g, new THREE.OctahedronGeometry(0.2, 0), mat(0x3a3f66, 0.3), [0, 1.2, 0]);
+    }
+  };
+
+  const SLOTS = [[-2.7, 0.9], [2.7, 0.9], [0, 2.7], [-1.5, -2.4], [1.5, -2.4]];
+  const HUB_SLOTS = [[-2.2, 0.4], [2.2, 0.4], [0, -1.6]];
+
+  function buildIsland(zone, zi) {
+    const g = new THREE.Group();
+    g.position.set(...zone.pos);
+    g.userData.zone = zi;
+    scene.add(g);
+    zoneGroups[zi] = g;
+    const isHub = zone === HUB;
+    const R = isHub ? 4.0 : 4.7;
+    const seg = isHub ? 12 : 6;
+
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(R, R * 0.98, 0.6, seg), mat(0x161a38, 0.04, { roughness: 0.85 }));
+    top.position.y = -0.3; top.receiveShadow = true; top.userData.zone = zi; g.add(top);
+    const rock = new THREE.Mesh(new THREE.ConeGeometry(R * 0.95, isHub ? 2.2 : 3.4, seg), mat(0x0e1128, 0.02, { roughness: 1 }));
+    rock.rotation.x = Math.PI; rock.position.y = -0.6 - (isHub ? 1.1 : 1.7); rock.userData.zone = zi; g.add(rock);
+    const rim = new THREE.Mesh(new THREE.RingGeometry(R - 0.22, R, seg, 1, Math.PI / 2), neon(zone.hex));
+    rim.rotation.x = -Math.PI / 2; rim.position.y = 0.012; g.add(rim);
+    const inner = new THREE.Mesh(new THREE.RingGeometry(R * 0.55, R * 0.55 + 0.05, seg, 1, Math.PI / 2), neon(zone.hex, 0.35));
+    inner.rotation.x = -Math.PI / 2; inner.position.y = 0.012; g.add(inner);
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(rock.geometry), new THREE.LineBasicMaterial({ color: zone.hex, transparent: true, opacity: 0.18 }));
+    edges.rotation.copy(rock.rotation); edges.position.copy(rock.position); g.add(edges);
+
+    const light = new THREE.PointLight(zone.hex, 9, 11, 2);
+    light.position.set(0, 3, 0); g.add(light);
+
+    // Centre crystal and light beam act as the zone's beacon.
+    const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(isHub ? 0.42 : 0.5, 0), mat(zone.hex, 0.8));
+    crystal.position.y = 2.6; crystal.userData.zone = zi; crystal.userData.spin = 0.9; crystal.userData.float = 2.6;
+    crystal.castShadow = true; spinners.push(crystal); g.add(crystal);
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 7, 8, 1, true), neon(zone.hex, 0.22));
+    beam.position.y = 5.8; g.add(beam);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: GLOW, color: zone.hex, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }));
+    halo.position.y = 2.6; halo.scale.set(3, 3, 1); g.add(halo);
+    pickTargets.push(top, crystal);
+
+    const slots = isHub ? HUB_SLOTS : SLOTS;
+    zone.items.forEach((item, k) => {
+      const [x, z] = slots[k];
+      const slot = new THREE.Group(); slot.position.set(x, 0, z); g.add(slot);
+      const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.05, 0.14, 6), mat(0x1f2448, 0.05));
+      pad.position.y = 0.07; pad.receiveShadow = true; slot.add(pad);
+      const padRing = new THREE.Mesh(new THREE.RingGeometry(0.86, 1.0, 6, 1, Math.PI / 2), neon(zone.hex, 0.75));
+      padRing.rotation.x = -Math.PI / 2; padRing.position.y = 0.145; slot.add(padRing);
+      const holder = new THREE.Group(); holder.position.y = 0.15;
+      holder.rotation.y = Math.atan2(-x, 6 - z) * 0.6; // turn objects roughly toward the camera
+      slot.add(holder);
+      item._slot = slot; item._holder = holder; item._padRing = padRing;
+      holder.userData = { item, phase: Math.random() * Math.PI * 2, grow: 1, hover: 0 };
+      fillHolder(item);
+      holders.push(holder);
+    });
+  }
+
+  function fillHolder(item) {
+    const h = item._holder;
+    while (h.children.length) h.remove(h.children[0]);
+    for (let i = spinners.length - 1; i >= 0; i--) {
+      let o = spinners[i]; while (o && o !== h) o = o.parent;
+      if (o === h) spinners.splice(i, 1);
+    }
+    const shape = new THREE.Group();
+    SHAPES[item.locked ? 'locked' : item.shape](shape, ZONES[item.zone].hex);
+    shape.traverse(o => { if (o.isMesh) pickTargets.push(o); });
+    shape.userData.item = item;
+    h.add(shape);
+  }
+
+  function buildBridges() {
+    TIERS.forEach((t, i) => {
+      const a = new THREE.Vector3(HUB.pos[0], HUB.pos[1] + 0.02, HUB.pos[2]);
+      const b = new THREE.Vector3(t.pos[0], t.pos[1] + 0.02, t.pos[2]);
+      const dir = b.clone().sub(a); const len = dir.length();
+      const mid = a.clone().add(b).multiplyScalar(0.5);
+      const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.05, len), neon(t.hex, 0.35));
+      bridge.position.copy(mid); bridge.lookAt(b); scene.add(bridge);
+      const p = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), neon(t.hex));
+      scene.add(p);
+      packets.push({ mesh: p, a, b, off: i * 0.25 });
+    });
+  }
+
+  function buildParticles() {
+    const n = isMobile ? 700 : 1400;
+    const pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+    const palette = [0x8b7bff, 0x00e5ff, 0xff4d5e, 0xff9f43, 0xffd93d, 0x2ee6a6].map(h => new THREE.Color(h));
+    for (let i = 0; i < n; i++) {
+      const r = 22 + Math.random() * 40, th = Math.random() * Math.PI * 2, ph = Math.acos(Math.random() * 1.6 - 0.6);
+      pos.set([r * Math.sin(ph) * Math.cos(th), r * Math.cos(ph) * 0.7, r * Math.sin(ph) * Math.sin(th)], i * 3);
+      const cc = Math.random() < 0.6 ? palette[0] : palette[(Math.random() * palette.length) | 0];
+      col.set([cc.r, cc.g, cc.b], i * 3);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.16, vertexColors: true, transparent: true, opacity: 0.75, depthWrite: false, map: GLOW, blending: THREE.AdditiveBlending }));
+    scene.add(pts);
+    return pts;
+  }
+
+  let GLOW, particles;
+  function buildWorld() {
+    GLOW = glowTexture();
+    scene.add(new THREE.HemisphereLight(0x9aa6ff, 0x0b0d1f, 1.1));
+    const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+    sun.position.set(8, 22, 14);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(isMobile ? 1024 : 2048, isMobile ? 1024 : 2048);
+    Object.assign(sun.shadow.camera, { left: -18, right: 18, top: 16, bottom: -16, near: 1, far: 60 });
+    sun.shadow.bias = -0.0008;
+    scene.add(sun);
+
+    const grid = new THREE.GridHelper(160, 80, 0x2b2f66, 0x1a1d40);
+    grid.position.y = -7; grid.material.transparent = true; grid.material.opacity = 0.35;
+    scene.add(grid);
+
+    ZONES.forEach(buildIsland);
+    buildBridges();
+    particles = buildParticles();
+  }
+
+  // ================================================================
+  // CAMERA
+  // ================================================================
+  function computeTarget() {
+    const v = state.view;
+    const aspect = innerWidth / innerHeight;
+    const portrait = aspect < 0.9;
+    const wide = innerWidth > 680;
+    if (v === 'overview') {
+      const d = Math.max(1, 1.55 / aspect);
+      scene.fog.near = 34 * d; scene.fog.far = 80 * d;
+      cam.tLook.set(0, 0.5, -1.5);
+      cam.tPos.set(0, 15 * d, 24 * d);
+      if (portrait) cam.tLook.y -= 1;
+      return;
+    }
+    const p = ZONES[v].pos;
+    const s = Math.max(1, 1.4 / aspect);
+    scene.fog.near = 34; scene.fog.far = 80 * s;
+    cam.tLook.set(p[0], p[1] + 0.9, p[2]);
+    cam.tPos.set(p[0], p[1] + 9 * s, p[2] + 14 * s);
+    if (state.panelOpen) {
+      // Shift the framing by half the panel's footprint so the island sits in the uncovered area.
+      const dist = 16.6 * s;
+      const visH = 2 * dist * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+      const r = panel.getBoundingClientRect();
+      if (wide) {
+        const dx = (r.width + 16) / 2 / innerWidth * visH * aspect;
+        cam.tLook.x += dx; cam.tPos.x += dx;
+      } else {
+        const dy = (innerHeight - r.top) / 2 / innerHeight * visH;
+        cam.tLook.y -= dy * 1.15;
+      }
+    }
+  }
+
+  // ================================================================
+  // UI: HUD, labels, panel
+  // ================================================================
+  const hud = $('#hud');
+  const hudDefs = [
+    { view: 'overview', label: 'Overview', c: 'var(--violet)' },
+    ...TIERS.map((t, i) => ({ view: i, label: t.short, c: t.css })),
+    { view: 4, label: HUB.short, c: HUB.css }
+  ];
+  hudDefs.forEach((d, i) => {
+    if (i === 1 || i === 5) hud.insertAdjacentHTML('beforeend', '<span class="sep" aria-hidden="true"></span>');
+    const b = document.createElement('button');
+    b.style.setProperty('--c', d.c);
+    b.dataset.view = d.view;
+    b.innerHTML = `<span class="dot"></span>${esc(d.label)}`;
+    b.addEventListener('click', () => goTo(d.view, true));
+    hud.appendChild(b);
+  });
+
+  const labelsEl = $('#labels');
+  const labels = ZONES.map((z, i) => {
+    const el = document.createElement('button');
+    el.className = 'zlabel';
+    el.style.setProperty('--c', z.css);
+    el.innerHTML = `${esc(z.short)}<small>${esc(z.sub)}</small>`;
+    el.addEventListener('click', () => goTo(i, true));
+    labelsEl.appendChild(el);
+    return { el, anchor: new THREE.Vector3(z.pos[0], z.pos[1] + 4.3, z.pos[2]) };
+  });
+
+  const panel = $('#panel'), panelBody = $('#panelBody');
+
+  function goTo(view, showPanel) {
+    state.view = view;
+    hud.querySelectorAll('button').forEach(b => b.classList.toggle('active', String(b.dataset.view) === String(view)));
+    const btn = hud.querySelector(`button[data-view="${view}"]`);
+    if (btn) btn.scrollIntoView({ block: 'nearest', inline: 'center', behavior: RM ? 'auto' : 'smooth' });
+    if (view === 'overview') closePanel();
+    else if (showPanel) renderZonePanel(view);
+    computeTarget();
+  }
+
+  function openPanel(html, cssColor) {
+    panel.style.setProperty('--c', cssColor);
+    panelBody.innerHTML = html;
+    panel.scrollTop = 0;
+    state.panelOpen = true;
+    panel.classList.add('open');
+    computeTarget();
+  }
+  function closePanel() {
+    state.panelOpen = false;
+    panel.classList.remove('open');
+    computeTarget();
+  }
+  $('#panelClose').addEventListener('click', closePanel);
+
+  function renderZonePanel(zi) {
+    const z = ZONES[zi];
+    const tierLabel = zi < 4 ? `Tier ${zi + 1} of 4` : 'Roles & penalties';
+    const chips = z.items.map(it => it.locked
+      ? `<button class="chip locked" data-item="${it.id}"><span class="ic">?</span>Locked. Win a quiz round to reveal</button>`
+      : `<button class="chip${it.fresh ? ' fresh' : ''}" data-item="${it.id}"><span class="ic">${shapeGlyph(it)}</span>${esc(it.title)}${state.discovered.has(it.id) ? '<span class="seen">Seen</span>' : ''}</button>`
+    ).join('');
+    const annex = z.annex ? `<h3>Annex III: eight areas</h3><div class="stack">${z.annex.map(a => `<span>${esc(a)}</span>`).join('')}</div>` : '';
+    const prev = (zi + ZONES.length - 1) % ZONES.length, next = (zi + 1) % ZONES.length;
+    openPanel(`
+      <span class="pill">${tierLabel} &middot; ${esc(z.short)}</span>
+      <h2>${esc(z.name)}</h2>
+      <p class="lead">${esc(z.lead)}</p>
+      <dl class="kv">
+        <dt>The rule</dt><dd>${esc(z.rule)}</dd>
+        <dt>Legal basis</dt><dd>${esc(z.basis)}</dd>
+        <dt>At stake</dt><dd>${esc(z.stakes)}</dd>
+      </dl>
+      ${annex}
+      <h3>On this island</h3>
+      <div class="chips">${chips}</div>
+      <div class="panel-nav">
+        <button class="ghost" data-go="${prev}">&larr; ${esc(ZONES[prev].short)}</button>
+        <button class="ghost" data-go="${next}">${esc(ZONES[next].short)} &rarr;</button>
+      </div>`, z.css);
+  }
+
+  function shapeGlyph(it) { return esc(it.title.trim()[0]); }
+
+  function renderItemPanel(item) {
+    const z = ZONES[item.zone];
+    if (item.locked) {
+      openPanel(`
+        <span class="pill">${esc(z.short)}</span>
+        <h2>Locked object</h2>
+        <p class="lead">Something else lives on this island. Classify a scenario correctly in Quiz mode to reveal it.</p>
+        <div class="panel-nav"><button class="ghost" data-go="${item.zone}">&larr; Back to island</button><button class="primary" data-quiz>Open quiz</button></div>`, z.css);
+      return;
+    }
+    if (!state.discovered.has(item.id)) { state.discovered.add(item.id); updateDiscovery(); }
+    if (item.fresh) { item.fresh = false; }
+    const ex = item.ex.length ? `<h3>${item.ex.length > 1 ? 'Examples' : 'Example'}</h3><ul class="ex">${item.ex.map(e => `<li>${esc(e)}</li>`).join('')}</ul>` : '';
+    openPanel(`
+      <span class="pill">${esc(z.name)}</span>
+      <h2>${esc(item.title)}</h2>
+      <p class="lead">${esc(item.desc)}</p>
+      ${ex}
+      <div class="oblig"><b>${item.zone === 0 ? 'Ban' : item.zone === 4 ? 'Role' : 'Duty'}</b>${esc(item.tag)}</div>
+      <div class="ref"><b>Source</b>${esc(item.ref)}</div>
+      <div class="panel-nav"><button class="ghost" data-go="${item.zone}">&larr; ${esc(z.short)} island</button></div>`, z.css);
+  }
+
+  panelBody.addEventListener('click', e => {
+    const chip = e.target.closest('[data-item]');
+    if (chip) { const it = ALL_ITEMS.find(i => i.id === chip.dataset.item); if (it) renderItemPanel(it); return; }
+    const go = e.target.closest('[data-go]');
+    if (go) { goTo(Number(go.dataset.go), true); return; }
+    if (e.target.closest('[data-quiz]')) openQuiz();
+  });
+
+  function updateDiscovery() {
+    const total = ALL_ITEMS.length;
+    const n = state.discovered.size;
+    $('#discText').textContent = `${n} of ${total} discovered`;
+    $('#discBar').style.width = `${(n / total) * 100}%`;
+    if (n === total) toast('Every object discovered. You know the map.', null);
+  }
+
+  // ================================================================
+  // POINTER PICKING
+  // ================================================================
+  const ray = new THREE.Raycaster();
+  const tooltip = $('#tooltip');
+  let hovered = null, downAt = null;
+
+  function pick(e) {
+    const r = renderer.domElement.getBoundingClientRect();
+    const v = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(v, camera);
+    const hit = ray.intersectObjects(pickTargets, false)[0];
+    if (!hit) return null;
+    let o = hit.object;
+    while (o) {
+      if (o.userData.item) return { item: o.userData.item };
+      if (o.userData.zone !== undefined) return { zone: o.userData.zone };
+      o = o.parent;
+    }
+    return null;
+  }
+
+  function setHover(holder, on) {
+    if (!holder) return;
+    holder.userData.hover = on ? 1 : 0;
+    holder.traverse(o => {
+      if (o.isMesh && o.material.emissive) {
+        const m = o.material;
+        if (m.userData.base === undefined) m.userData.base = m.emissiveIntensity;
+        m.emissiveIntensity = on ? m.userData.base + 0.7 : m.userData.base;
+      }
+    });
+  }
+
+  if (renderer) {
+    const canvas = renderer.domElement;
+    canvas.addEventListener('pointermove', e => {
+      pointerN.set((e.clientX / innerWidth) * 2 - 1, (e.clientY / innerHeight) * 2 - 1);
+      if (e.pointerType !== 'mouse') return;
+      const p = pick(e);
+      const holder = p && p.item ? p.item._holder : null;
+      if (holder !== hovered) { setHover(hovered, false); setHover(holder, true); hovered = holder; }
+      if (p) {
+        canvas.style.cursor = 'pointer';
+        const label = p.item ? (p.item.locked ? 'Locked object' : p.item.title) : ZONES[p.zone].name;
+        const sub = p.item ? (p.item.locked ? 'Win a quiz round to reveal' : 'Click to learn') : 'Click to fly here';
+        tooltip.innerHTML = `${esc(label)} <small>&middot; ${sub}</small>`;
+        tooltip.style.left = e.clientX + 'px'; tooltip.style.top = e.clientY + 'px';
+        tooltip.classList.add('on');
+      } else {
+        canvas.style.cursor = 'default';
+        tooltip.classList.remove('on');
+      }
+    });
+    canvas.addEventListener('pointerleave', () => { setHover(hovered, false); hovered = null; tooltip.classList.remove('on'); });
+    addEventListener('pointerdown', e => { downAt = e.target === canvas ? [e.clientX, e.clientY] : null; }, true);
+    canvas.addEventListener('pointerup', e => {
+      if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 8) return;
+      downAt = null;
+      const p = pick(e);
+      if (!p) return;
+      if (p.item) {
+        if (state.view !== p.item.zone) goTo(p.item.zone, false);
+        renderItemPanel(p.item);
+      } else {
+        goTo(p.zone, true);
+      }
+    });
+  }
+
+  // ================================================================
+  // UNLOCKS
+  // ================================================================
+  function unlockIn(zi) {
+    const item = ZONES[zi].items.find(i => i.locked) || ALL_ITEMS.find(i => i.locked);
+    if (!item) return null;
+    item.locked = false;
+    item.fresh = true;
+    if (renderer) {
+      fillHolder(item);
+      item._holder.userData.grow = 0;
+      spawnPulse(item.zone);
+    }
+    state.lastUnlockZone = item.zone;
+    return item;
+  }
+
+  function spawnPulse(zi) {
+    if (!renderer) return;
+    const z = ZONES[zi];
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.6, 0.85, 48), neon(z.hex, 0.9));
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(z.pos[0], z.pos[1] + 0.2, z.pos[2]);
+    scene.add(ring);
+    pulses.push({ mesh: ring, t: 0 });
+  }
+
+  // ================================================================
+  // QUIZ
+  // ================================================================
+  const quizEl = $('#quiz'), quizCard = $('#quizCard');
+  const quiz = { qs: [], i: 0, score: 0, answered: false, results: [], unlocked: [] };
+  let lastFocus = null;
+
+  function pickRound() {
+    const byTier = [0, 1, 2, 3].map(t => shuffle(QUIZ_POOL.filter(q => q.a === t)));
+    const picks = byTier.map(list => list[0]);
+    const rest = shuffle(QUIZ_POOL.filter(q => !picks.includes(q)));
+    return shuffle([...picks, ...rest.slice(0, ROUND - picks.length)]);
+  }
+
+  function openQuiz() {
+    lastFocus = document.activeElement;
+    closeIntro();
+    Object.assign(quiz, { qs: pickRound(), i: 0, score: 0, answered: false, results: [], unlocked: [] });
+    quizEl.classList.add('open');
+    renderQuestion();
+  }
+  function closeQuiz() {
+    quizEl.classList.remove('open');
+    if (quiz.unlocked.length) {
+      const zi = state.lastUnlockZone;
+      toast(`${quiz.unlocked.length} new object${quiz.unlocked.length > 1 ? 's' : ''} unlocked on the islands`, () => goTo(zi, true));
+    }
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+
+  function dotsHTML() {
+    return quiz.qs.map((_, k) => `<i class="${k < quiz.results.length ? (quiz.results[k] ? 'ok' : 'no') : k === quiz.i ? 'now' : ''}"></i>`).join('');
+  }
+
+  function renderQuestion() {
+    const q = quiz.qs[quiz.i];
+    quiz.answered = false;
+    quizCard.classList.remove('good', 'bad');
+    quizCard.innerHTML = `
+      <div class="quiz-top"><div class="dots" aria-hidden="true">${dotsHTML()}</div><div class="score">Score <b>${quiz.score}</b> / ${ROUND}</div></div>
+      <p class="eyebrow">Scenario ${quiz.i + 1} of ${ROUND} &middot; Which tier?</p>
+      <p class="scenario" id="quizScenario">${esc(q.q)}</p>
+      <div class="choices">${TIERS.map((t, k) => `
+        <button class="choice" data-k="${k}" style="--c:${t.css}"><span class="k">${k + 1}</span><span>${esc(t.short)}<small>${esc(['Banned', 'Strict requirements', 'Disclose AI use', 'No mandatory duties'][k])}</small></span></button>`).join('')}
+      </div>
+      <div class="feedback" id="quizFeedback" aria-live="assertive"></div>
+      <div class="quiz-foot"><button class="ghost" data-close>Exit quiz</button><button class="primary" id="quizNext" hidden>${quiz.i + 1 < ROUND ? 'Next scenario' : 'See results'}</button></div>`;
+    quizCard.querySelector('.choice').focus();
+  }
+
+  function answer(k) {
+    if (quiz.answered) return;
+    quiz.answered = true;
+    const q = quiz.qs[quiz.i];
+    const ok = k === q.a;
+    quiz.results.push(ok);
+    const btns = quizCard.querySelectorAll('.choice');
+    btns.forEach(b => { b.disabled = true; });
+    btns[q.a].classList.add('right');
+    if (!ok) btns[k].classList.add('wrong');
+    const fb = $('#quizFeedback');
+    void quizCard.offsetWidth; // restart the CSS animation
+    if (ok) {
+      quiz.score++;
+      quizCard.classList.add('good');
+      const u = unlockIn(q.a);
+      if (u) quiz.unlocked.push(u);
+      fb.innerHTML = `<strong class="ok">Correct.</strong> ${esc(q.why)}${u ? `<span class="unlock">Unlocked: ${esc(u.title)} on the ${esc(ZONES[u.zone].short)} island</span>` : ''}`;
+    } else {
+      quizCard.classList.add('bad');
+      fb.innerHTML = `<strong class="no">Not quite, it’s ${esc(TIERS[q.a].short)}.</strong> ${esc(q.why)}`;
+    }
+    quizCard.querySelector('.dots').innerHTML = dotsHTML();
+    quizCard.querySelector('.score').innerHTML = `Score <b>${quiz.score}</b> / ${ROUND}`;
+    const next = $('#quizNext'); next.hidden = false; next.focus();
+  }
+
+  function renderResults() {
+    const best = Math.max(quiz.score, Number(store.get('aiact-best') || 0));
+    store.set('aiact-best', String(best));
+    $('#bestScore').textContent = `Best ${best}/${ROUND}`;
+    const msg = quiz.score === ROUND ? 'Perfect round. You can classify AI like a regulator.'
+      : quiz.score >= 3 ? 'Solid. Review the misses below, then go again.'
+      : 'Good start. Tour the islands, then try another round.';
+    quizCard.classList.remove('good', 'bad');
+    quizCard.innerHTML = `
+      <div class="quiz-top"><div class="dots" aria-hidden="true">${dotsHTML()}</div><div class="score">Best <b>${best}</b> / ${ROUND}</div></div>
+      <div class="result-big">${quiz.score} / ${ROUND}</div>
+      <p class="sub">${msg}${quiz.unlocked.length ? ` You unlocked ${quiz.unlocked.length} new object${quiz.unlocked.length > 1 ? 's' : ''}.` : ''}</p>
+      <div class="recap">${quiz.qs.map((q, k) => `<div><i style="color:${quiz.results[k] ? 'var(--good)' : 'var(--bad)'}">${quiz.results[k] ? '✓' : '✗'}</i><span><b style="color:${TIERS[q.a].css}">${esc(TIERS[q.a].short)}:</b> ${esc(q.q)}</span></div>`).join('')}</div>
+      <div class="actions"><button class="primary" data-again>Play again</button><button class="secondary" data-close>Back to the islands</button></div>`;
+    quizCard.querySelector('[data-again]').focus();
+  }
+
+  quizCard.addEventListener('click', e => {
+    const c = e.target.closest('.choice');
+    if (c) return answer(Number(c.dataset.k));
+    if (e.target.id === 'quizNext') {
+      quiz.i++;
+      return quiz.i < ROUND ? renderQuestion() : renderResults();
+    }
+    if (e.target.closest('[data-again]')) return openQuiz();
+    if (e.target.closest('[data-close]')) return closeQuiz();
+  });
+  quizEl.addEventListener('click', e => { if (e.target === quizEl) closeQuiz(); });
+  $('#quizBtn').addEventListener('click', openQuiz);
+  const best0 = store.get('aiact-best');
+  if (best0) $('#bestScore').textContent = `Best ${best0}/${ROUND}`;
+
+  // ================================================================
+  // INTRO + TOAST
+  // ================================================================
+  const intro = $('#intro');
+  $('#pyramid').innerHTML = TIERS.map((t, i) => `
+    <div class="tier-row" style="--c:${t.css}; --w:${62 + i * 12.6}%; animation-delay:${0.15 + i * 0.12}s">
+      <b>${esc(t.short)}</b><span>${esc(['Banned outright', 'Strict requirements', 'Tell people it’s AI', 'No mandatory duties'][i])}</span><em>${esc(t.sub)}</em>
+    </div>`).join('');
+  function closeIntro() { intro.classList.remove('open'); store.set('aiact-intro', '1'); }
+  $('#startBtn').addEventListener('click', () => { closeIntro(); goTo('overview'); toast('Pick an island below, or click one in the scene', null); });
+  $('#startQuizBtn').addEventListener('click', openQuiz);
+  $('#helpBtn').addEventListener('click', () => { intro.classList.add('open'); $('#startBtn').focus(); });
+  intro.addEventListener('click', e => { if (e.target === intro) closeIntro(); });
+
+  let toastTimer = null, toastAction = null;
+  function toast(text, action) {
+    $('#toastText').textContent = text;
+    toastAction = action;
+    $('#toastBtn').hidden = !action;
+    $('#toast').classList.add('on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => $('#toast').classList.remove('on'), action ? 7000 : 3600);
+  }
+  $('#toastBtn').addEventListener('click', () => { $('#toast').classList.remove('on'); if (toastAction) toastAction(); });
+
+  // ================================================================
+  // KEYBOARD
+  // ================================================================
+  const order = ['overview', 0, 1, 2, 3, 4];
+  addEventListener('keydown', e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (quizEl.classList.contains('open')) {
+      if (e.key === 'Escape') return closeQuiz();
+      if (!quiz.answered && /^[1-4]$/.test(e.key)) return answer(Number(e.key) - 1);
+      return;
+    }
+    if (intro.classList.contains('open')) { if (e.key === 'Escape') closeIntro(); return; }
+    if (e.key === 'Escape') return closePanel();
+    if (e.key === 'q' || e.key === 'Q') return openQuiz();
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      const i = order.indexOf(state.view);
+      const n = (i + (e.key === 'ArrowRight' ? 1 : -1) + order.length) % order.length;
+      goTo(order[n], true);
+    }
+  });
+
+  // ================================================================
+  // LOOP
+  // ================================================================
+  const clock = new THREE.Clock();
+  const tmp = new THREE.Vector3();
+  let t = 0;
+  const easeOutBack = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+
+  function tick() {
+    const dt = Math.min(clock.getDelta(), 0.05);
+    t += dt;
+    const k = RM ? 1 : 1 - Math.exp(-dt * 2.4);
+    cam.pos.lerp(cam.tPos, k);
+    cam.look.lerp(cam.tLook, k);
+    if (!RM) parallax.lerp(tmp.set(pointerN.x * 0.8, -pointerN.y * 0.4, 0), 1 - Math.exp(-dt * 3));
+    camera.position.copy(cam.pos).add(parallax);
+    camera.lookAt(cam.look);
+
+    const amp = RM ? 0 : 0.12;
+    for (const h of holders) {
+      const u = h.userData;
+      h.position.y = 0.15 + Math.sin(t * 1.3 + u.phase) * amp;
+      if (u.grow < 1) u.grow = Math.min(1, u.grow + dt * (RM ? 10 : 1.1));
+      const target = (u.grow < 1 ? easeOutBack(u.grow) : 1) * (u.hover ? 1.1 : 1);
+      const s = u.grow < 1 ? target : THREE.MathUtils.lerp(h.scale.x, target, 1 - Math.exp(-dt * 10));
+      h.scale.setScalar(Math.max(0.001, s));
+      const ring = u.item._padRing;
+      ring.material.opacity = u.item.fresh ? 0.45 + 0.45 * Math.sin(t * 6) : u.item.locked ? 0.35 : 0.75;
+      h.traverse(o => {
+        if (o.userData.dot !== undefined && !RM) o.position.y = 1.25 + Math.max(0, Math.sin(t * 5 - o.userData.dot * 0.8)) * 0.1;
+        if (o.userData.scan) o.position.y = 1.25 + (RM ? 0 : Math.sin(t * 2) * 0.5);
+      });
+    }
+    if (!RM) for (const s of spinners) {
+      if (s.userData.axis === 'z') s.rotation.z += dt * s.userData.spin;
+      else s.rotation.y += dt * s.userData.spin;
+      if (s.userData.float) s.position.y = s.userData.float + Math.sin(t * 1.6) * 0.15;
+    }
+    for (const p of packets) {
+      const f = RM ? 0.5 : (t * 0.22 + p.off) % 1;
+      p.mesh.position.lerpVectors(p.a, p.b, f).y += 0.12 + Math.sin(f * Math.PI) * 0.4;
+    }
+    for (let i = pulses.length - 1; i >= 0; i--) {
+      const p = pulses[i];
+      p.t += dt;
+      const s = 1 + p.t * 7;
+      p.mesh.scale.set(s, s, s);
+      p.mesh.material.opacity = Math.max(0, 0.9 - p.t * 0.75);
+      if (p.t > 1.2) { scene.remove(p.mesh); p.mesh.geometry.dispose(); p.mesh.material.dispose(); pulses.splice(i, 1); }
+    }
+    if (particles && !RM) particles.rotation.y += dt * 0.012;
+
+    renderer.render(scene, camera);
+    placeLabels();
+    requestAnimationFrame(tick);
+  }
+
+  const proj = new THREE.Vector3();
+  function placeLabels() {
+    const narrowFocus = state.view !== 'overview' && innerWidth <= 680;
+    labels.forEach((l, i) => {
+      proj.copy(l.anchor).project(camera);
+      const off = proj.z > 1 || Math.abs(proj.x) > 1.1 || Math.abs(proj.y) > 1.1;
+      const hide = off || (narrowFocus && i !== state.view);
+      l.el.classList.toggle('hidden', hide);
+      if (!off) l.el.style.transform = `translate(${(proj.x * 0.5 + 0.5) * innerWidth}px, ${(-proj.y * 0.5 + 0.5) * innerHeight}px) translate(-50%, -100%)`;
+    });
+  }
+
+  addEventListener('resize', () => {
+    if (!renderer) return;
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+    computeTarget();
+  });
+
+  // ================================================================
+  // BOOT
+  // ================================================================
+  if (renderer) buildWorld();
+  updateDiscovery();
+  goTo('overview');
+  if (renderer) {
+    camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+    tick();
+  } else {
+    labelsEl.hidden = true;
+  }
+  if (!store.get('aiact-intro')) intro.classList.add('open');
+
+  // Exposed for automated content checks only.
+  window.__aiact = { TIERS, HUB, QUIZ_POOL, ALL_ITEMS, state, unlockIn, goTo };
+  </script>
+</body>
+</html>
