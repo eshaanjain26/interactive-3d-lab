@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SkyOps Airport Simulator</title>
+<meta name="description" content="A 3D international airport operations simulator: curb, check-in, security, passport control, duty free, gates, baggage hall, apron and runway, with live passengers, bags, aircraft, KPIs, SOPs, quizzes and crisis scenarios.">
+<style>
+  :root {
+    --bg: #dfe7ef;
+    --panel: rgba(250, 252, 254, 0.92);
+    --panel-solid: #f7f9fb;
+    --border: rgba(20, 32, 48, 0.10);
+    --ink: #132033;
+    --muted: #5a6879;
+    --faint: #8794a3;
+    --line: rgba(20, 32, 48, 0.09);
+    --accent: #1f5fbf;
+    --accent-ink: #ffffff;
+    --accent-soft: rgba(31, 95, 191, 0.12);
+    --gold: #b27a12;
+    --ok: #0f8a5f;
+    --warn: #c77700;
+    --bad: #c8343f;
+    --chip: rgba(20, 32, 48, 0.055);
+    --shadow: 0 10px 30px rgba(20, 40, 70, 0.16);
+    --font: 13px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0b121c; --panel: rgba(16, 24, 35, 0.9); --panel-solid: #121b27; --border: rgba(255,255,255,0.08); --ink: #e6edf5; --muted: #9eadbf; --faint: #6f7f92;
+      --line: rgba(255,255,255,0.08); --accent: #5aa2ff; --accent-ink: #08111d; --accent-soft: rgba(90,162,255,0.16); --gold: #f2c25a; --ok: #3ccf8e; --warn: #f2a93b; --bad: #ff6b74;
+      --chip: rgba(255,255,255,0.06); --shadow: 0 10px 30px rgba(0,0,0,0.45);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b121c; --panel: rgba(16, 24, 35, 0.9); --panel-solid: #121b27; --border: rgba(255,255,255,0.08); --ink: #e6edf5; --muted: #9eadbf; --faint: #6f7f92;
+    --line: rgba(255,255,255,0.08); --accent: #5aa2ff; --accent-ink: #08111d; --accent-soft: rgba(90,162,255,0.16); --gold: #f2c25a; --ok: #3ccf8e; --warn: #f2a93b; --bad: #ff6b74;
+    --chip: rgba(255,255,255,0.06); --shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
+  /* colour-blind safe status colours (Okabe-Ito) */
+  :root[data-cb="on"] { --ok: #0072b2; --warn: #e69f00; --bad: #cc79a7; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink);
+    font: 500 var(--font)/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+  #scene { position: fixed; inset: 0; }
+  #scene canvas { display: block; touch-action: none; outline: none; }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .glass { background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow); border-radius: 12px;
+    backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3); }
+  .eyebrow { font-size: 10.5px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px; border-radius: 8px; border: 1px solid var(--border); background: var(--chip); font-weight: 650; white-space: nowrap; }
+  .btn:hover { background: var(--accent-soft); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .btn[aria-pressed="true"], .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .seg { display: inline-flex; background: var(--chip); border-radius: 9px; padding: 3px; gap: 2px; border: 1px solid var(--border); }
+  .seg button { border: 0; background: transparent; height: 28px; padding: 0 10px; border-radius: 7px; font-weight: 650; white-space: nowrap; }
+  .seg button:hover { background: var(--accent-soft); }
+
+  /* top bar */
+  #top { position: fixed; top: 10px; left: 10px; right: 10px; display: flex; align-items: center; gap: 10px; padding: 7px 10px; z-index: 6; min-height: 52px; }
+  .brand { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .brand .logo { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, #1f5fbf, #0f8a9f); display: grid; place-items: center; color: #fff; flex: none; }
+  .brand .logo svg { width: 18px; height: 18px; fill: #fff; }
+  .brand b { font-size: 14.5px; font-weight: 800; letter-spacing: -.01em; display: block; white-space: nowrap; }
+  .brand small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+  .clock { font-variant-numeric: tabular-nums; font-weight: 800; font-size: 16px; padding: 4px 10px; border-radius: 8px; background: var(--chip); display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .clock span.d { font-size: 11px; font-weight: 700; color: var(--muted); }
+  .kpis { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; }
+  .kpis::-webkit-scrollbar { display: none; }
+  .kpi { display: flex; flex-direction: column; padding: 3px 10px; border-radius: 8px; background: var(--chip); min-width: 84px; border: 1px solid transparent; text-align: left; }
+  .kpi:hover { border-color: var(--border); }
+  .kpi small { font-size: 10px; font-weight: 700; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+  .kpi b { font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .kpi b.ok { color: var(--ok); } .kpi b.warn { color: var(--warn); } .kpi b.bad { color: var(--bad); }
+  .searchbox { position: relative; width: 210px; flex: none; }
+  .searchbox input { width: 100%; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: var(--chip); padding: 0 10px 0 30px; }
+  .searchbox svg { position: absolute; left: 9px; top: 9px; width: 14px; height: 14px; stroke: var(--muted); fill: none; stroke-width: 2; }
+  #results { position: absolute; top: 38px; left: 0; right: 0; max-height: 360px; overflow: auto; display: none; padding: 4px; z-index: 20; }
+  #results.on { display: block; }
+  #results button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 7px 9px; border-radius: 7px; }
+  #results button:hover, #results button.sel { background: var(--accent-soft); }
+  #results small { display: block; color: var(--muted); font-size: 11px; }
+
+  /* left panel */
+  #left { position: fixed; top: var(--hudTop, 72px); left: 10px; width: 262px; bottom: 132px; display: none; flex-direction: column; z-index: 5; overflow: hidden; }
+  #left.on { display: flex; }
+  #left .tabs { display: flex; gap: 2px; padding: 8px 8px 0; }
+  #left .tabs button { flex: 1; border: 0; background: none; padding: 7px 4px; border-radius: 7px 7px 0 0; font-weight: 700; color: var(--muted); border-bottom: 2px solid transparent; }
+  #left .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+  #left .body { flex: 1; overflow-y: auto; padding: 8px 10px 12px; }
+  .zone { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 0; background: none; padding: 6px 8px; border-radius: 8px; }
+  .zone:hover { background: var(--accent-soft); }
+  .zone .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .zone .k { margin-left: auto; font-size: 10.5px; color: var(--faint); font-weight: 700; }
+  .zone.locked { color: var(--faint); }
+  .group-h { margin: 10px 0 4px; }
+  .row { display: flex; align-items: center; gap: 8px; padding: 5px 2px; }
+  .row label { flex: 1; }
+  .toggle { appearance: none; width: 34px; height: 20px; border-radius: 10px; background: var(--line); position: relative; cursor: pointer; flex: none; border: 1px solid var(--border); }
+  .toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+  .toggle:checked { background: var(--accent); }
+  .toggle:checked::after { left: 16px; }
+  .lever { padding: 7px 0; border-bottom: 1px solid var(--line); }
+  .lever .top { display: flex; align-items: center; gap: 6px; }
+  .lever .top span { flex: 1; font-weight: 650; }
+  .lever .stepper { display: inline-flex; align-items: center; gap: 4px; }
+  .lever .stepper button { width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--border); background: var(--chip); font-weight: 800; }
+  .lever .stepper b { min-width: 34px; text-align: center; font-variant-numeric: tabular-nums; }
+  .lever small { color: var(--muted); font-size: 11px; }
+  .bar { height: 5px; border-radius: 3px; background: var(--line); margin-top: 5px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--ok); }
+
+  /* right info panel */
+  #info { position: fixed; top: var(--hudTop, 72px); right: 10px; width: 360px; bottom: 132px; display: none; flex-direction: column; z-index: 7; overflow: hidden; }
+  #info.on { display: flex; }
+  #info header { padding: 12px 14px 8px; border-bottom: 1px solid var(--line); }
+  #info header h2 { margin: 2px 0 4px; font-size: 17px; letter-spacing: -.01em; }
+  #info header .acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  #info .close { position: absolute; right: 10px; top: 10px; width: 30px; height: 30px; border-radius: 8px; border: 0; background: var(--chip); font-size: 16px; }
+  #info .tabs { display: flex; gap: 2px; padding: 0 10px; border-bottom: 1px solid var(--line); }
+  #info .tabs button { border: 0; background: none; padding: 8px 8px; font-weight: 700; color: var(--muted); border-bottom: 2px solid transparent; }
+  #info .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+  #info .content { flex: 1; overflow-y: auto; padding: 12px 14px 16px; }
+  #info p { margin: 0 0 10px; }
+  #info ol { margin: 0; padding-left: 20px; }
+  #info ol li { margin-bottom: 6px; }
+  .reg { padding: 8px 10px; border-radius: 8px; background: var(--chip); margin-bottom: 7px; }
+  .reg b { display: block; font-size: 11.5px; color: var(--accent); }
+  .data { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; }
+  .data div:nth-child(odd) { color: var(--muted); }
+  .data div:nth-child(even) { font-weight: 700; text-align: right; }
+  .rolechip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 99px; background: var(--chip); border: 1px solid var(--border); margin: 0 6px 6px 0; }
+  .timeline { list-style: none; padding: 0; margin: 0; }
+  .timeline li { display: grid; grid-template-columns: 44px 1fr; gap: 8px; padding: 4px 0; border-bottom: 1px dashed var(--line); }
+  .timeline li span { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 700; }
+  .live { padding: 9px 10px; border-radius: 9px; background: var(--accent-soft); margin-bottom: 10px; }
+  .live b { color: var(--accent); }
+
+  /* bottom bar */
+  #bottom { position: fixed; left: 10px; right: 10px; bottom: 10px; display: flex; align-items: center; gap: 10px; padding: 7px 10px; z-index: 6; overflow-x: auto; scrollbar-width: none; }
+  #bottom::-webkit-scrollbar { display: none; }
+  #bottom .grp { display: flex; align-items: center; gap: 6px; flex: none; }
+  #bottom select { height: 32px; border-radius: 8px; border: 1px solid var(--border); background: var(--chip); padding: 0 8px; font-weight: 650; }
+  .fps { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 11.5px; white-space: nowrap; }
+
+  /* minimap + log */
+  #mini { position: fixed; right: 10px; bottom: 64px; width: 236px; height: 172px; padding: 6px; z-index: 5; }
+  #mini canvas { width: 100%; height: 100%; display: block; border-radius: 8px; cursor: crosshair; }
+  #log { position: fixed; left: 282px; bottom: 64px; width: 360px; max-height: 128px; overflow: hidden; padding: 7px 10px; z-index: 4; font-size: 12px; }
+  #log ul { list-style: none; margin: 0; padding: 0; }
+  #log li { display: flex; gap: 8px; padding: 1px 0; }
+  #log li span { color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+  #log li.warn b { color: var(--warn); } #log li.go b { color: var(--ok); } #log li b { font-weight: 600; }
+
+  /* labels */
+  #labels { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+  .lbl { position: absolute; transform: translate(-50%, -100%); pointer-events: auto; padding: 3px 8px; border-radius: 99px; font-size: 11.5px; font-weight: 750; white-space: nowrap;
+    background: rgba(12, 22, 36, 0.78); color: #fff; border: 1px solid rgba(255,255,255,0.18); cursor: pointer; }
+  .lbl.locked { opacity: .65; }
+  .lbl:hover { background: var(--accent); color: var(--accent-ink); }
+
+  /* modals */
+  .modal { position: fixed; inset: 0; display: none; place-items: center; z-index: 30; background: rgba(5, 10, 18, 0.45); padding: 16px; }
+  .modal.on { display: grid; }
+  .modal .card { width: min(860px, 100%); max-height: min(86vh, 900px); display: flex; flex-direction: column; overflow: hidden; background: var(--panel-solid); }
+  .modal header { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .modal header h2 { margin: 0; font-size: 17px; flex: 1; }
+  .modal .content { overflow: auto; padding: 14px; }
+  table.fl { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  table.fl th { text-align: left; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 6px; border-bottom: 1px solid var(--line); }
+  table.fl td { padding: 7px 6px; border-bottom: 1px solid var(--line); }
+  table.fl tr.click { cursor: pointer; }
+  table.fl tr.click:hover td { background: var(--accent-soft); }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11.5px; font-weight: 750; background: var(--chip); }
+  .pill.ok { color: var(--ok); } .pill.warn { color: var(--warn); } .pill.bad { color: var(--bad); }
+  .quiz-q { font-size: 16px; font-weight: 700; margin: 4px 0 12px; }
+  .quiz-o { display: block; width: 100%; text-align: left; padding: 10px 12px; margin-bottom: 7px; border-radius: 9px; border: 1px solid var(--border); background: var(--chip); }
+  .quiz-o.right { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 15%, transparent); }
+  .quiz-o.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 15%, transparent); }
+  .gl { display: grid; grid-template-columns: 150px 1fr; gap: 6px 14px; }
+  .gl dt { font-weight: 800; }
+  .gl dd { margin: 0; color: var(--muted); }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .card2 { padding: 10px 12px; border-radius: 10px; background: var(--chip); border: 1px solid var(--border); }
+  .spark { width: 100%; height: 48px; display: block; }
+
+  /* explainer + cctv + follow */
+  #explainer { position: fixed; left: 50%; bottom: 74px; transform: translateX(-50%); width: min(620px, calc(100% - 24px)); padding: 12px 14px; z-index: 12; display: none; }
+  #explainer.on { display: block; }
+  #explainer .steps { display: flex; gap: 4px; margin: 8px 0; }
+  #explainer .steps i { flex: 1; height: 4px; border-radius: 2px; background: var(--line); }
+  #explainer .steps i.on { background: var(--accent); }
+  #explainer p { margin: 0; font-size: 14px; font-weight: 600; }
+  #explainer .acts { display: flex; gap: 6px; margin-top: 10px; justify-content: flex-end; }
+  #cctv { position: fixed; inset: 0; pointer-events: none; z-index: 2; display: none; }
+  #cctv.on { display: block; background: repeating-linear-gradient(0deg, rgba(0,0,0,0.12) 0 1px, transparent 1px 3px); }
+  #cctv .tag { position: absolute; top: calc(var(--hudTop, 72px) + 44px); left: 50%; transform: translateX(-50%); font: 700 13px ui-monospace, monospace; color: #fff; background: rgba(0,0,0,.55); padding: 4px 10px; border-radius: 6px; }
+  #cctv .rec { color: #ff4d4d; }
+  #chip { position: fixed; top: var(--hudTop, 72px); left: 50%; transform: translateX(-50%); padding: 6px 8px 6px 12px; z-index: 8; display: none; align-items: center; gap: 8px; font-weight: 650; }
+  #chip.on { display: flex; }
+  #crisis { position: fixed; top: calc(var(--hudTop, 72px) + 8px); left: 50%; transform: translateX(-50%); width: min(560px, calc(100% - 24px)); padding: 14px; z-index: 14; display: none; border: 2px solid var(--bad); }
+  #crisis.on { display: block; }
+  #crisis h3 { margin: 2px 0 6px; font-size: 16px; }
+  #crisis .opts button { display: block; width: 100%; text-align: left; margin-top: 7px; padding: 9px 11px; border-radius: 9px; border: 1px solid var(--border); background: var(--chip); }
+  #crisis .opts button:hover { background: var(--accent-soft); }
+  #crisis .timer { height: 4px; background: var(--line); border-radius: 2px; margin: 8px 0; overflow: hidden; }
+  #crisis .timer i { display: block; height: 100%; background: var(--bad); }
+  #tour { position: fixed; z-index: 25; width: min(340px, calc(100% - 24px)); padding: 14px; display: none; }
+  #tour.on { display: block; }
+  #tour h3 { margin: 2px 0 6px; font-size: 15px; }
+  #tour p { margin: 0 0 10px; }
+  #joy { position: fixed; left: 22px; bottom: 80px; width: 110px; height: 110px; border-radius: 50%; z-index: 9; display: none; touch-action: none; }
+  #joy.on { display: block; }
+  #joy i { position: absolute; left: 35px; top: 35px; width: 40px; height: 40px; border-radius: 50%; background: var(--accent); opacity: .85; }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; z-index: 50; background: var(--bg); }
+  #loading .in { text-align: center; }
+  #loading .bar { width: 240px; height: 6px; margin: 14px auto 0; }
+  #loading .bar i { width: 0; transition: width .2s; background: var(--accent); }
+  #err { position: fixed; inset: 0; display: none; place-items: center; z-index: 60; background: var(--bg); padding: 20px; text-align: center; }
+
+  .menu-btn { display: none; }
+  @media (max-width: 1499px) { #top { flex-wrap: wrap; } .kpis { order: 5; flex-basis: 100%; } }
+  @media (max-width: 1180px) { .searchbox { width: 160px; } #log { display: none; } }
+  @media (max-width: 900px) {
+    #top { flex-wrap: wrap; top: 8px; left: 8px; right: 8px; gap: 8px; }
+    .brand small, .searchbox { display: none; }
+    .kpis { order: 5; flex-basis: 100%; }
+    #left, #info { top: auto; bottom: 64px; left: 8px; right: 8px; width: auto; max-height: 52vh; }
+    #mini { display: none; }
+    .menu-btn { display: inline-flex; }
+    #bottom { left: 8px; right: 8px; bottom: 8px; }
+    .modal { padding: 8px; }
+    .gl { grid-template-columns: 1fr; }
+    #explainer { bottom: 66px; }
+  }
+  @media (max-width: 560px) {
+    .brand > div:last-child { display: none; }
+    #top { gap: 6px; padding: 6px 8px; }
+    .btn { height: 30px; padding: 0 8px; }
+    .seg button { padding: 0 7px; height: 26px; }
+    .clock { font-size: 14px; padding: 3px 8px; }
+    .clock span.d { display: none; }
+    .kpi { min-width: 74px; padding: 2px 8px; }
+    .kpi b { font-size: 13.5px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="scene" aria-label="3D view of SKY International airport. Click objects and people to learn about them."></div>
+<div id="labels" aria-hidden="true"></div>
+<div id="cctv"><div class="tag"><span class="rec">● REC</span> <span id="cctvName"></span> <span id="cctvTime"></span></div></div>
+
+<header id="top" class="glass">
+  <div class="brand">
+    <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></div>
+    <div><b>SkyOps</b><small>SKY International</small></div>
+  </div>
+  <button class="btn menu-btn" id="menuBtn" aria-label="Zones and layers">☰</button>
+  <div class="clock" aria-live="off"><span id="dayIcon" aria-hidden="true">☀</span><span id="clock">06:00</span><span class="d" id="wxLabel">Clear</span></div>
+  <div class="kpis" id="kpis" role="group" aria-label="Key performance indicators"></div>
+  <div class="searchbox">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="search" type="search" placeholder="Search: security, K9, runway 27…" aria-label="Search the airport" autocomplete="off">
+    <div id="results" class="glass" role="listbox"></div>
+  </div>
+  <div class="seg" role="group" aria-label="Mode">
+    <button data-mode="sandbox" aria-pressed="true">Sandbox</button>
+    <button data-mode="ops" aria-pressed="false">Operations</button>
+    <button data-mode="crisis" aria-pressed="false">Crisis</button>
+  </div>
+  <button class="btn" id="flightsBtn" aria-label="Flight board">Flights</button>
+  <button class="btn" id="learnBtn" aria-label="Learn: quiz, glossary, dashboard">Learn</button>
+  <button class="btn" id="settingsBtn" aria-label="Settings and accessibility">⚙</button>
+  <button class="btn" id="helpBtn" aria-label="Help and keyboard shortcuts">?</button>
+</header>
+
+<aside id="left" class="glass" aria-label="Zones, layers and staffing">
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="zones">Zones</button>
+    <button role="tab" aria-selected="false" data-tab="layers">Layers</button>
+    <button role="tab" aria-selected="false" data-tab="staff">Staffing</button>
+  </div>
+  <div class="body" id="leftBody"></div>
+</aside>
+
+<aside id="info" class="glass" aria-label="Details" aria-live="polite">
+  <button class="close" id="infoClose" aria-label="Close details">✕</button>
+  <header>
+    <div class="eyebrow" id="infoKind"></div>
+    <h2 id="infoTitle"></h2>
+    <div id="infoSummary"></div>
+    <div class="acts" id="infoActs"></div>
+  </header>
+  <div class="tabs" role="tablist" id="infoTabs"></div>
+  <div class="content" id="infoBody"></div>
+</aside>
+
+<div id="log" class="glass" aria-label="Operations log"><ul id="logList" aria-live="polite"></ul></div>
+<div id="mini" class="glass"><canvas id="miniCanvas" width="472" height="344" aria-label="Minimap: click to fly there"></canvas></div>
+
+<nav id="bottom" class="glass" aria-label="Camera and simulation controls">
+  <div class="grp seg" role="group" aria-label="Camera mode" id="camSeg">
+    <button data-cam="strategy" aria-pressed="true" title="Strategy camera (1)">Strategy</button>
+    <button data-cam="top" aria-pressed="false" title="Top-down (2)">Top</button>
+    <button data-cam="walk" aria-pressed="false" title="Walk on foot (3)">Walk</button>
+    <button data-cam="cctv" aria-pressed="false" title="Security cameras (4)">CCTV</button>
+    <button data-cam="drone" aria-pressed="false" title="Drone orbit (5)">Drone</button>
+  </div>
+  <div class="grp seg" role="group" aria-label="Simulation speed" id="speedSeg">
+    <button data-speed="0" aria-pressed="false" aria-label="Pause">❚❚</button>
+    <button data-speed="1" aria-pressed="true">1×</button>
+    <button data-speed="2" aria-pressed="false">2×</button>
+    <button data-speed="4" aria-pressed="false">4×</button>
+    <button data-speed="8" aria-pressed="false">8×</button>
+  </div>
+  <div class="grp">
+    <label class="sr" for="lightSel">Lighting</label>
+    <select id="lightSel" aria-label="Lighting">
+      <option value="clock">Light: follow clock</option>
+      <option value="6.3">Dawn</option>
+      <option value="12.5">Noon</option>
+      <option value="18.7">Dusk</option>
+      <option value="23">Night</option>
+    </select>
+    <label class="sr" for="wxSel">Weather</label>
+    <select id="wxSel" aria-label="Weather">
+      <option value="clear">Clear</option><option value="rain">Rain</option><option value="fog">Fog</option><option value="snow">Snow</option><option value="storm">Thunderstorm</option>
+    </select>
+  </div>
+  <div class="grp">
+    <button class="btn" id="followPaxBtn" title="Follow a random passenger (F)">Follow a passenger</button>
+    <button class="btn" id="tourBtn" title="Guided first flight">Guided tour</button>
+  </div>
+  <div class="fps" id="fps">60 fps</div>
+</nav>
+
+<div id="chip" class="glass"><span id="chipText"></span><button class="btn" id="chipStop">Stop</button></div>
+<div id="explainer" class="glass" role="dialog" aria-label="Animated explainer">
+  <div class="eyebrow" id="exTitle"></div>
+  <div class="steps" id="exSteps"></div>
+  <p id="exText"></p>
+  <div class="acts"><button class="btn" id="exPrev">Back</button><button class="btn" id="exPause">Pause</button><button class="btn primary" id="exNext">Next</button><button class="btn" id="exClose">Close</button></div>
+</div>
+<div id="crisis" class="glass" role="alertdialog" aria-labelledby="crTitle">
+  <div class="eyebrow" style="color:var(--bad)">Crisis</div>
+  <h3 id="crTitle"></h3>
+  <div id="crText"></div>
+  <div class="timer"><i id="crTimer"></i></div>
+  <div class="opts" id="crOpts"></div>
+</div>
+<div id="tour" class="glass" role="dialog" aria-labelledby="tourTitle">
+  <div class="eyebrow" id="tourStep"></div>
+  <h3 id="tourTitle"></h3>
+  <p id="tourText"></p>
+  <div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn" id="tourSkip">Skip</button><button class="btn primary" id="tourNext">Next</button></div>
+</div>
+<div id="joy" class="glass" aria-hidden="true"><i></i></div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="card glass">
+    <header><h2 id="modalTitle"></h2><div id="modalTabs" class="seg"></div><button class="btn" id="modalClose" aria-label="Close">✕</button></header>
+    <div class="content" id="modalBody"></div>
+  </div>
+</div>
+
+<div id="loading"><div class="in"><div class="eyebrow">SkyOps</div><h2 style="margin:6px 0 0">Opening SKY International</h2><div class="bar"><i id="loadBar"></i></div><p id="loadText" style="color:var(--muted)">Building the terminal…</p></div></div>
+<div id="err"><div><h2>3D view could not start</h2><p>SkyOps needs WebGL and the Three.js library from the CDN. Check your connection or try another browser.</p></div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+/*@MODULES@*/
+</script>
+</body>
+</html>
